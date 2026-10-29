@@ -1,0 +1,24 @@
+the coding AI must follow these step by step tasks
+
+TASK 01: apps/common/constants.py + exceptions.py + pagination.py
+TASK 02: apps/common/security.py + tests
+TASK 03: apps/common/permissions.py + tests
+TASK 04: apps/accounts/models.py constraints + tests
+TASK 05: apps/events/models.py constraints + tests
+TASK 06: apps/ops/models.py constraints + tests
+TASK 07: apps/audit/models.py constraints + tests
+TASK 08: apps/accounts/services.py OTP + tests
+TASK 09: apps/accounts/services.py verification + coordinator approval + tests
+TASK 10: apps/accounts/views.py + urls.py + serializers.py + tests
+TASK 11: apps/events/services.py lifecycle + tests
+TASK 12: apps/events/services.py applications + tests
+TASK 13: apps/events/views.py + urls.py + serializers.py + tests
+TASK 14: apps/ops/services.py QR + tests
+TASK 15: apps/ops/services.py assignment engine + tests
+TASK 16: apps/ops/services.py attendance/onboarding/feedback + tests
+TASK 17: apps/ops/views.py + urls.py + serializers.py + tests
+TASK 18: apps/audit/services.py moderation + dashboard + tests
+TASK 19: apps/audit/views.py + urls.py + tests
+TASK 20: Django admin workflow
+TASK 21: seed_demo_data command
+TASK 22: end-to-end feasibility test

@@ -1,0 +1,443 @@
+================================================================================
+C:\Users\USER\Documents\INTERN\Project\Volunteer HR Management\python stack\apps\common\tests\__init__.py
+----------------------------------------
+
+
+================================================================================
+C:\Users\USER\Documents\INTERN\Project\Volunteer HR Management\python stack\apps\common\tests\test_foundation.py
+----------------------------------------
+# apps/common/tests/test_foundation.py
+from django.test import SimpleTestCase
+from rest_framework import status
+from rest_framework.exceptions import APIException
+
+from apps.common import constants
+from apps.common.exceptions import (
+    AccountBlockedError,
+    AccountClosedError,
+    ApplicationNotAllowedError,
+    CapacityFullError,
+    DomainError,
+    InvalidOtpError,
+    InvalidStateError,
+    NotFoundError,
+    OnboardingRequiredError,
+    PermissionDeniedError,
+    QrTokenInvalidError,
+    TooManyAttemptsError,
+    VerificationRequiredError,
+    domain_exception_handler,
+)
+from apps.common.pagination import StandardPagination
+
+
+class FoundationTests(SimpleTestCase):
+    def test_constants_tuples_membership(self):
+        # Application active statuses
+        self.assertIn(constants.APPLICATION_PENDING, constants.ACTIVE_APPLICATION_STATUSES)
+        self.assertIn(constants.APPLICATION_ACCEPTED, constants.ACTIVE_APPLICATION_STATUSES)
+        self.assertIn(constants.APPLICATION_WAITLISTED, constants.ACTIVE_APPLICATION_STATUSES)
+        self.assertNotIn(constants.APPLICATION_REJECTED, constants.ACTIVE_APPLICATION_STATUSES)
+        self.assertNotIn(constants.APPLICATION_WITHDRAWN, constants.ACTIVE_APPLICATION_STATUSES)
+        self.assertNotIn(constants.APPLICATION_EXPIRED, constants.ACTIVE_APPLICATION_STATUSES)
+
+        # Assignment active statuses
+        self.assertIn(constants.ASSIGNMENT_ASSIGNED, constants.ACTIVE_ASSIGNMENT_STATUSES)
+        self.assertIn(constants.ASSIGNMENT_CONFIRMED, constants.ACTIVE_ASSIGNMENT_STATUSES)
+        self.assertIn(constants.ASSIGNMENT_COMPLETED, constants.ACTIVE_ASSIGNMENT_STATUSES)
+        self.assertNotIn(constants.ASSIGNMENT_CANCELLED, constants.ACTIVE_ASSIGNMENT_STATUSES)
+
+        # Visible event statuses
+        self.assertIn(constants.EVENT_PUBLISHED, constants.EVENT_VISIBLE_STATUSES)
+        self.assertIn(constants.EVENT_ACTIVE, constants.EVENT_VISIBLE_STATUSES)
+        self.assertNotIn(constants.EVENT_DRAFT, constants.EVENT_VISIBLE_STATUSES)
+        self.assertNotIn(constants.EVENT_COMPLETED, constants.EVENT_VISIBLE_STATUSES)
+        self.assertNotIn(constants.EVENT_CANCELLED, constants.EVENT_VISIBLE_STATUSES)
+
+        # Numerical constants
+        self.assertEqual(constants.OTP_MAX_ATTEMPTS, 5)
+        self.assertEqual(constants.OTP_TTL_SECONDS, 300)
+        self.assertEqual(constants.QR_DEFAULT_TTL_MINUTES, 240)
+
+    def test_domain_exception_handler_formats_payload_correctly(self):
+        # 1. Default CapacityFullError
+        exc = CapacityFullError()
+        response = domain_exception_handler(exc, context={})
+        self.assertIsNotNone(response)
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(
+            response.data,
+            {
+                "error": {
+                    "code": "capacity_full",
+                    "message": "No remaining capacity.",
+                }
+            },
+        )
+
+        # 2. PermissionDeniedError (403)
+        p_exc = PermissionDeniedError()
+        p_res = domain_exception_handler(p_exc, context={})
+        self.assertEqual(p_res.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(p_res.data["error"]["code"], "permission_denied")
+
+        # 3. AccountBlockedError (403)
+        b_exc = AccountBlockedError()
+        b_res = domain_exception_handler(b_exc, context={})
+        self.assertEqual(b_res.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(b_res.data["error"]["code"], "account_blocked")
+
+        # 4. AccountClosedError (403)
+        c_exc = AccountClosedError()
+        c_res = domain_exception_handler(c_exc, context={})
+        self.assertEqual(c_res.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(c_res.data["error"]["code"], "account_closed")
+
+        # 5. InvalidStateError (409)
+        s_exc = InvalidStateError()
+        s_res = domain_exception_handler(s_exc, context={})
+        self.assertEqual(s_res.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(s_res.data["error"]["code"], "invalid_state")
+
+        # 6. OnboardingRequiredError (409)
+        o_exc = OnboardingRequiredError()
+        o_res = domain_exception_handler(o_exc, context={})
+        self.assertEqual(o_res.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(o_res.data["error"]["code"], "onboarding_required")
+
+        # 7. VerificationRequiredError (409)
+        v_exc = VerificationRequiredError()
+        v_res = domain_exception_handler(v_exc, context={})
+        self.assertEqual(v_res.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(v_res.data["error"]["code"], "verification_required")
+
+        # 8. ApplicationNotAllowedError (400)
+        a_exc = ApplicationNotAllowedError()
+        a_res = domain_exception_handler(a_exc, context={})
+        self.assertEqual(a_res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(a_res.data["error"]["code"], "application_not_allowed")
+
+        # 9. QrTokenInvalidError (400)
+        q_exc = QrTokenInvalidError()
+        q_res = domain_exception_handler(q_exc, context={})
+        self.assertEqual(q_res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(q_res.data["error"]["code"], "qr_token_invalid")
+
+        # 10. NotFoundError (404)
+        n_exc = NotFoundError()
+        n_res = domain_exception_handler(n_exc, context={})
+        self.assertEqual(n_res.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(n_res.data["error"]["code"], "not_found")
+
+        # 11. InvalidOtpError (400)
+        otp_exc = InvalidOtpError()
+        otp_res = domain_exception_handler(otp_exc, context={})
+        self.assertEqual(otp_res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(otp_res.data["error"]["code"], "invalid_otp")
+
+        # 12. TooManyAttemptsError (429)
+        tm_exc = TooManyAttemptsError()
+        tm_res = domain_exception_handler(tm_exc, context={})
+        self.assertEqual(tm_res.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+        self.assertEqual(tm_res.data["error"]["code"], "too_many_attempts")
+
+        # 13. Custom override message and code
+        custom_exc = DomainError(message="Custom error detail.", code="custom_error_code")
+        custom_res = domain_exception_handler(custom_exc, context={})
+        self.assertEqual(custom_res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            custom_res.data,
+            {
+                "error": {
+                    "code": "custom_error_code",
+                    "message": "Custom error detail.",
+                }
+            },
+        )
+
+        # 14. Non-domain exception returns standard DRF handling
+        drf_exc = APIException("Generic API error")
+        drf_res = domain_exception_handler(drf_exc, context={})
+        self.assertIsNotNone(drf_res)
+        self.assertEqual(drf_res.status_code, status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def test_pagination_defaults(self):
+        paginator = StandardPagination()
+        self.assertEqual(paginator.page_size, 20)
+        self.assertEqual(paginator.page_size_query_param, "page_size")
+        self.assertEqual(paginator.max_page_size, 100)
+
+
+================================================================================
+C:\Users\USER\Documents\INTERN\Project\Volunteer HR Management\python stack\apps\common\tests\test_permissions.py
+----------------------------------------
+# apps/common/tests/test_permissions.py
+from datetime import timedelta
+from types import SimpleNamespace
+from django.test import SimpleTestCase
+from django.utils import timezone
+
+from apps.common.constants import (
+    ACCOUNT_ACTIVE,
+    ACCOUNT_BLOCKED,
+    ACCOUNT_CLOSED,
+    COORDINATOR_APPROVED,
+    COORDINATOR_PENDING,
+    COORDINATOR_SUSPENDED,
+)
+from apps.common.exceptions import (
+    AccountBlockedError,
+    AccountClosedError,
+    PermissionDeniedError,
+)
+from apps.common.permissions import (
+    IsActiveAccount,
+    IsAdminRole,
+    IsApprovedCoordinatorRole,
+    ensure_active_account,
+    ensure_admin,
+    ensure_approved_coordinator,
+    ensure_event_manager,
+    is_admin,
+    is_approved_coordinator,
+    is_event_manager,
+)
+
+
+class PermissionsTests(SimpleTestCase):
+    def _create_user(self, **kwargs):
+        defaults = {
+            "id": 1,
+            "is_authenticated": True,
+            "is_admin": False,
+            "is_superuser": False,
+            "account_status": ACCOUNT_ACTIVE,
+            "blocked_until": None,
+            "coordinator_profile": None,
+        }
+        defaults.update(kwargs)
+        return SimpleNamespace(**defaults)
+
+    def test_ensure_active_account_allows_active(self):
+        user = self._create_user(account_status=ACCOUNT_ACTIVE)
+        result = ensure_active_account(user)
+        self.assertEqual(result, user)
+
+        # Unauthenticated user raises PermissionDeniedError
+        unauth_user = self._create_user(is_authenticated=False)
+        with self.assertRaises(PermissionDeniedError):
+            ensure_active_account(unauth_user)
+
+        with self.assertRaises(PermissionDeniedError):
+            ensure_active_account(None)
+
+    def test_ensure_active_account_blocks_suspended_user(self):
+        # Indefinite block (blocked_until is None)
+        indefinite_blocked = self._create_user(
+            account_status=ACCOUNT_BLOCKED,
+            blocked_until=None,
+        )
+        with self.assertRaises(AccountBlockedError):
+            ensure_active_account(indefinite_blocked)
+
+        # Future block (blocked_until in future)
+        future_blocked = self._create_user(
+            account_status=ACCOUNT_BLOCKED,
+            blocked_until=timezone.now() + timedelta(days=2),
+        )
+        with self.assertRaises(AccountBlockedError):
+            ensure_active_account(future_blocked)
+
+        # Closed account
+        closed_user = self._create_user(account_status=ACCOUNT_CLOSED)
+        with self.assertRaises(AccountClosedError):
+            ensure_active_account(closed_user)
+
+    def test_ensure_active_account_allows_expired_blocked_user(self):
+        past_blocked = self._create_user(
+            account_status=ACCOUNT_BLOCKED,
+            blocked_until=timezone.now() - timedelta(hours=1),
+        )
+        result = ensure_active_account(past_blocked)
+        self.assertEqual(result, past_blocked)
+
+    def test_ensure_event_manager_checks_ownership(self):
+        coord_user = self._create_user(id=10)
+        other_user = self._create_user(id=20)
+        admin_user = self._create_user(id=99, is_admin=True)
+
+        event = SimpleNamespace(id=100, coordinator_id=10)
+
+        # 1. Event coordinator is allowed
+        self.assertTrue(is_event_manager(coord_user, event))
+        self.assertEqual(ensure_event_manager(coord_user, event), coord_user)
+
+        # 2. Admin is allowed regardless of coordinator_id
+        self.assertTrue(is_event_manager(admin_user, event))
+        self.assertEqual(ensure_event_manager(admin_user, event), admin_user)
+
+        # 3. Non-owner non-admin is rejected
+        self.assertFalse(is_event_manager(other_user, event))
+        with self.assertRaises(PermissionDeniedError):
+            ensure_event_manager(other_user, event)
+
+    def test_ensure_approved_coordinator(self):
+        profile_approved = SimpleNamespace(status=COORDINATOR_APPROVED)
+        profile_pending = SimpleNamespace(status=COORDINATOR_PENDING)
+        profile_suspended = SimpleNamespace(status=COORDINATOR_SUSPENDED)
+
+        user_approved = self._create_user(id=1, coordinator_profile=profile_approved)
+        user_pending = self._create_user(id=2, coordinator_profile=profile_pending)
+        user_suspended = self._create_user(id=3, coordinator_profile=profile_suspended)
+        user_no_profile = self._create_user(id=4, coordinator_profile=None)
+
+        self.assertTrue(is_approved_coordinator(user_approved))
+        self.assertEqual(ensure_approved_coordinator(user_approved), user_approved)
+
+        self.assertFalse(is_approved_coordinator(user_pending))
+        with self.assertRaises(PermissionDeniedError):
+            ensure_approved_coordinator(user_pending)
+
+        self.assertFalse(is_approved_coordinator(user_suspended))
+        with self.assertRaises(PermissionDeniedError):
+            ensure_approved_coordinator(user_suspended)
+
+        self.assertFalse(is_approved_coordinator(user_no_profile))
+        with self.assertRaises(PermissionDeniedError):
+            ensure_approved_coordinator(user_no_profile)
+
+    def test_ensure_admin(self):
+        admin_user = self._create_user(id=1, is_admin=True)
+        super_user = self._create_user(id=2, is_superuser=True)
+        regular_user = self._create_user(id=3, is_admin=False, is_superuser=False)
+
+        self.assertTrue(is_admin(admin_user))
+        self.assertEqual(ensure_admin(admin_user), admin_user)
+
+        self.assertTrue(is_admin(super_user))
+        self.assertEqual(ensure_admin(super_user), super_user)
+
+        self.assertFalse(is_admin(regular_user))
+        with self.assertRaises(PermissionDeniedError):
+            ensure_admin(regular_user)
+
+    def test_drf_permission_classes(self):
+        active_user = self._create_user(account_status=ACCOUNT_ACTIVE)
+        closed_user = self._create_user(account_status=ACCOUNT_CLOSED)
+        admin_user = self._create_user(account_status=ACCOUNT_ACTIVE, is_admin=True)
+        coord_user = self._create_user(
+            account_status=ACCOUNT_ACTIVE,
+            coordinator_profile=SimpleNamespace(status=COORDINATOR_APPROVED),
+        )
+
+        dummy_view = None
+
+        # IsActiveAccount
+        perm_active = IsActiveAccount()
+        self.assertTrue(perm_active.has_permission(SimpleNamespace(user=active_user), dummy_view))
+        self.assertFalse(perm_active.has_permission(SimpleNamespace(user=closed_user), dummy_view))
+
+        # IsAdminRole
+        perm_admin = IsAdminRole()
+        self.assertTrue(perm_admin.has_permission(SimpleNamespace(user=admin_user), dummy_view))
+        self.assertFalse(perm_admin.has_permission(SimpleNamespace(user=active_user), dummy_view))
+
+        # IsApprovedCoordinatorRole
+        perm_coord = IsApprovedCoordinatorRole()
+        self.assertTrue(perm_coord.has_permission(SimpleNamespace(user=coord_user), dummy_view))
+        self.assertFalse(perm_coord.has_permission(SimpleNamespace(user=active_user), dummy_view))
+
+
+================================================================================
+C:\Users\USER\Documents\INTERN\Project\Volunteer HR Management\python stack\apps\common\tests\test_security.py
+----------------------------------------
+# apps/common/tests/test_security.py
+from django.test import SimpleTestCase, override_settings
+
+from apps.common.security import (
+    compute_phone_hash,
+    decrypt_phone,
+    encrypt_phone,
+    generate_otp_code,
+    generate_raw_token,
+    hash_otp,
+    hash_token,
+    normalize_phone,
+)
+
+
+@override_settings(PHONE_HASH_HMAC_SECRET="test-hmac-secret-volunteer-system-2026")
+class SecurityTests(SimpleTestCase):
+    def test_phone_normalization_formats(self):
+        # International with plus and spaces/dashes
+        self.assertEqual(normalize_phone("+1 (555) 123-4567"), "+15551234567")
+        self.assertEqual(normalize_phone("  +44 20 7946 0958  "), "+442079460958")
+        self.assertEqual(normalize_phone("+95-9-123-456-789"), "+959123456789")
+
+        # Local without plus
+        self.assertEqual(normalize_phone("09-123-456-789"), "09123456789")
+        self.assertEqual(normalize_phone(" (09) 1234 5678 "), "0912345678")
+
+        # Empty / None handling
+        self.assertEqual(normalize_phone(""), "")
+        self.assertEqual(normalize_phone(None), "")
+
+    def test_phone_hash_is_deterministic(self):
+        # Same phone yields same hash
+        h1 = compute_phone_hash("+959123456789")
+        h2 = compute_phone_hash("+959123456789")
+        self.assertEqual(h1, h2)
+        self.assertEqual(len(h1), 64)  # HMAC-SHA256 hex digest length
+
+        # Formatted phone yields identical hash due to normalization
+        h3 = compute_phone_hash("+95-9-123-456-789")
+        self.assertEqual(h1, h3)
+
+        # Different phones yield different hashes
+        h4 = compute_phone_hash("+959987654321")
+        self.assertNotEqual(h1, h4)
+
+    def test_encrypt_decrypt_phone_roundtrip(self):
+        raw_phone = "+959123456789"
+        encrypted = encrypt_phone(raw_phone)
+
+        # Encrypted string must not be plain text
+        self.assertNotEqual(encrypted, raw_phone)
+        self.assertNotIn("959123456789", encrypted)
+
+        # Decryption restores the normalized phone
+        decrypted = decrypt_phone(encrypted)
+        self.assertEqual(decrypted, raw_phone)
+
+        # Test phone with spaces/dashes restores normalized form
+        formatted_phone = "+1 (555) 234-5678"
+        enc_formatted = encrypt_phone(formatted_phone)
+        dec_formatted = decrypt_phone(enc_formatted)
+        self.assertEqual(dec_formatted, "+15552345678")
+
+    def test_raw_token_does_not_equal_hash(self):
+        raw_token = generate_raw_token()
+        self.assertTrue(len(raw_token) >= 32)
+
+        hashed = hash_token(raw_token)
+        self.assertEqual(len(hashed), 64)  # SHA-256 hex digest
+        self.assertNotEqual(raw_token, hashed)
+
+        # Hash is deterministic
+        self.assertEqual(hash_token(raw_token), hashed)
+
+    def test_hash_otp_deterministic(self):
+        otp = generate_otp_code()
+        self.assertEqual(len(otp), 6)
+        self.assertTrue(otp.isdigit())
+
+        h1 = hash_otp(otp)
+        h2 = hash_otp(otp)
+        self.assertEqual(h1, h2)
+        self.assertEqual(len(h1), 64)
+        self.assertNotEqual(otp, h1)
+
+        # Different OTP codes yield different hashes
+        diff_otp = "000000" if otp != "000000" else "111111"
+        self.assertNotEqual(hash_otp(otp), hash_otp(diff_otp))
+

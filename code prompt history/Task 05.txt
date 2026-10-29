@@ -1,0 +1,91 @@
+Analyzed constraint%20reference.txt:L88-180
+Analyzed constraint%20reference.txt:L181-240
+Analyzed CONTRACT.txt:L240-330
+Analyzed CONTRACT.txt:L331-400
+Analyzed CONTRACT.txt:L401-420
+Ran search coordinator field references
+Edited models.py
+Analyzed admin.py:L1-41
+Analyzed serializers.py:L1-50
+Edited serializers.py
+Created __init__.py
+Created test_models.py
+Ran run apps.events.tests.test_models
+Ran run all tests across common, accounts, events
+
+### Task 05: Events Models, Visibility QuerySet, and Constraints Completed
+
+Implemented all canonical event models, database constraints with `models.CheckConstraint(condition=...)` and `models.UniqueConstraint(condition=...)`, the `EventQuerySet.visible()` filter, and unit tests in accordance with [`master_implementation_plan.md`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/master_implementation_plan.md), [`doc/constraint reference.txt`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/doc/constraint%20reference.txt), and [`doc/CONTRACT.txt`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/doc/CONTRACT.txt).
+
+---
+
+### Models & Constraints Implemented
+
+#### 1. [`apps/events/models.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/apps/events/models.py)
+
+- **`CharityField`**:
+  - `code` (`CharField(max_length=50, primary_key=True)`), `label`, `active`, `sort_order`.
+
+- **`EventQuerySet` & `Event`**:
+  - Custom QuerySet with `def visible(self): return self.filter(deleted_at__isnull=True)` bound as manager (`objects = EventQuerySet.as_manager()`).
+  - **Fields**: `id`, `coordinator` (`ForeignKey("accounts.User")`), `title`, `description`, `purpose_type`, `location_name`, `landmark_text`, `start_at`, `end_at`, `application_deadline`, `status`, `acceptance_mode`, `auto_assign_enabled`, `group_size`, `leader_strategy`, `max_participants`, `meals_provided`, `lodging_provided`, `travel_support_provided`, `compensation_kind`, `compensation_note`, `onboarding_text`, `onboarding_version`, `require_onboarding_ack`, `qr_registration_enabled`, `deleted_at`, `deleted_by`.
+  - **Constraints**:
+    - `ck_events_time`: `condition=Q(end_at__gt=F("start_at"))`
+    - `ck_events_deadline`: `condition=Q(application_deadline__isnull=True) | Q(application_deadline__lte=F("start_at"))`
+    - `ck_events_soft_delete`: `condition=(Q(deleted_at__isnull=True) & Q(deleted_by__isnull=True)) | (Q(deleted_at__isnull=False) & Q(deleted_by__isnull=False))`
+    - `ck_events_group_size`: `condition=Q(group_size__isnull=True) | Q(group_size__gt=0)`
+    - `ck_events_max_participants`: `condition=Q(max_participants__isnull=True) | Q(max_participants__gt=0)`
+    - `ck_events_onboarding_version`: `condition=Q(onboarding_version__gte=1)`
+  - **Indexes**:
+    - `idx_events_coordinator`, `idx_events_start_at`
+    - `idx_events_visible` (fields: `status`, `start_at`, `condition=Q(deleted_at__isnull=True)`)
+
+- **`EventCharityField`**:
+  - `event` (`ForeignKey`), `field_code` (`ForeignKey(CharityField, db_column="field_code", related_name="event_links")`).
+  - **Constraint**: `uq_event_charity_field` on `("event", "field_code")`.
+
+- **`EventPost`**:
+  - `event`, `title`, `description`, `required_headcount`, `physical_level`, `required_skills` (`ChoiceArrayField`), `leader_needed`, `new_volunteers_allowed`, `priority`, `status`.
+  - **Constraints**:
+    - `uq_event_post_event_title`: `UniqueConstraint(fields=["event", "title"])`
+    - `ck_event_posts_headcount`: `CheckConstraint(condition=Q(required_headcount__gt=0))`
+  - **Index**: `GinIndex(fields=["required_skills"], name="idx_event_posts_skills_gin")`.
+
+- **`EventApplication`**:
+  - `event`, `post`, `user`, `qr_token`, `source`, `status`, `applied_at`, `decided_by`, `decided_at`, `conditions_acknowledged_at`, `conditions_snapshot`, `note`.
+  - **Constraints**:
+    - `uq_event_application_active`: `UniqueConstraint(fields=["event", "user"], condition=Q(status__in=["pending", "accepted", "waitlisted"]))`
+    - `ck_application_walkin_token`: `CheckConstraint(condition=~Q(source="qr_walkin") | Q(qr_token__isnull=False))`
+    - `ck_application_decided`: `CheckConstraint(condition=~Q(status__in=["accepted", "rejected"]) | Q(decided_at__isnull=False))`
+
+---
+
+### Test Suite
+
+#### 2. [`apps/events/tests/test_models.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/apps/events/tests/test_models.py)
+- `test_event_time_constraint`: Validates rejection of `end_at <= start_at` and `application_deadline > start_at`.
+- `test_event_soft_delete_both_fields_required`: Validates both `deleted_at` and `deleted_by` must be set or both `None`.
+- `test_event_post_unique_title_per_event`: Validates post title uniqueness and headcount check constraints.
+- `test_event_application_unique_active_constraint`: Validates active application uniqueness, walk-in QR token requirement, and decision timestamp requirements.
+- `test_event_objects_visible_excludes_deleted`: Validates `Event.objects.visible()` filters out soft-deleted records.
+
+---
+
+### Test Verification
+
+```powershell
+python manage.py test apps.common.tests apps.accounts.tests apps.events.tests
+```
+
+**Output:**
+```
+Found 24 test(s).
+System check identified no issues (0 silenced).
+........................
+----------------------------------------------------------------------
+Ran 24 tests in 0.009s
+
+OK
+```
+
+Total passing tests across the project: **24/24**. Ready to proceed to **Task 06: Ops Models & Constraints** when you are ready.

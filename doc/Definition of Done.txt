@@ -1,0 +1,45 @@
+A module is complete only when:
+1. Models match this reference.
+2. Services implement the exact contract.
+3. Views are thin.
+4. Permissions are enforced in services.
+5. Audit logs are written for state changes.
+6. Tests pass.
+7. No forbidden pattern is used.
+8. API endpoints match the canonical API surface.
+
+
+---
+
+# Copy-paste prompt to give Gemini Flash
+
+Use this prompt when asking Gemini Flash to generate code. Attach or paste the reference file above.
+
+```text
+You are implementing code for the Volunteer Coordination System v0.5.
+
+Read docs/CODING_REFERENCE_v0_5.md carefully. It is the canonical reference.
+If any other document conflicts with it, docs/CODING_REFERENCE_v0_5.md wins.
+
+Rules:
+1. Generate complete files only.
+2. Do not omit code with comments like "rest unchanged".
+3. Use Django 5.1+ syntax.
+4. Use CheckConstraint(condition=...), not check=...
+5. Business logic must be in services.py.
+6. Views must be thin.
+7. Every state-changing service must use transaction.atomic.
+8. Every state-changing service must call audit log service.
+9. Use constants from apps.common.constants.
+10. Raise DomainError subclasses only.
+11. Do not use SQL views or unmanaged models.
+12. Do not store raw OTP, raw QR token, or plain phone numbers.
+13. Write tests for the module.
+14. If something is ambiguous, follow docs/CODING_REFERENCE_v0_5.md.
+
+Now implement TASK: [INSERT TASK NAME HERE]
+
+Files to touch:
+[INSERT FILES]
+
+Return the complete content of each touched file in separate code blocks.

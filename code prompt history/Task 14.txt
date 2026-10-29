@@ -1,0 +1,49 @@
+Analyzed models.py:L300-360
+Analyzed models.py:L230-300
+Analyzed models.py:L30-75
+Analyzed security.py:L30-60
+Analyzed security.py:L60-74
+Analyzed services.py:L1-50
+Edited services.py
+Created test_qr.py
+Ran run ops QR tests
+Ran run full test suite
+
+### Task 14: Ops QR Token Engine & Validation — Completed
+
+All QR token generation, non-consuming resolution, atomic redemption, and automated test requirements for Task 14 have been implemented and verified.
+
+#### 1. Ops QR Engine Services ([`apps/ops/services.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/apps/ops/services.py))
+- [`generate_qr_token`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/apps/ops/services.py#L136-L177):
+  - Enforces `ensure_event_manager(actor, event)`.
+  - Generates cryptographic raw token via `secrets.token_urlsafe(32)`.
+  - Computes SHA-256 digest (`token_hash`) for storage. The raw token is **never stored** in the database.
+  - Sets expiration according to `ttl_minutes` (default 240 mins) and records audit log.
+- [`resolve_qr_token`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/apps/ops/services.py#L180-L208):
+  - Hashes raw token and looks up `QrToken`.
+  - Verifies token validity (checks not revoked, not expired, and `used_count < max_uses`).
+  - Returns metadata preview (`event_id`, `title`, `purpose`, `expires_at`, `used_count`, `max_uses`) **without consuming** the token or incrementing `used_count`.
+- [`redeem_qr_token`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/apps/ops/services.py#L211-L287):
+  - Enforces `ensure_active_account(user)`.
+  - Executes inside an atomic transaction with `select_for_update()` on `QrToken` to prevent race conditions.
+  - Increments `used_count` and guards `max_uses` constraint.
+  - Dispatches by token purpose:
+    - `walkin_registration` $\to$ calls `apply_to_event(user, event, source="qr_walkin", qr_token=token)`
+    - `checkin` $\to$ calls `check_in(actor=user, event=event, target_user=user, method="qr_scan", qr_token=token)`
+    - `join_event` $\to$ calls `apply_to_event(user, event, source="invite")`
+- [`check_in`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/apps/ops/services.py#L290-L373):
+  - Validates active event status (`EVENT_ACTIVE`).
+  - Verifies volunteer active assignment and checks onboarding version acknowledgment (`require_onboarding_ack`).
+  - Handles idempotent check-in.
+
+---
+
+### Verification:
+Executed [`apps/ops/tests/test_qr.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/apps/ops/tests/test_qr.py):
+- `test_qr_generation_returns_raw_token_and_stores_hash` :white_check_mark:
+- `test_resolve_does_not_increment_used_count` :white_check_mark:
+- `test_redeem_increments_used_count_and_enforces_max_uses` :white_check_mark:
+- `test_expired_or_revoked_qr_fails` :white_check_mark:
+- `test_checkin_qr_token_redemption` :white_check_mark:
+
+**Full test suite: 69/69 tests passing (0.49s).**

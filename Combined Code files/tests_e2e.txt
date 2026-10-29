@@ -1,0 +1,419 @@
+================================================================================
+C:\Users\USER\Documents\INTERN\Project\Volunteer HR Management\python stack\tests_e2e\__init__.py
+----------------------------------------
+# tests_e2e package
+
+
+================================================================================
+C:\Users\USER\Documents\INTERN\Project\Volunteer HR Management\python stack\tests_e2e\test_feasibility_flow.py
+----------------------------------------
+# tests_e2e/test_feasibility_flow.py
+from datetime import timedelta
+from io import BytesIO
+from PIL import Image
+
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import override_settings
+from django.utils import timezone
+from rest_framework import status
+from rest_framework.test import APITestCase
+
+from apps.accounts.models import CoordinatorProfile, User, UserVerificationImage
+from apps.accounts.services import approve_coordinator, review_verification_image
+from apps.audit.models import AuditLog
+from apps.common.constants import (
+    APPLICATION_ACCEPTED,
+    ATTENDANCE_CHECKED_IN,
+    ATTENDANCE_COMPLETED,
+    ATTENDANCE_EXPECTED,
+    COORDINATOR_APPROVED,
+    EVENT_ACTIVE,
+    EVENT_COMPLETED,
+    EVENT_PUBLISHED,
+    VERIFICATION_VERIFIED,
+)
+from apps.common.exceptions import DomainError
+from apps.events.models import CharityField, Event, EventApplication, EventPost
+from apps.ops.models import Assignment, Attendance
+
+
+def make_test_image(name="test.jpg"):
+    img = Image.new("RGB", (100, 100), color="blue")
+    buf = BytesIO()
+    img.save(buf, format="JPEG")
+    buf.seek(0)
+    return SimpleUploadedFile(name, buf.read(), content_type="image/jpeg")
+
+
+@override_settings(DEBUG=True, DEV_FIXED_OTP="123456")
+class EndToEndFeasibilityFlowTest(APITestCase):
+    def setUp(self):
+        # Initial lookups
+        CharityField.objects.get_or_create(code="logistics", defaults={"label": "Logistics", "sort_order": 1})
+        CharityField.objects.get_or_create(code="teaching", defaults={"label": "Teaching", "sort_order": 2})
+
+    def test_complete_twenty_step_feasibility_flow(self):
+        now = timezone.now()
+
+        # =========================================================================
+        # 1. Request OTP -> Verify OTP -> Receive Token -> Coordinator User Created
+        # =========================================================================
+        coord_phone = "+959111222333"
+        req_resp = self.client.post("/api/v1/auth/otp/request/", {"phone": coord_phone}, format="json")
+        self.assertEqual(req_resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(req_resp.data["status"], "sent")
+
+        ver_resp = self.client.post(
+            "/api/v1/auth/otp/verify/",
+            {"phone": coord_phone, "code": "123456"},
+            format="json",
+        )
+        self.assertEqual(ver_resp.status_code, status.HTTP_200_OK)
+        coord_token = ver_resp.data["token"]
+        coord_user_id = ver_resp.data["user"]["id"]
+        coord_user = User.objects.get(id=coord_user_id)
+        self.assertIsNotNone(coord_token)
+
+        # =========================================================================
+        # 2. Update Profile -> Set charity interests -> Upload verification images
+        # =========================================================================
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {coord_token}")
+
+        prof_resp = self.client.patch(
+            "/api/v1/me/",
+            {"display_name": "Daw Myat Coordinator", "home_area": "Kamayut", "blood_type": "O_POS"},
+            format="json",
+        )
+        self.assertEqual(prof_resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(prof_resp.data["display_name"], "Daw Myat Coordinator")
+
+        int_resp = self.client.put(
+            "/api/v1/me/charity-interests/",
+            {"codes": ["logistics", "teaching"]},
+            format="json",
+        )
+        self.assertEqual(int_resp.status_code, status.HTTP_200_OK)
+
+        # Upload selfie & ID license
+        img_selfie = make_test_image("selfie.jpg")
+        up1_resp = self.client.post(
+            "/api/v1/me/verification-images/",
+            {"image_type": "mock_selfie", "image": img_selfie},
+            format="multipart",
+        )
+        self.assertEqual(up1_resp.status_code, status.HTTP_201_CREATED)
+
+        up2_resp = self.client.post(
+            "/api/v1/me/verification-images/",
+            {"image_type": "id_license", "image": make_test_image("id.jpg")},
+            format="multipart",
+        )
+        self.assertEqual(up2_resp.status_code, status.HTTP_201_CREATED)
+
+        # =========================================================================
+        # 3. Admin approves images -> User applies as coordinator -> Admin approves
+        # =========================================================================
+        admin_user = User.objects.create(
+            phone_hash="hash_admin_e2e_flow",
+            display_name="Chief Admin",
+            is_admin=True,
+        )
+
+        # Negative test 16a: Unverified coordinator approval rejected
+        coord_app_resp = self.client.post(
+            "/api/v1/me/coordinator/",
+            {"notes": "Ready to organize flood relief."},
+            format="json",
+        )
+        self.assertEqual(coord_app_resp.status_code, status.HTTP_200_OK)
+        coord_profile = CoordinatorProfile.objects.get(user=coord_user)
+
+        with self.assertRaises(DomainError):
+            approve_coordinator(admin_user, coord_profile)
+
+        # Admin approves both verification images
+        for v_img in UserVerificationImage.objects.filter(user=coord_user):
+            review_verification_image(admin_user, v_img, status="approved")
+
+        coord_user.refresh_from_db()
+        self.assertEqual(coord_user.verification_status, VERIFICATION_VERIFIED)
+
+        # Now coordinator approval succeeds
+        approve_coordinator(admin_user, coord_profile)
+        coord_profile.refresh_from_db()
+        self.assertEqual(coord_profile.status, COORDINATOR_APPROVED)
+
+        # =========================================================================
+        # 4. Coordinator creates Event (draft) -> Adds EventPosts -> Publishes Event
+        # =========================================================================
+        event_payload = {
+            "title": "Yangon Monsoon Relief Drive",
+            "description": "Essential food and medical aid distribution.",
+            "purpose_type": "charity_event",
+            "start_at": (now + timedelta(days=3)).isoformat(),
+            "end_at": (now + timedelta(days=3, hours=6)).isoformat(),
+            "application_deadline": (now + timedelta(days=2)).isoformat(),
+            "acceptance_mode": "auto",
+            "max_participants": 20,
+            "group_size": 2,
+            "require_onboarding_ack": True,
+            "onboarding_text": "Please wear safety boots and bring water.",
+            "charity_codes": ["logistics", "teaching"],
+        }
+        create_ev_resp = self.client.post("/api/v1/coordinator/events/", event_payload, format="json")
+        self.assertEqual(create_ev_resp.status_code, status.HTTP_201_CREATED)
+        event_id = create_ev_resp.data["id"]
+
+        # Add Post 1: Heavy logistics
+        post1_resp = self.client.post(
+            f"/api/v1/events/{event_id}/posts/",
+            {
+                "title": "Heavy Logistics Pack",
+                "required_headcount": 5,
+                "physical_level": "heavy",
+                "required_skills": ["logistics"],
+                "leader_needed": True,
+            },
+            format="json",
+        )
+        self.assertEqual(post1_resp.status_code, status.HTTP_201_CREATED)
+        post1_id = post1_resp.data["id"]
+
+        # Add Post 2: Workshop Teaching
+        post2_resp = self.client.post(
+            f"/api/v1/events/{event_id}/posts/",
+            {
+                "title": "Health Education Facilitator",
+                "required_headcount": 5,
+                "physical_level": "light",
+                "required_skills": ["teaching"],
+                "leader_needed": True,
+            },
+            format="json",
+        )
+        self.assertEqual(post2_resp.status_code, status.HTTP_201_CREATED)
+        post2_id = post2_resp.data["id"]
+
+        # Publish Event
+        pub_resp = self.client.post(f"/api/v1/events/{event_id}/publish/", {}, format="json")
+        self.assertEqual(pub_resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(pub_resp.data["status"], EVENT_PUBLISHED)
+
+        # =========================================================================
+        # 5. Coordinator activates Event
+        # =========================================================================
+        act_resp = self.client.post(f"/api/v1/events/{event_id}/activate/", {}, format="json")
+        self.assertEqual(act_resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(act_resp.data["status"], EVENT_ACTIVE)
+
+        # =========================================================================
+        # 6. Volunteer 1 & Volunteer 2 apply to event
+        # =========================================================================
+        # Volunteer 1 signup
+        vol1_phone = "+959444555666"
+        self.client.credentials()  # clear auth
+        self.client.post("/api/v1/auth/otp/request/", {"phone": vol1_phone}, format="json")
+        v1_ver = self.client.post("/api/v1/auth/otp/verify/", {"phone": vol1_phone, "code": "123456"}, format="json")
+        vol1_token = v1_ver.data["token"]
+        vol1_user_id = v1_ver.data["user"]["id"]
+        vol1_user = User.objects.get(id=vol1_user_id)
+
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {vol1_token}")
+        self.client.patch(
+            "/api/v1/me/",
+            {
+                "display_name": "Ko Zaw Volunteer",
+                "skills": ["logistics"],
+                "has_leader_experience": True,
+                "physical_ok": True,
+                "can_lift_heavy": True,
+            },
+            format="json",
+        )
+
+        # Volunteer 1 applies
+        app1_resp = self.client.post(
+            f"/api/v1/events/{event_id}/apply/",
+            {"post_id": post1_id, "source": "browse"},
+            format="json",
+        )
+        self.assertEqual(app1_resp.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(app1_resp.data["status"], APPLICATION_ACCEPTED)
+        app1_id = app1_resp.data["id"]
+
+        # Negative test 16b: Duplicate active application rejected
+        dup_resp = self.client.post(
+            f"/api/v1/events/{event_id}/apply/",
+            {"post_id": post1_id, "source": "browse"},
+            format="json",
+        )
+        self.assertEqual(dup_resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+        # Volunteer 2 signup
+        vol2_phone = "+959777888999"
+        self.client.credentials()
+        self.client.post("/api/v1/auth/otp/request/", {"phone": vol2_phone}, format="json")
+        v2_ver = self.client.post("/api/v1/auth/otp/verify/", {"phone": vol2_phone, "code": "123456"}, format="json")
+        vol2_token = v2_ver.data["token"]
+        vol2_user_id = v2_ver.data["user"]["id"]
+        vol2_user = User.objects.get(id=vol2_user_id)
+
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {vol2_token}")
+        self.client.patch(
+            "/api/v1/me/",
+            {
+                "display_name": "Ma Hla Volunteer",
+                "skills": ["teaching"],
+                "has_leader_experience": True,
+                "physical_ok": True,
+            },
+            format="json",
+        )
+        app2_resp = self.client.post(
+            f"/api/v1/events/{event_id}/apply/",
+            {"post_id": post2_id, "source": "browse"},
+            format="json",
+        )
+        self.assertEqual(app2_resp.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(app2_resp.data["status"], APPLICATION_ACCEPTED)
+
+        # =========================================================================
+        # 7. Auto-assignment assigns post and creates Attendance (status=expected)
+        # =========================================================================
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {coord_token}")
+        auto_resp = self.client.post(f"/api/v1/events/{event_id}/assignments/auto-run/", {}, format="json")
+        self.assertEqual(auto_resp.status_code, status.HTTP_200_OK)
+
+        # Verify Attendance is expected
+        att1 = Attendance.objects.get(event_id=event_id, user=vol1_user)
+        self.assertEqual(att1.status, ATTENDANCE_EXPECTED)
+        assign1 = Assignment.objects.get(event_id=event_id, user=vol1_user)
+        self.assertIsNotNone(assign1.group_code)
+        self.assertTrue(assign1.is_group_leader)
+
+        # =========================================================================
+        # 8. Volunteer acknowledges onboarding
+        # =========================================================================
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {vol1_token}")
+
+        # Coordinator generates check-in QR token
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {coord_token}")
+        qr_gen = self.client.post(
+            f"/api/v1/events/{event_id}/qr/",
+            {"purpose": "checkin", "max_uses": 10, "ttl_minutes": 120},
+            format="json",
+        )
+        self.assertEqual(qr_gen.status_code, status.HTTP_201_CREATED)
+        raw_qr_token = qr_gen.data["token"]
+
+        # Negative test 16c: Checkin without onboarding acknowledgment rejected (409 Conflict)
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {vol1_token}")
+        bad_cin = self.client.post(
+            f"/api/v1/events/{event_id}/check-in/",
+            {"token": raw_qr_token, "method": "qr_scan"},
+            format="json",
+        )
+        self.assertEqual(bad_cin.status_code, status.HTTP_409_CONFLICT)
+
+        # Volunteer acknowledges onboarding
+        ack_resp = self.client.post(
+            f"/api/v1/events/{event_id}/onboarding/acknowledge/",
+            {"method": "app_tick"},
+            format="json",
+        )
+        self.assertEqual(ack_resp.status_code, status.HTTP_200_OK)
+
+        # =========================================================================
+        # 9 & 10. Volunteer redeems QR token -> Attendance status becomes 'checked_in'
+        # =========================================================================
+        redeem_resp = self.client.post(
+            "/api/v1/qr/redeem/",
+            {"token": raw_qr_token},
+            format="json",
+        )
+        self.assertEqual(redeem_resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(redeem_resp.data["action"], "checkin")
+
+        att1.refresh_from_db()
+        self.assertEqual(att1.status, ATTENDANCE_CHECKED_IN)
+        self.assertIsNotNone(att1.checkin_at)
+
+        # =========================================================================
+        # 11. Volunteer checks out
+        # =========================================================================
+        cout_resp = self.client.post(f"/api/v1/events/{event_id}/check-out/", {}, format="json")
+        self.assertEqual(cout_resp.status_code, status.HTTP_200_OK)
+        att1.refresh_from_db()
+        self.assertIsNotNone(att1.checkout_at)
+
+        # =========================================================================
+        # 12. Coordinator marks event completed -> Attendance becomes 'completed'
+        # =========================================================================
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {coord_token}")
+        comp_resp = self.client.post(f"/api/v1/events/{event_id}/complete/", {}, format="json")
+        self.assertEqual(comp_resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(comp_resp.data["status"], EVENT_COMPLETED)
+
+        att1.refresh_from_db()
+        self.assertEqual(att1.status, ATTENDANCE_COMPLETED)
+
+        # =========================================================================
+        # 13. Volunteer submits feedback for event and coordinator
+        # =========================================================================
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {vol1_token}")
+
+        # Feedback to event
+        fb_ev_resp = self.client.post(
+            f"/api/v1/events/{event_id}/feedback/",
+            {
+                "direction": "volunteer_to_event",
+                "score": 5,
+                "comment": "Well organized and meaningful community project.",
+                "tags": ["helpful", "well_organized"],
+            },
+            format="json",
+        )
+        self.assertEqual(fb_ev_resp.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(fb_ev_resp.data["score"], 5)
+
+        # Feedback to coordinator
+        fb_coord_resp = self.client.post(
+            f"/api/v1/events/{event_id}/feedback/",
+            {
+                "direction": "volunteer_to_coordinator",
+                "score": 5,
+                "comment": "Coordinator was very supportive.",
+            },
+            format="json",
+        )
+        self.assertEqual(fb_coord_resp.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(fb_coord_resp.data["target_user"], coord_user.id)
+
+        # =========================================================================
+        # 14. Coordinator submits feedback for volunteer
+        # =========================================================================
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {coord_token}")
+        fb_vol_resp = self.client.post(
+            f"/api/v1/events/{event_id}/feedback/",
+            {
+                "direction": "coordinator_to_volunteer",
+                "target_user_id": vol1_user.id,
+                "score": 5,
+                "comment": "Outstanding initiative and leadership during logistics dispatch.",
+            },
+            format="json",
+        )
+        self.assertEqual(fb_vol_resp.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(fb_vol_resp.data["target_user"], vol1_user.id)
+
+        # =========================================================================
+        # 15. Verify audit logs recorded every lifecycle transition
+        # =========================================================================
+        logged_actions = set(AuditLog.objects.values_list("action", flat=True))
+        self.assertIn("create_event", logged_actions)
+        self.assertIn("publish_event", logged_actions)
+        self.assertIn("activate_event", logged_actions)
+        self.assertIn("complete_event", logged_actions)
+        self.assertIn("check_in", logged_actions)
+        self.assertIn("check_out", logged_actions)
+        self.assertIn("submit_feedback", logged_actions)

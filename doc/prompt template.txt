@@ -1,0 +1,49 @@
+You are implementing ONE module of an existing Django project.
+
+## Inputs
+1. MASTER_RULES.md is attached.
+2. CONTRACT.md is attached.
+3. The current target files are pasted below.
+4. The test file for this module is pasted below.
+
+## Module
+{{MODULE_NAME}}
+
+## Files you may touch
+{{EXACT_FILE_LIST}}
+
+## Current file contents
+{{CURRENT_FILE_CONTENTS}}
+
+## Tests to satisfy
+{{TEST_FILE_CONTENTS}}
+
+## Task
+Implement the module so the tests pass.
+
+## Required process
+1. Read the contract.
+2. Read the tests.
+3. Identify any contract conflict.
+4. If there is a conflict, output:
+   BLOCKED: contract conflict
+   and stop.
+5. Otherwise implement the module.
+
+## Output requirements
+- Output complete files only.
+- One fenced code block per file.
+- Include the exact file path above each block.
+- Do not output diffs.
+- Do not output "... unchanged".
+- Do not touch unlisted files.
+- Do not invent model names, field names, endpoints, or statuses.
+- Keep all business logic in services.py.
+- Keep serializers and views thin.
+
+## Success criteria
+- All provided tests pass.
+- No contract violations.
+- No new dependencies.
+- No schema renames.
+- No unrelated changes.

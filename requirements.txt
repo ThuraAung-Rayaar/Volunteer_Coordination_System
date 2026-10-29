@@ -1,0 +1,21 @@
+# C:\Users\USER\Documents\INTERN\Project\Volunteer HR Management\python stack\requirements.txt
+# Core Framework
+Django>=5.1,<5.2
+djangorestframework>=3.15,<3.16
+django-cors-headers>=4.4,<5.0
+django-filter>=24.3,<25.0
+
+# Database (PostgreSQL)
+psycopg[binary]>=3.2,<3.3
+
+# Environment & Configuration
+python-dotenv>=1.0.1
+
+# Security & Cryptography (Fernet phone encryption, HMAC)
+cryptography>=42.0.0
+
+# Image processing (for user verification selfies/ID)
+Pillow>=10.4.0
+
+# API Documentation (OpenAPI / Swagger)
+drf-spectacular>=0.27.2

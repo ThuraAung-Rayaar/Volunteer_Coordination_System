@@ -1,0 +1,69 @@
+Analyzed test_feasibility_flow.py:L1-100
+Analyzed test_feasibility_flow.py:L101-200
+Analyzed test_feasibility_flow.py:L201-350
+
+Error: API error (attempt 1): request failed: stream idle timeout (5m0s): context deadline exceeded (Error ID: 6cb319d0-24cd-4e5c-ba4c-334904d549d5-1218)
+
+Error: Agent execution terminated due to error. (Error ID: 6cb319d0-24cd-4e5c-ba4c-334904d549d5-1219)
+
+Error: API error (attempt 1): request failed: Post "https://daily-cloudcode-pa.googleapis.com/v1internal:streamGenerateContent?alt=sse": read tcp 192.168.10.198:54812->172.217.117.4:443: wsarecv: An existing connection was forcibly closed by the remote host. (Error ID: 6cb319d0-24cd-4e5c-ba4c-334904d549d5-1220)
+
+Analyzed test_feasibility_flow.py:L351-410
+Ran run E2E Feasibility Test
+Ran run full project test suite
+
+### Task 22: Complete End-to-End Feasibility Flow Test Verified
+
+The end-to-end integration test in [`tests_e2e/test_feasibility_flow.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/tests_e2e/test_feasibility_flow.py) has been implemented and verified. It executes the full 20-step lifecycle across all `/api/v1/` endpoints using DRF's `APITestCase` / `APIClient`.
+
+---
+
+### Step-by-Step Flow Execution
+
+| Step | Action | Endpoint / Method | Verified Outcome |
+| :--- | :--- | :--- | :--- |
+| **1** | Request OTP $\to$ Verify OTP $\to$ Receive Token | `POST /api/v1/auth/otp/request/`<br>`POST /api/v1/auth/otp/verify/` | User record created, Token returned. |
+| **2** | Update Profile $\to$ Set Charity Interests $\to$ Upload Images | `PATCH /api/v1/me/`<br>`PUT /api/v1/me/charity-interests/`<br>`POST /api/v1/me/verification-images/` | Profile saved, interests set, mock selfie and ID license uploaded. |
+| **3** | Image Review $\to$ Coordinator Application $\to$ Approval | `POST /api/v1/me/coordinator/`<br>`accounts.services.approve_coordinator` | **Negative test:** Unverified approval fails (`DomainError`). Verified on image approval, coordinator status becomes `approved`. |
+| **4** | Coordinator creates Event (draft) $\to$ Adds Posts $\to$ Publishes | `POST /api/v1/coordinator/events/`<br>`POST /api/v1/events/{id}/posts/`<br>`POST /api/v1/events/{id}/publish/` | Event created with 2 posts (Heavy Logistics & Teaching), status becomes `published`. |
+| **5** | Coordinator activates Event | `POST /api/v1/events/{id}/activate/` | Event status becomes `active`. |
+| **6** | Volunteer 1 & Volunteer 2 Apply to Event | `POST /api/v1/events/{id}/apply/` | Both applications accepted (auto-mode).<br>**Negative test:** Duplicate application rejected (400 Bad Request). |
+| **7** | Auto-Assignment & Group Allocation | `POST /api/v1/events/{id}/assignments/auto-run/` | Deterministic grouping into `G1`, leader designated (`is_group_leader=True`), `Attendance` created with `status="expected"`. |
+| **8** | Onboarding Acknowledgment | `POST /api/v1/events/{id}/onboarding/acknowledge/` | **Negative test:** Check-in without acknowledgment rejected (409 Conflict). Acknowledgment recorded for active version. |
+| **9** | Coordinator generates Check-in QR Token | `POST /api/v1/events/{id}/qr/` | Returns raw one-time token; database stores SHA-256 hash. |
+| **10** | Volunteer redeems QR Token | `POST /api/v1/qr/redeem/` | Safely decrements remaining capacity and sets `Attendance.status="checked_in"` with timestamp. |
+| **11** | Volunteer checks out | `POST /api/v1/events/{id}/check-out/` | `checkout_at` recorded. |
+| **12** | Coordinator marks Event Completed | `POST /api/v1/events/{id}/complete/` | Event status becomes `completed`; attendance transitions to `completed`. |
+| **13** | Volunteer Feedback (Event & Coordinator) | `POST /api/v1/events/{id}/feedback/` | Volunteer-to-event (score 5) and volunteer-to-coordinator (forced target = coordinator) submitted. |
+| **14** | Coordinator Feedback (Volunteer) | `POST /api/v1/events/{id}/feedback/` | Coordinator rates volunteer (score 5). |
+| **15** | Audit Log Verification | Query `AuditLog` table | Confirmed append-only audit entries for `create_event`, `publish_event`, `activate_event`, `complete_event`, `check_in`, `check_out`, and `submit_feedback`. |
+| **16** | Negative Validation Cases | Multiple endpoints | Duplicate applications rejected, check-in without onboarding rejected, unverified coordinator approval rejected. |
+
+---
+
+### Test Execution
+
+```powershell
+.\.venv\Scripts\python.exe manage.py test tests_e2e
+```
+```text
+Creating test database for alias 'default'...
+Found 1 test(s).
+System check identified no issues (0 silenced).
+Bad Request: /api/v1/events/1/apply/
+Conflict: /api/v1/events/1/check-in/
+.
+----------------------------------------------------------------------
+Ran 1 test in 0.303s
+
+OK
+Destroying test database for alias 'default'...
+```
+
+```powershell
+.\.venv\Scripts\python.exe manage.py test apps.accounts.tests apps.common.tests apps.events.tests apps.ops.tests apps.audit.tests tests_e2e
+```
+```text
+Ran 99 tests in 1.021s
+OK
+```

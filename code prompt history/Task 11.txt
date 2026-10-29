@@ -1,0 +1,36 @@
+Analyzed services.py:L1-100
+Analyzed services.py:L101-200
+Analyzed services.py:L201-319
+Analyzed test_lifecycle.py:L1-100
+Analyzed test_lifecycle.py:L101-234
+Ran run event lifecycle tests
+Ran run full test suite
+
+### Task 11: Events Lifecycle Services — Completed
+
+All functions, lifecycle state machines, cascading rules, and unit tests for Task 11 are implemented and verified.
+
+#### 1. Events Lifecycle & Post Services ([`apps/events/services.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/apps/events/services.py))
+- [`create_event`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/apps/events/services.py#L30-L60): Enforces coordinator approval (`ensure_approved_coordinator` or `ensure_admin`). Creates event initialized to `status="draft"` with `onboarding_version=1`, atomically attaches charity fields, and logs audit action.
+- [`update_event`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/apps/events/services.py#L62-L101): Enforces event management permissions (`ensure_event_manager`). Automatically increments `onboarding_version` when `onboarding_text` is altered, prevents direct lifecycle status tampering, and updates fields atomically.
+- [`publish_event`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/apps/events/services.py#L103-L128): Requires event to be in `draft` state (`InvalidStateError` if not) and requires at least one recruiting post (`DomainError(..., code="post_required")` if none exist). Transitions event status to `published`.
+- [`activate_event`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/apps/events/services.py#L130-L151): Enforces event management permissions and `published` status requirement. Transitions status to `active`.
+- [`complete_event`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/apps/events/services.py#L153-L191): Requires event to be in `active` state. Transitions status to `completed` and cascades:
+  - Active assignments (`assigned`, `confirmed`) $\to$ `completed`
+  - Checked-in attendances $\to$ `completed`
+- [`cancel_event`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/apps/events/services.py#L193-L234): Only permitted for `published` or `active` events. Transitions status to `cancelled` and cascades:
+  - Active assignments $\to$ `cancelled`
+  - Expected attendance records $\to$ `absent`
+- [`add_post`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/apps/events/services.py#L250-L271), [`update_post`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/apps/events/services.py#L273-L299), [`close_post`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/apps/events/services.py#L301-L319): Manages recruiting positions and closing them to new applicants.
+
+---
+
+### Verification:
+Executed [`apps/events/tests/test_lifecycle.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/apps/events/tests/test_lifecycle.py):
+- `test_publish_requires_at_least_one_post` :white_check_mark:
+- `test_invalid_lifecycle_transition_raises_error` :white_check_mark:
+- `test_onboarding_text_change_increments_version` :white_check_mark:
+- `test_complete_event_cascades_status_to_assignments` :white_check_mark:
+- `test_cancel_event_cascades_status` :white_check_mark:
+
+**Full test suite: 54/54 tests passing (0.43s).**

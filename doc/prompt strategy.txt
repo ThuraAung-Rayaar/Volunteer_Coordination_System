@@ -1,0 +1,9 @@
+Current idea,Recommended change
+“Generate perfect code”,Change goal to “make the provided tests pass without violating the contract.”
+Send plan + SQL + tree,Send only MASTER_RULES.md + CONTRACT.md + target files + tests.
+Ask Flash to implement whole module loosely,Give exact function names and endpoint names.
+Let Flash repair indefinitely,"Maximum 2 repair loops, then escalate."
+Generate UI early,"Freeze OpenAPI first, then generate TypeScript types."
+Use raw ModelViewSet writes,Use explicit lifecycle actions only.
+Let Flash decide business rules,Lock rules in CONTRACT.md first.
+Trust output without tests,Every prompt must include tests first.

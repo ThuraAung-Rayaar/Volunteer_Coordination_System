@@ -1,0 +1,80 @@
+Analyzed master_implementation_plan.md:L1-150
+Ran list files in doc directory
+Analyzed error%20response%20format.txt:L1-10
+Analyzed code%20reference%20file.txt:L1-100
+Analyzed code%20reference%20file.txt:L100-170
+Analyzed code%20reference%20file.txt:L170-220
+Analyzed code%20reference%20file.txt:L220-300
+Analyzed code%20reference%20file.txt:L300-353
+Analyzed MASTER_RULES.txt:L1-100
+Analyzed CONTRACT.txt:L1-100
+Ran check EXCEPTION_HANDLER in settings.py
+Ran check apps/common directory
+Created constants.py
+Created exceptions.py
+Created pagination.py
+Analyzed settings.py:L125-165
+Edited settings.py
+Created __init__.py
+Created test_foundation.py
+Ran run test_foundation test suite
+
+### Task 01: Common Foundation (Constants, Exceptions, Pagination) Completed
+
+Implemented the foundational constants, standardized domain exceptions, custom exception handler, and pagination according to [`master_implementation_plan.md`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/master_implementation_plan.md) and [`doc/CONTRACT.txt`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/doc/CONTRACT.txt).
+
+---
+
+### Files Created & Configured
+
+#### 1. [`apps/common/constants.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/apps/common/constants.py)
+Canonical status strings, operational parameters, and membership tuples:
+- **Statuses**: Account (`active`, `blocked`, `closed`), Coordinator (`pending`, `approved`, `suspended`, `revoked`), Event (`draft`, `published`, `active`, `completed`, `cancelled`), Application (`pending`, `accepted`, `waitlisted`, `rejected`, `withdrawn`, `expired`), Assignment (`assigned`, `confirmed`, `completed`, `cancelled`), Attendance (`expected`, `checked_in`, `absent`, `completed`).
+- **Tuples**: `ACTIVE_APPLICATION_STATUSES`, `ACTIVE_ASSIGNMENT_STATUSES`, `EVENT_VISIBLE_STATUSES`.
+- **Operational limits**: `OTP_MAX_ATTEMPTS = 5`, `OTP_TTL_SECONDS = 300`, `QR_DEFAULT_TTL_MINUTES = 240`.
+
+#### 2. [`apps/common/exceptions.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/apps/common/exceptions.py)
+Domain exceptions hierarchy and DRF exception handler:
+- Base `DomainError(code, message, http_status)`
+- Subclasses: `PermissionDeniedError` (403), `AccountBlockedError` (403), `AccountClosedError` (403), `InvalidStateError` (409), `CapacityFullError` (409), `OnboardingRequiredError` (409), `ApplicationNotAllowedError` (400), `QrTokenInvalidError` (400), `NotFoundError` (404), `InvalidOtpError` (400), `TooManyAttemptsError` (429), `VerificationRequiredError` (409).
+- `domain_exception_handler(exc, context)`: Serializes errors to the canonical contract shape:
+  ```json
+  {
+    "error": {
+      "code": "capacity_full",
+      "message": "No remaining capacity."
+    }
+  }
+  ```
+
+#### 3. [`apps/common/pagination.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/apps/common/pagination.py)
+- `StandardPagination` inheriting from DRF `PageNumberPagination`: `page_size = 20`, `page_size_query_param = "page_size"`, `max_page_size = 100`.
+
+#### 4. [`backend/settings.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/settings.py)
+- Wired `REST_FRAMEWORK['EXCEPTION_HANDLER'] = 'apps.common.exceptions.domain_exception_handler'`.
+- Wired `REST_FRAMEWORK['DEFAULT_PAGINATION_CLASS'] = 'apps.common.pagination.StandardPagination'`.
+
+#### 5. [`apps/common/tests/test_foundation.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/apps/common/tests/test_foundation.py)
+- Verified tuple membership and operational limits.
+- Verified all domain exception subclasses, status codes, and error payloads.
+- Verified pagination parameters.
+
+---
+
+### Test Verification
+
+```powershell
+python manage.py test apps.common.tests.test_foundation
+```
+**Output:**
+```
+Found 3 test(s).
+System check identified no issues (0 silenced).
+...
+----------------------------------------------------------------------
+Ran 3 tests in 0.001s
+
+OK
+```
+
+Ready to proceed to **Task 02: Common Security (HMAC, Encryption, Tokens)** when you are ready.

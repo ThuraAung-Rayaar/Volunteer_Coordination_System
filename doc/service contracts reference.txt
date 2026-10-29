@@ -1,0 +1,265 @@
+Every service function must be implemented in the correct app.
+apps/accounts/services.py
+
+request_otp(phone: str, purpose: str = "login") -> dict
+verify_otp(phone: str, code: str, purpose: str = "login") -> tuple[user, token, created]
+update_profile(user, data: dict) -> user
+set_charity_interests(user, codes: list[str]) -> None
+add_verification_image(user, image_type: str, uploaded_file) -> image
+review_verification_image(actor, image, status: str, note: str = "") -> image
+recompute_verification_status(user) -> None
+apply_as_coordinator(user, notes: str = "") -> coordinator_profile
+approve_coordinator(actor, coordinator_profile) -> coordinator_profile
+suspend_coordinator(actor, coordinator_profile) -> coordinator_profile
+revoke_coordinator(actor, coordinator_profile) -> coordinator_profile
+
+OTP rules:
+OTP expires in 300 seconds.
+Max attempts: 5.
+Store only code_hash.
+In DEBUG only, settings.DEV_FIXED_OTP may be accepted.
+If account is blocked, reject login.
+If account is closed, reject login.
+First successful OTP creates user.
+Verification image rules:
+Convert uploaded image to JPEG.
+Strip EXIF.
+Store in private storage, not public MEDIA URL.
+Save file SHA-256.
+Set old images of same image_type to is_current=False.
+Set new image is_current=True.
+Set user verification_status = pending
+
+
+Verification status recomputation:
+If any current image is rejected:
+    verification_status = rejected
+Else if current approved mock_selfie exists
+and current approved id_license or driver_license exists:
+    verification_status = verified
+Else if any current image is pending:
+    verification_status = pending
+Else:
+    verification_status = none
+
+Coordinator approval rule:
+Admin can approve coordinator only if user.verification_status == verified.
+==================
+apps/events/services.py
+create_event(actor, data: dict, charity_codes: list[str]) -> event
+update_event(actor, event, data: dict) -> event
+publish_event(actor, event) -> event
+activate_event(actor, event) -> event
+complete_event(actor, event) -> event
+cancel_event(actor, event) -> event
+add_post(actor, event, data: dict) -> post
+update_post(actor, post, data: dict) -> post
+close_post(actor, post) -> post
+set_event_charity_fields(actor, event, charity_codes: list[str]) -> None
+apply_to_event(user, event, post=None, source="browse", qr_token=None) -> application
+withdraw_application(user, application) -> application
+accept_application(actor, application, post=None) -> tuple[application, assignment_or_none]
+reject_application(actor, application, reason: str = "") -> application
+waitlist_application(actor, application) -> application
+
+Event lifecycle:
+draft -> published -> active -> completed
+published -> cancelled
+active -> cancelled
+
+Publish rules:
+Actor must be event coordinator or admin.
+Event must be draft.
+Event must have at least one post.
+Complete rules:
+Event must be active.
+Set event status to completed.
+Set confirmed assignments to completed.
+Set checked-in attendance rows to completed.
+Cancel rules:
+Event must be published or active.
+Cancel active assignments.
+Set attendance expected rows to absent only if not checked in.
+Application rules:
+Event must be visible and status published or active.
+Application deadline must not have passed.
+User must be active.
+User must not already have active application for same event.
+If source is qr_walkin, QR token is required.
+Store conditions_snapshot containing:
+meals_provided
+lodging_provided
+travel_support_provided
+compensation_kind
+compensation_note
+onboarding_version
+
+Auto acceptance:
+If event.acceptance_mode == auto:
+    if capacity remains:
+        application.status = accepted
+        application.decided_at = now
+        assignment = create_assignment_from_application(application)
+    else:
+        application.status = waitlisted
+        application.decided_at = now
+Else:
+    application.status = pending
+Manual acceptance:
+Coordinator accepts application.
+Set decided_by and decided_at.
+Try create_assignment_from_application(application).
+Assignment may be None if no post matches.
+=============================
+apps/ops/services.py
+
+generate_qr_token(actor, event, purpose: str, max_uses=None, ttl_minutes=None) -> tuple[qr_token, raw_token]
+resolve_qr_token(raw_token: str) -> dict
+redeem_qr_token(user, raw_token: str) -> dict
+create_assignment_from_application(application, actor=None) -> assignment_or_none
+run_auto_assignment(actor, event) -> list[assignment]
+assign_manually(actor, application, post=None, group_code=None, is_group_leader=False) -> assignment
+confirm_assignment(user, assignment) -> assignment
+cancel_assignment(actor, assignment, reason: str = "") -> assignment
+acknowledge_onboarding(user, event) -> acknowledgment
+check_in(actor, event, user, method: str, qr_token=None) -> attendance
+check_out(actor, event, user) -> attendance
+mark_absent(actor, event, user) -> attendance
+submit_feedback(user, event, direction: str, target_user=None, score: int, tags=None, comment="") -> feedback
+
+QR rules:
+generate_qr_token returns raw token once.
+DB stores only token_hash.
+resolve_qr_token is public and does not consume token.
+redeem_qr_token requires authenticated user and consumes token only on success.
+Token validation:
+exists,
+not revoked,
+not expired,
+used_count < max_uses if max_uses exists.
+
+QR redemption behavior:
+
+purpose == checkin:
+    check_in(user, event, user, method="qr_scan", qr_token=token)
+
+purpose == walkin_registration:
+    apply_to_event(user, event, source="qr_walkin", qr_token=token)
+
+purpose == join_event:
+    apply_to_event(user, event, source="invite")
+
+
+Assignment creation:
+
+create_assignment_from_application is the only place assignments are created.
+It must also create Attendance(status="expected") if missing.
+It must return None if no eligible post has capacity.
+
+Post eligibility:
+
+If post.required_skills is not empty:
+    user.skills must overlap post.required_skills.
+
+If post.physical_level == heavy:
+    user.physical_ok must be True
+    and user.can_lift_heavy must be True.
+
+If post.physical_level == medium:
+    user.physical_ok must be True.
+
+If post.new_volunteers_allowed is False:
+    user.new_to_volunteer must be False.
+
+
+Auto assignment:
+
+1. Lock event.
+2. Get accepted applications without active assignment.
+3. Get open posts ordered by priority ascending, id ascending.
+4. For each application, choose first eligible post with remaining capacity.
+5. Create assignment.
+6. After assignments are created, build groups:
+   - group by post,
+   - group size = event.group_size,
+   - group_code format: "G1", "G2", etc. per post.
+7. Leader selection:
+   - if post.leader_needed or event.leader_strategy == "first_experienced",
+   - choose first member in group with has_leader_experience=True,
+   - set is_group_leader=True.
+8. Never create more than one leader per group.
+
+Check-in rules:
+
+Event must be active.
+User must have active assignment for event.
+If event.require_onboarding_ack is True:
+    user must have acknowledged current event.onboarding_version.
+If actor is the user:
+    method must be qr_scan and QR token must be valid.
+If actor is coordinator/admin:
+    method may be coordinator_manual.
+If already checked in, return existing attendance idempotently.
+
+Checkout rules:
+Attendance must be checked_in.
+Set checkout_at = now.
+Keep status checked_in until event completion, unless coordinator marks completed.
+
+Feedback rules:
+Event must be completed.
+Score is required and must be 1..5.
+
+coordinator_to_volunteer:
+    rater must be event coordinator/admin.
+    target_user required.
+    target_user must have had active assignment in event.
+
+volunteer_to_event:
+    rater must have had active assignment in event.
+    target_user must be None.
+
+volunteer_to_coordinator:
+    rater must have had active assignment in event.
+    target_user is forced to event.coordinator_id.
+
+
+============
+apps/audit/services.py
+log_action(actor, action: str, entity_type: str, entity_id, before=None, after=None, ip=None) -> audit_log
+warn_user(admin, target_user, reason: str) -> moderation_action
+block_user(admin, target_user, reason: str, expires_at=None) -> moderation_action
+unblock_user(admin, target_user, reason: str) -> moderation_action
+close_account(admin, target_user, reason: str) -> moderation_action
+reinstate_account(admin, target_user, reason: str) -> moderation_action
+delete_event(admin, event, reason: str) -> moderation_action
+restore_event(admin, event, reason: str) -> moderation_action
+cancel_event_by_admin(admin, event, reason: str) -> moderation_action
+hide_feedback(admin, feedback, reason: str) -> moderation_action
+dashboard_stats() -> dict
+
+
+Moderation rules:
+Admin only.
+Must update target object state and create ModerationAction in same transaction.
+Must write AuditLog.
+user_block may set blocked_until.
+user_unblock sets account_status=active and blocked_until=None.
+event_delete sets deleted_at and deleted_by.
+event_restore clears deleted_at and deleted_by.
+feedback_hide sets feedback.status=hidden.
+Dashboard stats must include:
+active_users
+blocked_users
+users_pending_verification
+images_pending_review
+coordinators_pending_approval
+coordinators_approved
+events_draft
+events_published
+events_active
+events_completed
+events_cancelled
+events_deleted
+warnings_last_30d
+Use ORM aggregation only. Do not use SQL views.

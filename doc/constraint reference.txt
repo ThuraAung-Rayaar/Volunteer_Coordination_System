@@ -1,0 +1,345 @@
+Use condition=, not check=.
+apps/accounts/models.py
+from django.contrib.postgres.indexes import GinIndex
+from django.db import models
+from django.db.models import Q
+
+User constraints:
+class Meta:
+    db_table = "users"
+    constraints = [
+        models.CheckConstraint(
+            condition=Q(blocked_until__isnull=True) | Q(account_status="blocked"),
+            name="ck_users_blocked_until",
+        ),
+        models.CheckConstraint(
+            condition=Q(is_willing_to_donate=True)
+            | (
+                Q(is_willing_to_donate_blood=False)
+                & Q(is_willing_to_donate_items=False)
+            ),
+            name="ck_users_donation_consistency",
+        ),
+    ]
+    indexes = [
+        models.Index(fields=["account_status"], name="idx_users_account_status"),
+        models.Index(fields=["verification_status"], name="idx_users_verif_status"),
+        models.Index(
+            fields=["is_admin"],
+            name="idx_users_is_admin",
+            condition=Q(is_admin=True),
+        ),
+        models.Index(
+            fields=["blood_type"],
+            name="idx_users_blood_donors",
+            condition=Q(is_willing_to_donate_blood=True),
+        ),
+        GinIndex(fields=["skills"], name="idx_users_skills_gin"),
+    ]
+
+CoordinatorProfile constraint:
+class Meta:
+    db_table = "coordinator_profiles"
+    constraints = [
+        models.CheckConstraint(
+            condition=Q(status="pending") | Q(approved_at__isnull=False),
+            name="ck_coordinator_approval",
+        ),
+    ]
+
+UserCharityInterest FK naming:
+field_code = models.ForeignKey(
+    "events.CharityField",
+    on_delete=models.CASCADE,
+    db_column="field_code",
+    related_name="user_interests",
+)
+
+UserVerificationImage constraints:
+class Meta:
+    db_table = "user_verification_images"
+    constraints = [
+        models.UniqueConstraint(
+            fields=["user", "image_type"],
+            condition=Q(is_current=True),
+            name="uq_current_verification_image",
+        ),
+        models.CheckConstraint(
+            condition=Q(status="pending")
+            | (Q(reviewed_by__isnull=False) & Q(reviewed_at__isnull=False)),
+            name="ck_verification_review",
+        ),
+        models.CheckConstraint(
+            condition=Q(comparison_score__isnull=True)
+            | (Q(comparison_score__gte=0) & Q(comparison_score__lte=1)),
+            name="ck_verification_score_range",
+        ),
+    ]
+
+AuthOtp constraint:
+class Meta:
+    db_table = "auth_otp"
+    constraints = [
+        models.CheckConstraint(
+            condition=Q(attempt_count__gte=0),
+            name="ck_auth_otp_attempt_count",
+        ),
+    ]
+============
+apps/events/models.py
+CharityField primary key:
+code = models.CharField(max_length=50, primary_key=True)
+
+EventCharityField FK naming:
+
+field_code = models.ForeignKey(
+    CharityField,
+    on_delete=models.PROTECT,
+    db_column="field_code",
+    related_name="event_links",
+)
+
+Event constraints:
+class Meta:
+    db_table = "events"
+    constraints = [
+        models.CheckConstraint(
+            condition=Q(end_at__gt=models.F("start_at")),
+            name="ck_events_time",
+        ),
+        models.CheckConstraint(
+            condition=Q(application_deadline__isnull=True)
+            | Q(application_deadline__lte=models.F("start_at")),
+            name="ck_events_deadline",
+        ),
+        models.CheckConstraint(
+            condition=(
+                Q(deleted_at__isnull=True) & Q(deleted_by__isnull=True)
+            )
+            | (
+                Q(deleted_at__isnull=False) & Q(deleted_by__isnull=False)
+            ),
+            name="ck_events_soft_delete",
+        ),
+        models.CheckConstraint(
+            condition=Q(group_size__isnull=True) | Q(group_size__gt=0),
+            name="ck_events_group_size",
+        ),
+        models.CheckConstraint(
+            condition=Q(max_participants__isnull=True) | Q(max_participants__gt=0),
+            name="ck_events_max_participants",
+        ),
+        models.CheckConstraint(
+            condition=Q(onboarding_version__gte=1),
+            name="ck_events_onboarding_version",
+        ),
+    ]
+    indexes = [
+        models.Index(fields=["coordinator"], name="idx_events_coordinator"),
+        models.Index(fields=["start_at"], name="idx_events_start_at"),
+        models.Index(
+            fields=["status", "start_at"],
+            name="idx_events_visible",
+            condition=Q(deleted_at__isnull=True),
+        ),
+    ]
+Add queryset helper:
+
+class EventQuerySet(models.QuerySet):
+    def visible(self):
+        return self.filter(deleted_at__isnull=True)
+
+
+class Event(models.Model):
+    objects = EventQuerySet.as_manager()
+
+EventPost constraints:
+
+class Meta:
+    db_table = "event_posts"
+    constraints = [
+        models.UniqueConstraint(
+            fields=["event", "title"],
+            name="uq_event_post_event_title",
+        ),
+        models.CheckConstraint(
+            condition=Q(required_headcount__gt=0),
+            name="ck_event_posts_headcount",
+        ),
+    ]
+    indexes = [
+        GinIndex(fields=["required_skills"], name="idx_event_posts_skills_gin"),
+    ]
+
+
+EventApplication constraints:
+
+class Meta:
+    db_table = "event_applications"
+    constraints = [
+        models.UniqueConstraint(
+            fields=["event", "user"],
+            condition=Q(status__in=["pending", "accepted", "waitlisted"]),
+            name="uq_event_application_active",
+        ),
+        models.CheckConstraint(
+            condition=~Q(source="qr_walkin") | Q(qr_token__isnull=False),
+            name="ck_application_walkin_token",
+        ),
+        models.CheckConstraint(
+            condition=~Q(status__in=["accepted", "rejected"])
+            | Q(decided_at__isnull=False),
+            name="ck_application_decided",
+        ),
+    ]
+
+==================
+apps/ops/models.py
+QrToken constraints:
+
+class Meta:
+    db_table = "qr_tokens"
+    constraints = [
+        models.CheckConstraint(
+            condition=Q(max_uses__isnull=True) | Q(max_uses__gt=0),
+            name="ck_qr_max_uses",
+        ),
+        models.CheckConstraint(
+            condition=Q(used_count__gte=0),
+            name="ck_qr_used_count_nonnegative",
+        ),
+        models.CheckConstraint(
+            condition=Q(max_uses__isnull=True)
+            | Q(used_count__lte=models.F("max_uses")),
+            name="ck_qr_used_count",
+        ),
+    ]
+Assignment constraints:
+class Meta:
+    db_table = "assignments"
+    constraints = [
+        models.UniqueConstraint(
+            fields=["event", "user"],
+            condition=~Q(status="cancelled"),
+            name="uq_assignment_active",
+        ),
+        models.UniqueConstraint(
+            fields=["application"],
+            condition=~Q(status="cancelled"),
+            name="uq_assignment_application",
+        ),
+        models.UniqueConstraint(
+            fields=["event", "group_code"],
+            condition=Q(is_group_leader=True) & ~Q(status="cancelled"),
+            name="uq_assignment_group_leader",
+        ),
+        models.CheckConstraint(
+            condition=(
+                Q(assigned_by="auto") & Q(assigned_by_user__isnull=True)
+            )
+            | (
+                ~Q(assigned_by="auto") & Q(assigned_by_user__isnull=False)
+            ),
+            name="ck_assignment_actor",
+        ),
+        models.CheckConstraint(
+            condition=Q(schedule_start__isnull=True)
+            | Q(schedule_end__isnull=True)
+            | Q(schedule_end__gt=models.F("schedule_start")),
+            name="ck_assignment_schedule",
+        ),
+        models.CheckConstraint(
+            condition=Q(is_group_leader=False) | Q(group_code__isnull=False),
+            name="ck_assignment_leader_group",
+        ),
+    ]
+Attendance constraints:
+class Meta:
+    db_table = "attendance"
+    constraints = [
+        models.UniqueConstraint(
+            fields=["event", "user"],
+            name="uq_attendance_event_user",
+        ),
+        models.CheckConstraint(
+            condition=~Q(status__in=["checked_in", "completed"])
+            | Q(checkin_at__isnull=False),
+            name="ck_attendance_checkin",
+        ),
+        models.CheckConstraint(
+            condition=Q(checkout_at__isnull=True)
+            | (
+                Q(checkin_at__isnull=False)
+                & Q(checkout_at__gte=models.F("checkin_at"))
+            ),
+            name="ck_attendance_checkout",
+        ),
+    ]
+Feedback constraints:
+class Meta:
+    db_table = "feedback"
+    constraints = [
+        models.CheckConstraint(
+            condition=Q(score__gte=1) & Q(score__lte=5),
+            name="ck_feedback_score",
+        ),
+        models.CheckConstraint(
+            condition=(
+                Q(direction="volunteer_to_event") & Q(target_user__isnull=True)
+            )
+            | (
+                ~Q(direction="volunteer_to_event") & Q(target_user__isnull=False)
+            ),
+            name="ck_feedback_target",
+        ),
+        models.UniqueConstraint(
+            fields=["event", "rater_user", "direction"],
+            condition=Q(target_user__isnull=True),
+            name="uq_feedback_event_once",
+        ),
+        models.UniqueConstraint(
+            fields=["event", "rater_user", "direction", "target_user"],
+            condition=Q(target_user__isnull=False),
+            name="uq_feedback_user_once",
+        ),
+    ]
+=============
+apps/audit/models.py
+ModerationAction constraints
+class Meta:
+    db_table = "moderation_actions"
+    constraints = [
+        models.CheckConstraint(
+            condition=(
+                Q(
+                    action_type__in=[
+                        "user_warning",
+                        "user_block",
+                        "user_unblock",
+                        "account_close",
+                        "account_reinstate",
+                    ]
+                )
+                & Q(target_user__isnull=False)
+            )
+            | (
+                Q(
+                    action_type__in=[
+                        "event_delete",
+                        "event_restore",
+                        "event_cancel",
+                    ]
+                )
+                & Q(event__isnull=False)
+            )
+            | (
+                Q(action_type="feedback_hide")
+                & Q(feedback__isnull=False)
+            ),
+            name="ck_moderation_subject",
+        ),
+        models.CheckConstraint(
+            condition=Q(expires_at__isnull=True) | Q(action_type="user_block"),
+            name="ck_moderation_expiry",
+        ),
+    ]

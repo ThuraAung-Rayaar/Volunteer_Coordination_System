@@ -1,0 +1,1786 @@
+================================================================================
+C:\Users\USER\Documents\INTERN\Project\Volunteer HR Management\python stack\apps\events\__init__.py
+----------------------------------------
+
+================================================================================
+C:\Users\USER\Documents\INTERN\Project\Volunteer HR Management\python stack\apps\events\admin.py
+----------------------------------------
+# apps/events/admin.py
+from django.contrib import admin
+
+from apps.audit.services import delete_event, restore_event
+from apps.events.models import (
+    CharityField,
+    Event,
+    EventApplication,
+    EventCharityField,
+    EventPost,
+)
+from apps.events.services import activate_event, publish_event
+
+
+@admin.register(CharityField)
+class CharityFieldAdmin(admin.ModelAdmin):
+    list_display = ("code", "label", "active", "sort_order")
+    list_editable = ("active", "sort_order")
+    search_fields = ("code", "label")
+
+
+class EventCharityFieldInline(admin.TabularInline):
+    model = EventCharityField
+    extra = 1
+
+
+class EventPostInline(admin.StackedInline):
+    model = EventPost
+    extra = 1
+
+
+@admin.register(Event)
+class EventAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "title",
+        "coordinator",
+        "purpose_type",
+        "status",
+        "start_at",
+        "end_at",
+        "deleted_at",
+    )
+    list_filter = (
+        "status",
+        "purpose_type",
+        "compensation_kind",
+        "meals_provided",
+        "lodging_provided",
+    )
+    search_fields = ("title", "description", "location_name")
+    inlines = [EventCharityFieldInline, EventPostInline]
+    actions = [
+        "publish_event",
+        "activate_event",
+        "soft_delete_event",
+        "restore_event",
+        "publish_selected_events",
+        "activate_selected_events",
+        "soft_delete_selected_events",
+        "restore_selected_events",
+    ]
+
+    @admin.action(description="Publish selected draft events")
+    def publish_event(self, request, queryset):
+        for event in queryset:
+            if event.status == "draft":
+                try:
+                    publish_event(actor=request.user, event=event)
+                except Exception as e:
+                    self.message_user(request, f"Error publishing event #{event.id}: {e}", level="error")
+
+    @admin.action(description="Activate selected published events")
+    def activate_event(self, request, queryset):
+        for event in queryset:
+            if event.status == "published":
+                try:
+                    activate_event(actor=request.user, event=event)
+                except Exception as e:
+                    self.message_user(request, f"Error activating event #{event.id}: {e}", level="error")
+
+    @admin.action(description="Soft delete selected events")
+    def soft_delete_event(self, request, queryset):
+        for event in queryset:
+            if event.deleted_at is None:
+                try:
+                    delete_event(admin=request.user, event=event, reason="Deleted via admin panel")
+                except Exception as e:
+                    self.message_user(request, f"Error deleting event #{event.id}: {e}", level="error")
+
+    @admin.action(description="Restore selected deleted events")
+    def restore_event(self, request, queryset):
+        for event in queryset:
+            if event.deleted_at is not None:
+                try:
+                    restore_event(admin=request.user, event=event, reason="Restored via admin panel")
+                except Exception as e:
+                    self.message_user(request, f"Error restoring event #{event.id}: {e}", level="error")
+
+    publish_selected_events = publish_event
+    activate_selected_events = activate_event
+    soft_delete_selected_events = soft_delete_event
+    restore_selected_events = restore_event
+
+
+@admin.register(EventPost)
+class EventPostAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "title",
+        "event",
+        "required_headcount",
+        "physical_level",
+        "status",
+        "priority",
+    )
+    list_filter = ("status", "physical_level", "leader_needed")
+    search_fields = ("title", "event__title")
+
+
+@admin.register(EventApplication)
+class EventApplicationAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "event",
+        "user",
+        "post",
+        "source",
+        "status",
+        "applied_at",
+        "decided_at",
+    )
+    list_filter = ("status", "source")
+    search_fields = ("user__display_name", "event__title")
+    readonly_fields = ("applied_at", "decided_at", "decided_by", "conditions_snapshot")
+
+================================================================================
+C:\Users\USER\Documents\INTERN\Project\Volunteer HR Management\python stack\apps\events\apps.py
+----------------------------------------
+from django.apps import AppConfig
+
+
+class EventsConfig(AppConfig):
+    default_auto_field = 'django.db.models.BigAutoField'
+    name = 'apps.events'
+
+================================================================================
+C:\Users\USER\Documents\INTERN\Project\Volunteer HR Management\python stack\apps\events\models.py
+----------------------------------------
+# apps/events/models.py
+from django.contrib.postgres.indexes import GinIndex
+from django.core.exceptions import ValidationError
+from django.db import models
+from django.db.models import F, Q
+
+from apps.common.constants import (
+    APPLICATION_ACCEPTED,
+    APPLICATION_EXPIRED,
+    APPLICATION_PENDING,
+    APPLICATION_REJECTED,
+    APPLICATION_WAITLISTED,
+    APPLICATION_WITHDRAWN,
+    EVENT_ACTIVE,
+    EVENT_CANCELLED,
+    EVENT_COMPLETED,
+    EVENT_DRAFT,
+    EVENT_PUBLISHED,
+)
+from apps.common.fields import ChoiceArrayField
+
+
+class CharityField(models.Model):
+    code = models.CharField(max_length=50, primary_key=True)
+    label = models.CharField(max_length=100)
+    active = models.BooleanField(default=True)
+    sort_order = models.IntegerField(default=100)
+
+    class Meta:
+        db_table = "charity_fields"
+        ordering = ["sort_order", "code"]
+        verbose_name = "Charity Field"
+        verbose_name_plural = "Charity Fields"
+
+    def __str__(self):
+        return f"{self.label} ({self.code})"
+
+
+class EventQuerySet(models.QuerySet):
+    def visible(self):
+        return self.filter(deleted_at__isnull=True)
+
+
+class Event(models.Model):
+    PURPOSE_TYPE_CHOICES = [
+        ("charity_event", "Charity Event"),
+        ("help_wanted_event", "Help Wanted Event"),
+    ]
+
+    STATUS_CHOICES = [
+        (EVENT_DRAFT, "Draft"),
+        (EVENT_PUBLISHED, "Published"),
+        (EVENT_ACTIVE, "Active"),
+        (EVENT_COMPLETED, "Completed"),
+        (EVENT_CANCELLED, "Cancelled"),
+    ]
+
+    ACCEPTANCE_MODE_CHOICES = [
+        ("auto", "Auto"),
+        ("manual", "Manual"),
+    ]
+
+    LEADER_STRATEGY_CHOICES = [
+        ("none", "None"),
+        ("first_experienced", "First Experienced"),
+        ("manual", "Manual"),
+    ]
+
+    COMPENSATION_KIND_CHOICES = [
+        ("unpaid", "Unpaid"),
+        ("arranged_outside_system", "Arranged Outside System"),
+    ]
+
+    id = models.BigAutoField(primary_key=True)
+
+    coordinator = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.PROTECT,
+        related_name="coordinated_events",
+    )
+
+    title = models.CharField(max_length=255)
+    description = models.TextField(null=True, blank=True)
+    purpose_type = models.CharField(
+        max_length=30,
+        choices=PURPOSE_TYPE_CHOICES,
+        default="charity_event",
+    )
+
+    location_name = models.CharField(max_length=255, null=True, blank=True)
+    landmark_text = models.TextField(null=True, blank=True)
+
+    start_at = models.DateTimeField(db_index=True)
+    end_at = models.DateTimeField()
+    application_deadline = models.DateTimeField(null=True, blank=True)
+
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default=EVENT_DRAFT,
+    )
+
+    acceptance_mode = models.CharField(
+        max_length=20,
+        choices=ACCEPTANCE_MODE_CHOICES,
+        default="manual",
+    )
+    auto_assign_enabled = models.BooleanField(default=True)
+    group_size = models.IntegerField(null=True, blank=True)
+    leader_strategy = models.CharField(
+        max_length=30,
+        choices=LEADER_STRATEGY_CHOICES,
+        default="none",
+    )
+    max_participants = models.IntegerField(null=True, blank=True)
+
+    # Recruiting conditions (informational only)
+    meals_provided = models.BooleanField(default=False)
+    lodging_provided = models.BooleanField(default=False)
+    travel_support_provided = models.BooleanField(default=False)
+
+    compensation_kind = models.CharField(
+        max_length=30,
+        choices=COMPENSATION_KIND_CHOICES,
+        default="unpaid",
+    )
+    compensation_note = models.TextField(null=True, blank=True)
+
+    # Onboarding
+    onboarding_text = models.TextField(null=True, blank=True)
+    onboarding_version = models.IntegerField(default=1)
+    require_onboarding_ack = models.BooleanField(default=True)
+
+    # Walk-in QR registration
+    qr_registration_enabled = models.BooleanField(default=True)
+
+    # Soft delete
+    deleted_at = models.DateTimeField(null=True, blank=True)
+    deleted_by = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="deleted_events",
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    objects = EventQuerySet.as_manager()
+
+    class Meta:
+        db_table = "events"
+        verbose_name = "Event"
+        verbose_name_plural = "Events"
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(end_at__gt=F("start_at")),
+                name="ck_events_time",
+            ),
+            models.CheckConstraint(
+                condition=Q(application_deadline__isnull=True)
+                | Q(application_deadline__lte=F("start_at")),
+                name="ck_events_deadline",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    Q(deleted_at__isnull=True) & Q(deleted_by__isnull=True)
+                )
+                | (
+                    Q(deleted_at__isnull=False) & Q(deleted_by__isnull=False)
+                ),
+                name="ck_events_soft_delete",
+            ),
+            models.CheckConstraint(
+                condition=Q(group_size__isnull=True) | Q(group_size__gt=0),
+                name="ck_events_group_size",
+            ),
+            models.CheckConstraint(
+                condition=Q(max_participants__isnull=True) | Q(max_participants__gt=0),
+                name="ck_events_max_participants",
+            ),
+            models.CheckConstraint(
+                condition=Q(onboarding_version__gte=1),
+                name="ck_events_onboarding_version",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["coordinator"], name="idx_events_coordinator"),
+            models.Index(fields=["start_at"], name="idx_events_start_at"),
+            models.Index(
+                fields=["status", "start_at"],
+                name="idx_events_visible",
+                condition=Q(deleted_at__isnull=True),
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.title} ({self.status})"
+
+    def clean(self):
+        super().clean()
+        if self.start_at and self.end_at and self.end_at <= self.start_at:
+            raise ValidationError({"end_at": "end_at must be greater than start_at."})
+        if self.application_deadline and self.start_at and self.application_deadline > self.start_at:
+            raise ValidationError({"application_deadline": "application_deadline must be <= start_at."})
+        if (self.deleted_at is None) != (self.deleted_by is None):
+            raise ValidationError("deleted_at and deleted_by must be set together or both null.")
+        if self.group_size is not None and self.group_size <= 0:
+            raise ValidationError({"group_size": "group_size must be greater than 0."})
+        if self.max_participants is not None and self.max_participants <= 0:
+            raise ValidationError({"max_participants": "max_participants must be greater than 0."})
+        if self.onboarding_version is not None and self.onboarding_version < 1:
+            raise ValidationError({"onboarding_version": "onboarding_version must be >= 1."})
+
+
+class EventCharityField(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    event = models.ForeignKey(
+        Event,
+        on_delete=models.CASCADE,
+        related_name="charity_links",
+    )
+    field_code = models.ForeignKey(
+        CharityField,
+        on_delete=models.PROTECT,
+        db_column="field_code",
+        related_name="event_links",
+    )
+
+    class Meta:
+        db_table = "event_charity_fields"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["event", "field_code"],
+                name="uq_event_charity_field",
+            ),
+        ]
+        verbose_name = "Event Charity Field"
+        verbose_name_plural = "Event Charity Fields"
+
+    def __str__(self):
+        return f"{self.event.title} -> {self.field_code.label}"
+
+
+class EventPost(models.Model):
+    PHYSICAL_LEVEL_CHOICES = [
+        ("none", "None"),
+        ("light", "Light"),
+        ("medium", "Medium"),
+        ("heavy", "Heavy"),
+    ]
+
+    STATUS_CHOICES = [
+        ("open", "Open"),
+        ("full", "Full"),
+        ("closed", "Closed"),
+    ]
+
+    id = models.BigAutoField(primary_key=True)
+    event = models.ForeignKey(
+        Event,
+        on_delete=models.CASCADE,
+        related_name="posts",
+    )
+
+    title = models.CharField(max_length=150)
+    description = models.TextField(null=True, blank=True)
+    required_headcount = models.IntegerField()
+
+    physical_level = models.CharField(
+        max_length=20,
+        choices=PHYSICAL_LEVEL_CHOICES,
+        default="none",
+    )
+    required_skills = ChoiceArrayField(
+        models.CharField(max_length=50),
+        default=list,
+        blank=True,
+    )
+
+    leader_needed = models.BooleanField(default=False)
+    new_volunteers_allowed = models.BooleanField(default=True)
+    priority = models.IntegerField(default=100)
+
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default="open",
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "event_posts"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["event", "title"],
+                name="uq_event_post_event_title",
+            ),
+            models.CheckConstraint(
+                condition=Q(required_headcount__gt=0),
+                name="ck_event_posts_headcount",
+            ),
+        ]
+        indexes = [
+            GinIndex(fields=["required_skills"], name="idx_event_posts_skills_gin"),
+        ]
+        verbose_name = "Event Post"
+        verbose_name_plural = "Event Posts"
+
+    def __str__(self):
+        return f"{self.title} @ {self.event.title}"
+
+    def clean(self):
+        super().clean()
+        if self.required_headcount is not None and self.required_headcount <= 0:
+            raise ValidationError({"required_headcount": "required_headcount must be greater than 0."})
+
+
+class EventApplication(models.Model):
+    SOURCE_CHOICES = [
+        ("browse", "Browse"),
+        ("qr_walkin", "QR Walk-in"),
+        ("invite", "Invite"),
+    ]
+
+    STATUS_CHOICES = [
+        (APPLICATION_PENDING, "Pending"),
+        (APPLICATION_ACCEPTED, "Accepted"),
+        (APPLICATION_WAITLISTED, "Waitlisted"),
+        (APPLICATION_REJECTED, "Rejected"),
+        (APPLICATION_WITHDRAWN, "Withdrawn"),
+        (APPLICATION_EXPIRED, "Expired"),
+    ]
+
+    id = models.BigAutoField(primary_key=True)
+    event = models.ForeignKey(
+        Event,
+        on_delete=models.CASCADE,
+        related_name="applications",
+    )
+    post = models.ForeignKey(
+        EventPost,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="applications",
+    )
+    user = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.CASCADE,
+        related_name="applications",
+    )
+    qr_token = models.ForeignKey(
+        "ops.QrToken",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="applications",
+    )
+
+    source = models.CharField(
+        max_length=20,
+        choices=SOURCE_CHOICES,
+        default="browse",
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default=APPLICATION_PENDING,
+        db_index=True,
+    )
+
+    applied_at = models.DateTimeField(auto_now_add=True)
+    decided_by = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="decided_applications",
+    )
+    decided_at = models.DateTimeField(null=True, blank=True)
+
+    conditions_acknowledged_at = models.DateTimeField(null=True, blank=True)
+    conditions_snapshot = models.JSONField(null=True, blank=True)
+    note = models.TextField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "event_applications"
+        verbose_name = "Event Application"
+        verbose_name_plural = "Event Applications"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["event", "user"],
+                condition=Q(status__in=["pending", "accepted", "waitlisted"]),
+                name="uq_event_application_active",
+            ),
+            models.CheckConstraint(
+                condition=~Q(source="qr_walkin") | Q(qr_token__isnull=False),
+                name="ck_application_walkin_token",
+            ),
+            models.CheckConstraint(
+                condition=~Q(status__in=["accepted", "rejected"])
+                | Q(decided_at__isnull=False),
+                name="ck_application_decided",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["event", "status"], name="idx_event_apps_status"),
+        ]
+
+    def __str__(self):
+        return f"{self.user.display_name} -> {self.event.title} [{self.status}]"
+
+    def clean(self):
+        super().clean()
+        if self.source == "qr_walkin" and self.qr_token is None:
+            raise ValidationError({"qr_token": "qr_token is required when source is 'qr_walkin'."})
+        if self.status in [APPLICATION_ACCEPTED, APPLICATION_REJECTED] and self.decided_at is None:
+            raise ValidationError({"decided_at": f"decided_at is required when status is '{self.status}'."})
+
+================================================================================
+C:\Users\USER\Documents\INTERN\Project\Volunteer HR Management\python stack\apps\events\serializers.py
+----------------------------------------
+# apps/events/serializers.py
+from rest_framework import serializers
+
+from apps.events.models import CharityField, Event, EventApplication, EventCharityField, EventPost
+
+
+class CharityFieldSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CharityField
+        fields = ["code", "label", "active", "sort_order"]
+
+
+class EventPostSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EventPost
+        fields = [
+            "id",
+            "event",
+            "title",
+            "description",
+            "required_headcount",
+            "physical_level",
+            "required_skills",
+            "leader_needed",
+            "new_volunteers_allowed",
+            "priority",
+            "status",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "event", "created_at", "updated_at"]
+
+
+class EventPostCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EventPost
+        fields = [
+            "title",
+            "description",
+            "required_headcount",
+            "physical_level",
+            "required_skills",
+            "leader_needed",
+            "new_volunteers_allowed",
+            "priority",
+        ]
+
+
+class EventSerializer(serializers.ModelSerializer):
+    posts = EventPostSerializer(many=True, read_only=True)
+    coordinator_name = serializers.CharField(source="coordinator.display_name", read_only=True)
+    charity_codes = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Event
+        fields = [
+            "id",
+            "coordinator",
+            "coordinator_name",
+            "title",
+            "description",
+            "purpose_type",
+            "location_name",
+            "landmark_text",
+            "start_at",
+            "end_at",
+            "application_deadline",
+            "status",
+            "acceptance_mode",
+            "auto_assign_enabled",
+            "group_size",
+            "leader_strategy",
+            "max_participants",
+            "meals_provided",
+            "lodging_provided",
+            "travel_support_provided",
+            "compensation_kind",
+            "compensation_note",
+            "onboarding_text",
+            "onboarding_version",
+            "require_onboarding_ack",
+            "qr_registration_enabled",
+            "charity_codes",
+            "posts",
+            "created_at",
+        ]
+        read_only_fields = [
+            "id",
+            "coordinator",
+            "status",
+            "onboarding_version",
+            "created_at",
+        ]
+
+    def get_charity_codes(self, obj):
+        return list(obj.charity_links.values_list("field_code_id", flat=True))
+
+
+class EventCreateUpdateSerializer(serializers.ModelSerializer):
+    charity_codes = serializers.ListField(
+        child=serializers.CharField(max_length=50),
+        required=False,
+        default=list,
+    )
+
+    class Meta:
+        model = Event
+        fields = [
+            "title",
+            "description",
+            "purpose_type",
+            "location_name",
+            "landmark_text",
+            "start_at",
+            "end_at",
+            "application_deadline",
+            "acceptance_mode",
+            "auto_assign_enabled",
+            "group_size",
+            "leader_strategy",
+            "max_participants",
+            "meals_provided",
+            "lodging_provided",
+            "travel_support_provided",
+            "compensation_kind",
+            "compensation_note",
+            "onboarding_text",
+            "require_onboarding_ack",
+            "qr_registration_enabled",
+            "charity_codes",
+        ]
+
+
+class EventApplicationSerializer(serializers.ModelSerializer):
+    user_display_name = serializers.CharField(source="user.display_name", read_only=True)
+    event_title = serializers.CharField(source="event.title", read_only=True)
+    post_title = serializers.CharField(source="post.title", read_only=True, allow_null=True)
+
+    class Meta:
+        model = EventApplication
+        fields = [
+            "id",
+            "event",
+            "event_title",
+            "post",
+            "post_title",
+            "user",
+            "user_display_name",
+            "qr_token",
+            "source",
+            "status",
+            "applied_at",
+            "decided_at",
+            "conditions_acknowledged_at",
+            "conditions_snapshot",
+            "note",
+            "created_at",
+        ]
+        read_only_fields = [
+            "id",
+            "user",
+            "applied_at",
+            "decided_at",
+            "conditions_snapshot",
+            "created_at",
+        ]
+
+
+class EventApplicationCreateSerializer(serializers.Serializer):
+    post_id = serializers.IntegerField(required=False, allow_null=True)
+    source = serializers.CharField(max_length=20, default="browse", required=False)
+    qr_token_id = serializers.IntegerField(required=False, allow_null=True)
+
+================================================================================
+C:\Users\USER\Documents\INTERN\Project\Volunteer HR Management\python stack\apps\events\services.py
+----------------------------------------
+# apps/events/services.py
+from django.db import transaction
+from django.utils import timezone
+
+from apps.audit.services import log_action
+from apps.common.constants import (
+    ACTIVE_APPLICATION_STATUSES,
+    ACTIVE_ASSIGNMENT_STATUSES,
+    APPLICATION_ACCEPTED,
+    APPLICATION_PENDING,
+    APPLICATION_REJECTED,
+    APPLICATION_WAITLISTED,
+    APPLICATION_WITHDRAWN,
+    ASSIGNMENT_CANCELLED,
+    ASSIGNMENT_COMPLETED,
+    ATTENDANCE_ABSENT,
+    ATTENDANCE_CHECKED_IN,
+    ATTENDANCE_COMPLETED,
+    ATTENDANCE_EXPECTED,
+    EVENT_ACTIVE,
+    EVENT_CANCELLED,
+    EVENT_COMPLETED,
+    EVENT_DRAFT,
+    EVENT_PUBLISHED,
+)
+from apps.common.exceptions import (
+    CapacityFullError,
+    DomainError,
+    InvalidStateError,
+    PermissionDeniedError,
+)
+from apps.common.permissions import (
+    ensure_active_account,
+    ensure_admin,
+    ensure_approved_coordinator,
+    ensure_event_manager,
+    is_admin,
+)
+from apps.events.models import CharityField, Event, EventApplication, EventCharityField, EventPost
+
+
+def create_event(actor, data: dict, charity_codes: list[str] = ()) -> Event:
+    """
+    Coordinator or Admin creates a new event in draft status.
+    """
+    if not is_admin(actor):
+        ensure_approved_coordinator(actor)
+
+    clean_data = dict(data)
+    # Ensure status starts at draft and coordinator is actor
+    clean_data["status"] = EVENT_DRAFT
+    clean_data["coordinator"] = actor
+    clean_data.setdefault("onboarding_version", 1)
+
+    # Pop charity codes if included in data dict
+    codes = charity_codes or clean_data.pop("charity_codes", ())
+
+    with transaction.atomic():
+        event = Event.objects.create(**clean_data)
+        if codes:
+            set_event_charity_fields(actor, event, codes)
+
+        log_action(
+            actor=actor,
+            action="create_event",
+            entity_type="event",
+            entity_id=event.id,
+            after_data={"title": event.title, "start_at": str(event.start_at)},
+        )
+
+    return event
+
+
+def update_event(actor, event: Event, data: dict) -> Event:
+    """
+    Coordinator or Admin updates event fields.
+    If onboarding_text changes, onboarding_version is incremented automatically.
+    """
+    ensure_event_manager(actor, event)
+
+    clean_data = dict(data)
+    # Do not allow arbitrary status jumps via update_event
+    clean_data.pop("status", None)
+    clean_data.pop("coordinator", None)
+
+    with transaction.atomic():
+        # Check if onboarding_text changed
+        if "onboarding_text" in clean_data:
+            new_text = clean_data["onboarding_text"]
+            if new_text != event.onboarding_text:
+                event.onboarding_version += 1
+
+        codes = clean_data.pop("charity_codes", None)
+        if codes is not None:
+            set_event_charity_fields(actor, event, codes)
+
+        for field, value in clean_data.items():
+            if hasattr(event, field):
+                setattr(event, field, value)
+
+        event.clean()
+        event.save()
+
+        log_action(
+            actor=actor,
+            action="update_event",
+            entity_type="event",
+            entity_id=event.id,
+            after_data={k: str(v) for k, v in clean_data.items()},
+        )
+
+    return event
+
+
+def publish_event(actor, event: Event) -> Event:
+    """
+    Transition event from draft to published.
+    Requires at least one post.
+    """
+    ensure_event_manager(actor, event)
+
+    if event.status != EVENT_DRAFT:
+        raise InvalidStateError(f"Cannot publish event in status '{event.status}'. Must be 'draft'.")
+
+    if not event.posts.exists():
+        raise DomainError("Event must have at least one post before publishing.", code="post_required")
+
+    with transaction.atomic():
+        event.status = EVENT_PUBLISHED
+        event.save(update_fields=["status"])
+
+        log_action(
+            actor=actor,
+            action="publish_event",
+            entity_type="event",
+            entity_id=event.id,
+        )
+
+    return event
+
+
+def activate_event(actor, event: Event) -> Event:
+    """
+    Transition event from published to active.
+    """
+    ensure_event_manager(actor, event)
+
+    if event.status != EVENT_PUBLISHED:
+        raise InvalidStateError(f"Cannot activate event in status '{event.status}'. Must be 'published'.")
+
+    with transaction.atomic():
+        event.status = EVENT_ACTIVE
+        event.save(update_fields=["status"])
+
+        log_action(
+            actor=actor,
+            action="activate_event",
+            entity_type="event",
+            entity_id=event.id,
+        )
+
+    return event
+
+
+def complete_event(actor, event: Event) -> Event:
+    """
+    Transition event from active to completed.
+    Cascades status:
+    - Active/confirmed assignments become completed
+    - Checked-in attendances become completed
+    """
+    ensure_event_manager(actor, event)
+
+    if event.status != EVENT_ACTIVE:
+        raise InvalidStateError(f"Cannot complete event in status '{event.status}'. Must be 'active'.")
+
+    from apps.ops.models import Assignment, Attendance
+
+    with transaction.atomic():
+        event.status = EVENT_COMPLETED
+        event.save(update_fields=["status"])
+
+        # Complete active assignments
+        Assignment.objects.filter(
+            event=event,
+            status__in=ACTIVE_ASSIGNMENT_STATUSES,
+        ).update(status=ASSIGNMENT_COMPLETED)
+
+        # Complete checked-in attendances
+        Attendance.objects.filter(
+            event=event,
+            status=ATTENDANCE_CHECKED_IN,
+        ).update(status=ATTENDANCE_COMPLETED)
+
+        log_action(
+            actor=actor,
+            action="complete_event",
+            entity_type="event",
+            entity_id=event.id,
+        )
+
+    return event
+
+
+def cancel_event(actor, event: Event, reason: str = "") -> Event:
+    """
+    Cancel an event (from published or active).
+    Cascades:
+    - Active assignments become cancelled
+    - Expected attendances (not checked in) become absent
+    """
+    ensure_event_manager(actor, event)
+
+    if event.status not in (EVENT_PUBLISHED, EVENT_ACTIVE):
+        raise InvalidStateError(
+            f"Cannot cancel event in status '{event.status}'. Must be 'published' or 'active'."
+        )
+
+    from apps.ops.models import Assignment, Attendance
+
+    with transaction.atomic():
+        event.status = EVENT_CANCELLED
+        event.save(update_fields=["status"])
+
+        # Cancel active assignments
+        Assignment.objects.filter(
+            event=event,
+            status__in=ACTIVE_ASSIGNMENT_STATUSES,
+        ).update(status=ASSIGNMENT_CANCELLED)
+
+        # Mark expected attendance as absent
+        Attendance.objects.filter(
+            event=event,
+            status=ATTENDANCE_EXPECTED,
+        ).update(status=ATTENDANCE_ABSENT)
+
+        log_action(
+            actor=actor,
+            action="cancel_event",
+            entity_type="event",
+            entity_id=event.id,
+            after_data={"reason": reason},
+        )
+
+    return event
+
+
+def set_event_charity_fields(actor, event: Event, charity_codes: list[str]) -> None:
+    """
+    Replace event charity fields atomically.
+    """
+    ensure_event_manager(actor, event)
+
+    with transaction.atomic():
+        valid_fields = list(CharityField.objects.filter(code__in=charity_codes, active=True))
+        EventCharityField.objects.filter(event=event).delete()
+        EventCharityField.objects.bulk_create(
+            [EventCharityField(event=event, field_code=field) for field in valid_fields]
+        )
+
+
+def add_post(actor, event: Event, data: dict) -> EventPost:
+    """
+    Add recruiting post to event.
+    """
+    ensure_event_manager(actor, event)
+
+    with transaction.atomic():
+        clean_data = dict(data)
+        clean_data["event"] = event
+        clean_data.setdefault("status", "open")
+        post = EventPost.objects.create(**clean_data)
+
+        log_action(
+            actor=actor,
+            action="add_post",
+            entity_type="event_post",
+            entity_id=post.id,
+            after_data={"title": post.title, "required_headcount": post.required_headcount},
+        )
+
+    return post
+
+
+def update_post(actor, post: EventPost, data: dict) -> EventPost:
+    """
+    Update post details.
+    """
+    ensure_event_manager(actor, post.event)
+
+    clean_data = dict(data)
+    clean_data.pop("event", None)
+
+    with transaction.atomic():
+        for field, value in clean_data.items():
+            if hasattr(post, field):
+                setattr(post, field, value)
+
+        post.clean()
+        post.save()
+
+        log_action(
+            actor=actor,
+            action="update_post",
+            entity_type="event_post",
+            entity_id=post.id,
+            after_data={k: str(v) for k, v in clean_data.items()},
+        )
+
+    return post
+
+
+def close_post(actor, post: EventPost) -> EventPost:
+    """
+    Close post to new applications.
+    """
+    ensure_event_manager(actor, post.event)
+
+    with transaction.atomic():
+        post.status = "closed"
+        post.save(update_fields=["status"])
+
+        log_action(
+            actor=actor,
+            action="close_post",
+            entity_type="event_post",
+            entity_id=post.id,
+        )
+
+    return post
+
+
+def apply_to_event(
+    user,
+    event: Event,
+    post: EventPost = None,
+    source: str = "browse",
+    qr_token=None,
+) -> EventApplication:
+    """
+    Volunteer applies to an event (or specific post in an event).
+    Enforces active account, event status, deadlines, duplicates, and capacity gating.
+    Lock order: Event -> Post -> Application.
+    """
+    ensure_active_account(user)
+
+    if event.deleted_at is not None or event.status not in (EVENT_PUBLISHED, EVENT_ACTIVE):
+        raise InvalidStateError(
+            f"Event is not open for applications. Current status: '{event.status}'."
+        )
+
+    if event.application_deadline and event.application_deadline <= timezone.now():
+        raise DomainError("Application deadline has passed.", code="deadline_passed")
+
+    # Check existing active applications for (event, user)
+    if EventApplication.objects.filter(
+        event=event,
+        user=user,
+        status__in=ACTIVE_APPLICATION_STATUSES,
+    ).exists():
+        raise DomainError(
+            "User already has an active application for this event.",
+            code="duplicate_application",
+        )
+
+    if source == "qr_walkin":
+        if not qr_token:
+            raise DomainError("QR token required for walk-in registration.", code="qr_token_required")
+        if qr_token.expires_at <= timezone.now() or qr_token.revoked_at is not None:
+            raise DomainError("QR token is expired or revoked.", code="invalid_qr_token")
+
+    conditions_snapshot = {
+        "meals_provided": event.meals_provided,
+        "lodging_provided": event.lodging_provided,
+        "travel_support_provided": event.travel_support_provided,
+        "compensation_kind": event.compensation_kind,
+        "compensation_note": event.compensation_note,
+        "onboarding_version": event.onboarding_version,
+    }
+
+    with transaction.atomic():
+        # Lock event
+        locked_event = Event.objects.select_for_update().get(id=event.id)
+        locked_post = None
+        if post:
+            locked_post = EventPost.objects.select_for_update().get(id=post.id)
+
+        from apps.ops.models import Assignment
+
+        # Capacity check and status determination
+        if locked_event.acceptance_mode == "auto":
+            if locked_post:
+                active_assignments_count = Assignment.objects.filter(
+                    post=locked_post,
+                    status__in=ACTIVE_ASSIGNMENT_STATUSES,
+                ).count()
+                capacity = locked_post.required_headcount - active_assignments_count
+            else:
+                if locked_event.max_participants:
+                    accepted_count = EventApplication.objects.filter(
+                        event=locked_event,
+                        status=APPLICATION_ACCEPTED,
+                    ).count()
+                    capacity = locked_event.max_participants - accepted_count
+                else:
+                    capacity = 999999
+
+            if capacity > 0:
+                app_status = APPLICATION_ACCEPTED
+                decided_at = timezone.now()
+            else:
+                app_status = APPLICATION_WAITLISTED
+                decided_at = timezone.now()
+        else:
+            app_status = APPLICATION_PENDING
+            decided_at = None
+
+        application = EventApplication.objects.create(
+            event=locked_event,
+            post=locked_post,
+            user=user,
+            source=source,
+            qr_token=qr_token,
+            status=app_status,
+            decided_at=decided_at,
+            conditions_snapshot=conditions_snapshot,
+        )
+
+        if app_status == APPLICATION_ACCEPTED and locked_event.auto_assign_enabled:
+            from apps.ops.services import create_assignment_from_application
+            create_assignment_from_application(application)
+
+        log_action(
+            actor=user,
+            action="apply_event",
+            entity_type="event_application",
+            entity_id=application.id,
+            after_data={"status": app_status, "source": source},
+        )
+
+    return application
+
+
+def accept_application(
+    actor,
+    application: EventApplication,
+    post: EventPost = None,
+):
+    """
+    Coordinator or Admin accepts an application.
+    Verifies capacity on target post or event.
+    Returns (application, assignment).
+    """
+    ensure_event_manager(actor, application.event)
+
+    if application.status == APPLICATION_ACCEPTED:
+        raise InvalidStateError("Application is already accepted.")
+
+    if application.status not in (APPLICATION_PENDING, APPLICATION_WAITLISTED):
+        raise InvalidStateError(
+            f"Cannot accept application in status '{application.status}'."
+        )
+
+    target_post = post or application.post
+
+    with transaction.atomic():
+        locked_app = EventApplication.objects.select_for_update().get(id=application.id)
+        from apps.ops.models import Assignment
+
+        if target_post:
+            locked_post = EventPost.objects.select_for_update().get(id=target_post.id)
+            active_post_assigns = Assignment.objects.filter(
+                post=locked_post,
+                status__in=ACTIVE_ASSIGNMENT_STATUSES,
+            ).count()
+            if active_post_assigns >= locked_post.required_headcount:
+                raise CapacityFullError("Target post capacity is full.")
+            locked_app.post = locked_post
+        elif locked_app.event.max_participants:
+            accepted_apps_count = EventApplication.objects.filter(
+                event=locked_app.event,
+                status=APPLICATION_ACCEPTED,
+            ).exclude(id=locked_app.id).count()
+            if accepted_apps_count >= locked_app.event.max_participants:
+                raise CapacityFullError("Event capacity is full.")
+
+        locked_app.status = APPLICATION_ACCEPTED
+        locked_app.decided_by = actor
+        locked_app.decided_at = timezone.now()
+        locked_app.save()
+
+        from apps.ops.services import create_assignment_from_application
+        assignment = create_assignment_from_application(locked_app, actor=actor)
+
+        log_action(
+            actor=actor,
+            action="accept_application",
+            entity_type="event_application",
+            entity_id=locked_app.id,
+        )
+
+    return locked_app, assignment
+
+
+def reject_application(
+    actor,
+    application: EventApplication,
+    reason: str = "",
+) -> EventApplication:
+    """
+    Coordinator or Admin rejects an application.
+    """
+    ensure_event_manager(actor, application.event)
+
+    if application.status == APPLICATION_REJECTED:
+        return application
+
+    with transaction.atomic():
+        application.status = APPLICATION_REJECTED
+        application.decided_by = actor
+        application.decided_at = timezone.now()
+        if reason:
+            application.note = reason
+        application.save()
+
+        log_action(
+            actor=actor,
+            action="reject_application",
+            entity_type="event_application",
+            entity_id=application.id,
+            after_data={"reason": reason},
+        )
+
+    return application
+
+
+def waitlist_application(
+    actor,
+    application: EventApplication,
+) -> EventApplication:
+    """
+    Coordinator or Admin waitlists an application.
+    """
+    ensure_event_manager(actor, application.event)
+
+    with transaction.atomic():
+        application.status = APPLICATION_WAITLISTED
+        application.decided_by = actor
+        application.decided_at = timezone.now()
+        application.save()
+
+        log_action(
+            actor=actor,
+            action="waitlist_application",
+            entity_type="event_application",
+            entity_id=application.id,
+        )
+
+    return application
+
+
+def withdraw_application(
+    user,
+    application: EventApplication,
+) -> EventApplication:
+    """
+    Volunteer withdraws own application.
+    Cancels any active assignment.
+    """
+    if application.user_id != user.id:
+        raise PermissionDeniedError("Cannot withdraw another volunteer's application.")
+
+    if application.status not in (APPLICATION_PENDING, APPLICATION_ACCEPTED, APPLICATION_WAITLISTED):
+        raise InvalidStateError(
+            f"Cannot withdraw application in status '{application.status}'."
+        )
+
+    from apps.ops.models import Assignment
+
+    with transaction.atomic():
+        Assignment.objects.filter(
+            application=application,
+            status__in=ACTIVE_ASSIGNMENT_STATUSES,
+        ).update(status=ASSIGNMENT_CANCELLED)
+
+        application.status = APPLICATION_WITHDRAWN
+        application.save()
+
+        log_action(
+            actor=user,
+            action="withdraw_application",
+            entity_type="event_application",
+            entity_id=application.id,
+        )
+
+    return application
+
+================================================================================
+C:\Users\USER\Documents\INTERN\Project\Volunteer HR Management\python stack\apps\events\tests.py
+----------------------------------------
+from django.test import TestCase
+
+# Create your tests here.
+
+================================================================================
+C:\Users\USER\Documents\INTERN\Project\Volunteer HR Management\python stack\apps\events\urls.py
+----------------------------------------
+# apps/events/urls.py
+from django.urls import path
+
+from apps.events.views import (
+    ApplicationAcceptView,
+    ApplicationRejectView,
+    ApplicationWaitlistView,
+    ApplicationWithdrawView,
+    CharityFieldListView,
+    CoordinatorEventDetailPatchView,
+    CoordinatorEventListCreateView,
+    EventActivateView,
+    EventApplicationsListView,
+    EventApplyView,
+    EventCancelView,
+    EventCompleteView,
+    EventPostListCreateView,
+    EventPublishView,
+    EventRosterView,
+    EventUnassignedView,
+    PostDetailPatchView,
+    PublicEventDetailView,
+    PublicEventListView,
+)
+
+urlpatterns = [
+    # Charity Fields
+    path("charity-fields/", CharityFieldListView.as_view(), name="charity-fields-list"),
+
+    # Public Events
+    path("events/", PublicEventListView.as_view(), name="public-events-list"),
+    path("events/<int:pk>/", PublicEventDetailView.as_view(), name="public-event-detail"),
+
+    # Coordinator Event Management
+    path("coordinator/events/", CoordinatorEventListCreateView.as_view(), name="coordinator-events-list-create"),
+    path("coordinator/events/<int:pk>/", CoordinatorEventDetailPatchView.as_view(), name="coordinator-event-patch"),
+
+    # Event Lifecycle Actions
+    path("events/<int:pk>/publish/", EventPublishView.as_view(), name="event-publish"),
+    path("events/<int:pk>/activate/", EventActivateView.as_view(), name="event-activate"),
+    path("events/<int:pk>/complete/", EventCompleteView.as_view(), name="event-complete"),
+    path("events/<int:pk>/cancel/", EventCancelView.as_view(), name="event-cancel"),
+
+    # Event Posts
+    path("events/<int:pk>/posts/", EventPostListCreateView.as_view(), name="event-posts-list-create"),
+    path("posts/<int:pk>/", PostDetailPatchView.as_view(), name="post-patch"),
+
+    # Applications
+    path("events/<int:pk>/apply/", EventApplyView.as_view(), name="event-apply"),
+    path("events/<int:pk>/applications/", EventApplicationsListView.as_view(), name="event-applications-list"),
+    path("events/<int:pk>/roster/", EventRosterView.as_view(), name="event-roster"),
+    path("events/<int:pk>/unassigned/", EventUnassignedView.as_view(), name="event-unassigned"),
+
+    # Application Decisions
+    path("applications/<int:pk>/accept/", ApplicationAcceptView.as_view(), name="application-accept"),
+    path("applications/<int:pk>/reject/", ApplicationRejectView.as_view(), name="application-reject"),
+    path("applications/<int:pk>/waitlist/", ApplicationWaitlistView.as_view(), name="application-waitlist"),
+    path("applications/<int:pk>/withdraw/", ApplicationWithdrawView.as_view(), name="application-withdraw"),
+]
+
+================================================================================
+C:\Users\USER\Documents\INTERN\Project\Volunteer HR Management\python stack\apps\events\views.py
+----------------------------------------
+# apps/events/views.py
+from django.db.models import Q
+from django.shortcuts import get_object_or_404
+from rest_framework import status
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
+from apps.common.constants import (
+    ACTIVE_ASSIGNMENT_STATUSES,
+    EVENT_ACTIVE,
+    EVENT_PUBLISHED,
+)
+from apps.common.exceptions import PermissionDeniedError
+from apps.common.permissions import (
+    IsActiveAccount,
+    ensure_event_manager,
+    is_admin,
+    is_event_manager,
+)
+from apps.events.models import CharityField, Event, EventApplication, EventPost
+from apps.events.serializers import (
+    CharityFieldSerializer,
+    EventApplicationCreateSerializer,
+    EventApplicationSerializer,
+    EventCreateUpdateSerializer,
+    EventPostCreateSerializer,
+    EventPostSerializer,
+    EventSerializer,
+)
+from apps.events.services import (
+    accept_application,
+    activate_event,
+    add_post,
+    apply_to_event,
+    cancel_event,
+    close_post,
+    complete_event,
+    create_event,
+    publish_event,
+    reject_application,
+    update_event,
+    update_post,
+    waitlist_application,
+    withdraw_application,
+)
+from apps.ops.models import Assignment, Attendance, QrToken
+
+
+class CharityFieldListView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        fields = CharityField.objects.filter(active=True).order_by("sort_order")
+        return Response(CharityFieldSerializer(fields, many=True).data)
+
+
+class PublicEventListView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        qs = Event.objects.visible().filter(status__in=[EVENT_PUBLISHED, EVENT_ACTIVE])
+
+        charity_field = request.query_params.get("charity_field")
+        if charity_field:
+            qs = qs.filter(charity_links__field_code_id=charity_field)
+
+        date_from = request.query_params.get("date_from")
+        if date_from:
+            qs = qs.filter(start_at__gte=date_from)
+
+        date_to = request.query_params.get("date_to")
+        if date_to:
+            qs = qs.filter(start_at__lte=date_to)
+
+        q = request.query_params.get("q")
+        if q:
+            qs = qs.filter(
+                Q(title__icontains=q)
+                | Q(description__icontains=q)
+                | Q(location_name__icontains=q)
+                | Q(landmark_text__icontains=q)
+            )
+
+        qs = qs.distinct().order_by("start_at")
+        return Response(EventSerializer(qs, many=True).data)
+
+
+class PublicEventDetailView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request, pk):
+        event = get_object_or_404(Event.objects.visible(), pk=pk)
+        if event.status not in (EVENT_PUBLISHED, EVENT_ACTIVE):
+            if not is_event_manager(request.user, event):
+                raise PermissionDeniedError("Event is not publicly visible.")
+        return Response(EventSerializer(event).data)
+
+
+class CoordinatorEventListCreateView(APIView):
+    permission_classes = [IsAuthenticated, IsActiveAccount]
+
+    def get(self, request):
+        if is_admin(request.user):
+            qs = Event.objects.visible()
+        else:
+            qs = Event.objects.visible().filter(coordinator=request.user)
+        qs = qs.order_by("-created_at")
+        return Response(EventSerializer(qs, many=True).data)
+
+    def post(self, request):
+        serializer = EventCreateUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        event = create_event(
+            actor=request.user,
+            data=serializer.validated_data,
+        )
+        return Response(EventSerializer(event).data, status=status.HTTP_201_CREATED)
+
+
+class CoordinatorEventDetailPatchView(APIView):
+    permission_classes = [IsAuthenticated, IsActiveAccount]
+
+    def patch(self, request, pk):
+        event = get_object_or_404(Event.objects.visible(), pk=pk)
+        serializer = EventCreateUpdateSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        updated_event = update_event(
+            actor=request.user,
+            event=event,
+            data=serializer.validated_data,
+        )
+        return Response(EventSerializer(updated_event).data)
+
+
+class EventPublishView(APIView):
+    permission_classes = [IsAuthenticated, IsActiveAccount]
+
+    def post(self, request, pk):
+        event = get_object_or_404(Event.objects.visible(), pk=pk)
+        published = publish_event(request.user, event)
+        return Response(EventSerializer(published).data)
+
+
+class EventActivateView(APIView):
+    permission_classes = [IsAuthenticated, IsActiveAccount]
+
+    def post(self, request, pk):
+        event = get_object_or_404(Event.objects.visible(), pk=pk)
+        activated = activate_event(request.user, event)
+        return Response(EventSerializer(activated).data)
+
+
+class EventCompleteView(APIView):
+    permission_classes = [IsAuthenticated, IsActiveAccount]
+
+    def post(self, request, pk):
+        event = get_object_or_404(Event.objects.visible(), pk=pk)
+        completed = complete_event(request.user, event)
+        return Response(EventSerializer(completed).data)
+
+
+class EventCancelView(APIView):
+    permission_classes = [IsAuthenticated, IsActiveAccount]
+
+    def post(self, request, pk):
+        event = get_object_or_404(Event.objects.visible(), pk=pk)
+        reason = request.data.get("reason", "")
+        cancelled = cancel_event(request.user, event, reason=reason)
+        return Response(EventSerializer(cancelled).data)
+
+
+class EventPostListCreateView(APIView):
+    def get_permissions(self):
+        if self.request.method == "GET":
+            return [AllowAny()]
+        return [IsAuthenticated(), IsActiveAccount()]
+
+    def get(self, request, pk):
+        event = get_object_or_404(Event.objects.visible(), pk=pk)
+        posts = event.posts.all().order_by("priority", "id")
+        return Response(EventPostSerializer(posts, many=True).data)
+
+    def post(self, request, pk):
+        event = get_object_or_404(Event.objects.visible(), pk=pk)
+        serializer = EventPostCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        post = add_post(request.user, event, serializer.validated_data)
+        return Response(EventPostSerializer(post).data, status=status.HTTP_201_CREATED)
+
+
+class PostDetailPatchView(APIView):
+    permission_classes = [IsAuthenticated, IsActiveAccount]
+
+    def patch(self, request, pk):
+        post = get_object_or_404(EventPost, pk=pk)
+        if request.data.get("status") == "closed":
+            closed_post = close_post(request.user, post)
+            return Response(EventPostSerializer(closed_post).data)
+        updated_post = update_post(request.user, post, request.data)
+        return Response(EventPostSerializer(updated_post).data)
+
+
+class EventApplyView(APIView):
+    permission_classes = [IsAuthenticated, IsActiveAccount]
+
+    def post(self, request, pk):
+        event = get_object_or_404(Event.objects.visible(), pk=pk)
+        serializer = EventApplicationCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        post = None
+        post_id = serializer.validated_data.get("post_id")
+        if post_id:
+            post = get_object_or_404(event.posts, pk=post_id)
+
+        qr_token = None
+        qr_token_id = serializer.validated_data.get("qr_token_id")
+        if qr_token_id:
+            qr_token = get_object_or_404(QrToken, pk=qr_token_id)
+
+        source = serializer.validated_data.get("source", "browse")
+        application = apply_to_event(
+            user=request.user,
+            event=event,
+            post=post,
+            source=source,
+            qr_token=qr_token,
+        )
+        return Response(
+            EventApplicationSerializer(application).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class EventApplicationsListView(APIView):
+    permission_classes = [IsAuthenticated, IsActiveAccount]
+
+    def get(self, request, pk):
+        event = get_object_or_404(Event.objects.visible(), pk=pk)
+        ensure_event_manager(request.user, event)
+        apps = event.applications.all().order_by("-created_at")
+        return Response(EventApplicationSerializer(apps, many=True).data)
+
+
+class EventRosterView(APIView):
+    permission_classes = [IsAuthenticated, IsActiveAccount]
+
+    def get(self, request, pk):
+        event = get_object_or_404(Event.objects.visible(), pk=pk)
+        ensure_event_manager(request.user, event)
+
+        assignments = (
+            Assignment.objects.filter(event=event)
+            .select_related("user", "post")
+            .order_by("group_code", "id")
+        )
+        attendances = {
+            att.user_id: att.status
+            for att in Attendance.objects.filter(event=event)
+        }
+
+        roster = []
+        for a in assignments:
+            roster.append(
+                {
+                    "assignment_id": a.id,
+                    "user_id": a.user_id,
+                    "display_name": a.user.display_name,
+                    "post_id": a.post_id,
+                    "post_title": a.post.title if a.post else None,
+                    "group_code": a.group_code,
+                    "is_group_leader": a.is_group_leader,
+                    "status": a.status,
+                    "attendance_status": attendances.get(a.user_id, "none"),
+                }
+            )
+
+        return Response({"roster": roster})
+
+
+class EventUnassignedView(APIView):
+    permission_classes = [IsAuthenticated, IsActiveAccount]
+
+    def get(self, request, pk):
+        event = get_object_or_404(Event.objects.visible(), pk=pk)
+        ensure_event_manager(request.user, event)
+
+        unassigned_apps = (
+            EventApplication.objects.filter(event=event, status="accepted")
+            .filter(~Q(assignments__status__in=ACTIVE_ASSIGNMENT_STATUSES))
+            .distinct()
+        )
+        return Response(EventApplicationSerializer(unassigned_apps, many=True).data)
+
+
+class ApplicationAcceptView(APIView):
+    permission_classes = [IsAuthenticated, IsActiveAccount]
+
+    def post(self, request, pk):
+        app = get_object_or_404(EventApplication, pk=pk)
+        post = None
+        post_id = request.data.get("post_id")
+        if post_id:
+            post = get_object_or_404(app.event.posts, pk=post_id)
+
+        accepted_app, assignment = accept_application(
+            actor=request.user,
+            application=app,
+            post=post,
+        )
+        return Response(
+            {
+                "application": EventApplicationSerializer(accepted_app).data,
+                "assigned": bool(assignment),
+            }
+        )
+
+
+class ApplicationRejectView(APIView):
+    permission_classes = [IsAuthenticated, IsActiveAccount]
+
+    def post(self, request, pk):
+        app = get_object_or_404(EventApplication, pk=pk)
+        reason = request.data.get("reason", "")
+        rejected_app = reject_application(
+            actor=request.user,
+            application=app,
+            reason=reason,
+        )
+        return Response(EventApplicationSerializer(rejected_app).data)
+
+
+class ApplicationWaitlistView(APIView):
+    permission_classes = [IsAuthenticated, IsActiveAccount]
+
+    def post(self, request, pk):
+        app = get_object_or_404(EventApplication, pk=pk)
+        waitlisted_app = waitlist_application(
+            actor=request.user,
+            application=app,
+        )
+        return Response(EventApplicationSerializer(waitlisted_app).data)
+
+
+class ApplicationWithdrawView(APIView):
+    permission_classes = [IsAuthenticated, IsActiveAccount]
+
+    def post(self, request, pk):
+        app = get_object_or_404(EventApplication, pk=pk)
+        withdrawn_app = withdraw_application(
+            user=request.user,
+            application=app,
+        )
+        return Response(EventApplicationSerializer(withdrawn_app).data)

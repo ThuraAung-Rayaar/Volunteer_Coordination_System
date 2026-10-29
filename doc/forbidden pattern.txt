@@ -1,0 +1,19 @@
+Do not generate code that does any of these:
+
+Do not use CheckConstraint(check=...)
+Do not use raw status strings
+Do not put business logic in serializers
+Do not put business logic in views
+Do not return raw QR token after generation
+Do not store raw OTP
+Do not store raw phone number
+Do not expose verification image path publicly
+Do not allow direct PATCH of status fields
+Do not create SQL views in v0.5
+Do not create unmanaged Django models in v0.5
+Do not build React Native admin screens in v0.5
+Do not use floating point for IDs, scores, or money-like values
+Do not silently overwrite soft-deleted events
+Do not allow volunteer to check in another volunteer
+Do not allow coordinator to approve unverified coordinator
+

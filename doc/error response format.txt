@@ -1,0 +1,10 @@
+Error Response Format
+Every business error must return:
+{
+  "error": {
+    "code": "capacity_full",
+    "message": "No remaining capacity."
+  }
+}
+
+Do not return ad-hoc error shapes.

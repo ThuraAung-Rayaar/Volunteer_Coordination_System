@@ -1,0 +1,89 @@
+Analyzed constraint%20reference.txt:L197-285
+Analyzed constraint%20reference.txt:L285-330
+Ran list sections in CONTRACT.txt
+Analyzed CONTRACT.txt:L424-580
+Edited models.py
+Analyzed admin.py:L1-37
+Analyzed serializers.py:L1-46
+Created __init__.py
+Created test_models.py
+Ran run apps.ops.tests.test_models
+Ran run all tests across all modules
+
+### Task 06: Ops Models & Constraints Completed
+
+Implemented all canonical operations models (`QrToken`, `Assignment`, `Attendance`, `OnboardingAcknowledgment`, `Feedback`), database constraints using `models.CheckConstraint(condition=...)` and `models.UniqueConstraint(condition=...)`, and unit tests in accordance with [`master_implementation_plan.md`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/master_implementation_plan.md), [`doc/constraint reference.txt`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/doc/constraint%20reference.txt), and [`doc/CONTRACT.txt`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/doc/CONTRACT.txt).
+
+---
+
+### Models & Constraints Implemented
+
+#### 1. [`apps/ops/models.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/apps/ops/models.py)
+
+- **`QrToken`**:
+  - **Fields**: `event` (`ForeignKey`), `created_by` (`ForeignKey("accounts.User")`), `purpose`, `token_hash` (unique), `max_uses`, `used_count`, `expires_at`, `revoked_at`.
+  - **Check Constraints**:
+    - `ck_qr_max_uses`: `Q(max_uses__isnull=True) | Q(max_uses__gt=0)`
+    - `ck_qr_used_count_nonnegative`: `Q(used_count__gte=0)`
+    - `ck_qr_used_count`: `Q(max_uses__isnull=True) | Q(used_count__lte=F("max_uses"))`
+
+- **`Assignment`**:
+  - **Fields**: `event` (`ForeignKey`), `application` (`ForeignKey`), `post` (`ForeignKey nullable`), `user` (`ForeignKey`), `group_code`, `is_group_leader`, `status`, `assigned_by`, `assigned_by_user` (`ForeignKey nullable`), `schedule_start`, `schedule_end`, `conditions_snapshot`.
+  - **Constraints**:
+    - `uq_assignment_active`: `UniqueConstraint(fields=["event", "user"], condition=~Q(status="cancelled"))`
+    - `uq_assignment_application`: `UniqueConstraint(fields=["application"], condition=~Q(status="cancelled"))`
+    - `uq_assignment_group_leader`: `UniqueConstraint(fields=["event", "group_code"], condition=Q(is_group_leader=True) & ~Q(status="cancelled"))`
+    - `ck_assignment_actor`: `(Q(assigned_by="auto") & Q(assigned_by_user__isnull=True)) | (~Q(assigned_by="auto") & Q(assigned_by_user__isnull=False))`
+    - `ck_assignment_schedule`: `Q(schedule_start__isnull=True) | Q(schedule_end__isnull=True) | Q(schedule_end__gt=F("schedule_start"))`
+    - `ck_assignment_leader_group`: `Q(is_group_leader=False) | Q(group_code__isnull=False)`
+
+- **`Attendance`**:
+  - **Fields**: `event` (`ForeignKey`), `user` (`ForeignKey`), `assignment` (`ForeignKey nullable`), `qr_token` (`ForeignKey nullable`), `status`, `checkin_at`, `checkout_at`, `method`, `recorded_by` (`ForeignKey("accounts.User", db_column="recorded_by_user_id")`), `note`.
+  - **Constraints**:
+    - `uq_attendance_event_user`: `UniqueConstraint(fields=["event", "user"])`
+    - `ck_attendance_checkin`: `~Q(status__in=["checked_in", "completed"]) | Q(checkin_at__isnull=False)`
+    - `ck_attendance_checkout`: `Q(checkout_at__isnull=True) | (Q(checkin_at__isnull=False) & Q(checkout_at__gte=F("checkin_at")))`
+
+- **`OnboardingAcknowledgment`**:
+  - **Fields**: `user` (`ForeignKey`), `event` (`ForeignKey`), `onboarding_version`, `method`, `acknowledged_at`.
+  - **Constraint**: `uq_onboarding_ack` on `("user", "event", "onboarding_version")`.
+
+- **`Feedback`**:
+  - **Fields**: `event` (`ForeignKey`), `rater_user` (`ForeignKey`), `target_user` (`ForeignKey nullable`), `direction`, `score`, `tags` (`ChoiceArrayField`), `comment`, `status`.
+  - **Constraints**:
+    - `ck_feedback_score`: `Q(score__gte=1) & Q(score__lte=5)`
+    - `ck_feedback_target`: `(Q(direction="volunteer_to_event") & Q(target_user__isnull=True)) | (~Q(direction="volunteer_to_event") & Q(target_user__isnull=False))`
+    - `uq_feedback_event_once`: `UniqueConstraint(fields=["event", "rater_user", "direction"], condition=Q(target_user__isnull=True))`
+    - `uq_feedback_user_once`: `UniqueConstraint(fields=["event", "rater_user", "direction", "target_user"], condition=Q(target_user__isnull=False))`
+
+---
+
+### Test Suite
+
+#### 2. [`apps/ops/tests/test_models.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/apps/ops/tests/test_models.py)
+- `test_qr_max_uses_boundary`: Validates token usage boundaries, non-negative bounds, and over-use prevention.
+- `test_assignment_unique_active_per_event_and_application`: Validates single active assignment constraints, actor assignment logic (`auto` vs `coordinator`), and schedule start/end chronology.
+- `test_single_group_leader_constraint`: Validates group leader uniqueness per squad and rejects leaders lacking group codes.
+- `test_attendance_checkin_checkout_ordering`: Validates check-in timestamp presence for attendance confirmation and prevents `checkout_at < checkin_at`.
+- `test_feedback_direction_target_constraint`: Validates target user presence according to feedback direction and score boundaries (1..5).
+
+---
+
+### Test Verification
+
+```powershell
+python manage.py test apps.common.tests apps.accounts.tests apps.events.tests apps.ops.tests
+```
+
+**Output:**
+```
+Found 29 test(s).
+System check identified no issues (0 silenced).
+.............................
+----------------------------------------------------------------------
+Ran 29 tests in 0.011s
+
+OK
+```
+
+Total passing tests across the project: **29/29**. Ready to proceed to **Task 07: Audit Models & Constraints** when you are ready.

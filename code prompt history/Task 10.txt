@@ -1,0 +1,47 @@
+Analyzed serializers.py:L1-110
+Analyzed serializers.py:L110-115
+Analyzed views.py:L1-115
+Analyzed views.py:L115-135
+Analyzed urls.py:L1-24
+Analyzed test_api.py:L1-133
+Ran run accounts API tests
+Ran run full test suite
+
+### Task 10: Accounts API (Views, Serializers, URLs) — Completed
+
+All routes, serializers, views, and automated tests for Task 10 are implemented and verified.
+
+#### 1. Serializers ([`apps/accounts/serializers.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/apps/accounts/serializers.py))
+- [`UserProfileSerializer`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/apps/accounts/serializers.py#L19-L63): Handles volunteer profile data including capabilities, preferences, and emergency contact. Strictly marks `id`, `phone_hash`, `is_admin`, `account_status`, `verification_status`, and `created_at` as read-only.
+- [`OtpRequestSerializer`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/apps/accounts/serializers.py#L8-L11) & [`OtpVerifySerializer`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/apps/accounts/serializers.py#L13-L16): Validates phone numbers and 6-digit verification codes.
+- [`VerificationImageSerializer`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/apps/accounts/serializers.py#L66-L82): **Metadata only** (`id`, `image_type`, `file_format`, `file_sha256`, `status`, `comparison_status`, `is_current`, `reviewed_at`, `created_at`). The internal private filesystem path is withheld from responses.
+- [`CharityInterestsUpdateSerializer`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/apps/accounts/serializers.py#L96-L100) & [`CoordinatorProfileSerializer`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/apps/accounts/serializers.py#L103-L111): Manages interest codes and coordinator profile data.
+
+#### 2. Views ([`apps/accounts/views.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/apps/accounts/views.py))
+- [`OtpRequestView`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/apps/accounts/views.py#L30-L40): `AllowAny` — calls `request_otp`.
+- [`OtpVerifyView`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/apps/accounts/views.py#L43-L61): `AllowAny` — calls `verify_otp`, returns auth token and user profile.
+- [`MeProfileView`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/apps/accounts/views.py#L64-L76): `IsAuthenticated, IsActiveAccount` — `GET` retrieves own profile; `PATCH` delegates to `update_profile` which rejects elevation attempts (`is_admin`, etc.) with `400 Bad Request`.
+- [`MeCharityInterestsView`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/apps/accounts/views.py#L78-L91): `GET` retrieves user charity interest codes; `PUT` delegates to `set_charity_interests`.
+- [`MeVerificationImagesView`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/apps/accounts/views.py#L93-L113): Supports `MultiPartParser` for file uploads, delegates to `add_verification_image`.
+- [`MeCoordinatorView`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/apps/accounts/views.py#L116-L135): `GET` returns coordinator profile status; `POST` applies for coordinator role via `apply_as_coordinator`.
+
+#### 3. URL Routing ([`apps/accounts/urls.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/apps/accounts/urls.py))
+- `POST /api/v1/auth/otp/request/`
+- `POST /api/v1/auth/otp/verify/`
+- `GET / PATCH /api/v1/me/`
+- `GET / PUT /api/v1/me/charity-interests/`
+- `GET / POST /api/v1/me/verification-images/`
+- `GET / POST /api/v1/me/coordinator/`
+
+---
+
+### Verification:
+Executed [`apps/accounts/tests/test_api.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/apps/accounts/tests/test_api.py):
+- `test_otp_flow_api_returns_token` :white_check_mark:
+- `test_me_patch_cannot_elevate_admin` :white_check_mark:
+- `test_verification_images_returns_metadata_only` :white_check_mark:
+- `test_me_profile_unauthenticated_fails` :white_check_mark:
+- `test_me_charity_interests_get_and_put` :white_check_mark:
+- `test_me_coordinator_apply` :white_check_mark:
+
+**Full test suite: 54/54 tests passing (0.29s).**

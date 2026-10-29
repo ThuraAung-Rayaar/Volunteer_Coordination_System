@@ -1,0 +1,829 @@
+# CONTRACT — Volunteer Coordination System v0.5
+
+This file is the single source of truth.
+Flash must treat this file as authoritative.
+
+---
+
+## 1. Stack
+
+- Backend: Django + Django REST Framework
+- Database: PostgreSQL
+- ORM: Django models
+- Migrations: Django migrations
+- API docs: drf-spectacular
+- Auth: phone OTP + DRF token
+- Admin: Django admin
+- Mobile later: React Native + Expo + TypeScript
+- Mobile state: TanStack Query
+- Mobile secure storage: expo-secure-store
+
+---
+
+## 2. Project structure
+
+Do not restructure the project.
+
+apps/
+  accounts/
+  audit/
+  common/
+  events/
+  ops/
+backend/
+docs/
+  CONTRACT.md
+  MASTER_RULES.md
+
+Target helper files:
+
+apps/common/
+  constants.py
+  exceptions.py
+  security.py
+  permissions.py
+  pagination.py
+  validators.py
+  fields.py
+
+New authentication file:
+
+apps/accounts/authentication.py
+
+This file provides blocked-aware DRF token authentication.
+
+---
+
+## 3. Canonical model names
+
+Use these exact model names.
+
+### accounts
+- User
+- CoordinatorProfile
+- UserCharityInterest
+- UserVerificationImage
+- AuthOtp
+
+### events
+- CharityField
+- Event
+- EventCharityField
+- EventPost
+- EventApplication
+
+### ops
+- QrToken
+- Assignment
+- Attendance
+- OnboardingAcknowledgment
+- Feedback
+
+### audit
+- ModerationAction
+- AuditLog
+
+Do not rename these models.
+
+---
+
+## 4. Canonical user fields
+
+User:
+- id
+- phone_hash
+- phone_enc
+- display_name
+- password
+- is_admin
+- account_status
+- blocked_until
+- preferred_language
+- home_area
+- emergency_contact_name
+- emergency_contact_phone_enc
+- blood_type
+- is_willing_to_donate
+- is_willing_to_donate_blood
+- is_willing_to_donate_items
+- physical_ok
+- good_eyesight
+- needs_glasses
+- can_lift_heavy
+- can_work_outdoor
+- has_leader_experience
+- new_to_volunteer
+- skills
+- needs_meal_support
+- needs_travel_support
+- accepts_unpaid
+- verification_status
+- last_login
+
+Account status:
+- active
+- blocked
+- closed
+
+Verification status:
+- none
+- pending
+- verified
+- rejected
+
+Blood type:
+- A+
+- A-
+- B+
+- B-
+- AB+
+- AB-
+- O+
+- O-
+- unknown
+
+Rules:
+- `phone_hash` is unique.
+- `password` may be null for app-only users.
+- `blocked_until` may only be set when account_status = blocked.
+- If is_willing_to_donate_blood or is_willing_to_donate_items is true,
+  then is_willing_to_donate must also be true.
+
+---
+
+## 5. CoordinatorProfile
+
+Fields:
+- user
+- status
+- approved_by
+- approved_at
+- notes
+
+Status:
+- pending
+- approved
+- suspended
+- revoked
+
+Rules:
+- Only an approved CoordinatorProfile can own an event.
+- A normal User cannot create events.
+- A User may have both volunteer and coordinator capabilities.
+
+---
+
+## 6. UserVerificationImage
+
+Fields:
+- user
+- image_type
+- image_path
+- file_format
+- file_sha256
+- comparison_score
+- status
+- comparison_status
+- is_current
+- reviewed_by
+- reviewed_at
+- note
+
+image_type:
+- mock_selfie
+- id_license
+- driver_license
+
+status:
+- pending
+- approved
+- rejected
+
+comparison_status:
+- pending
+- match
+- no_match
+- needs_review
+
+Rules:
+- Only JPEG files are accepted.
+- Store only the server path/reference in the database.
+- Validate actual file content, not only extension.
+- Only one image per user per image_type may have is_current = true.
+- Uploading a new current image must deactivate the previous current image.
+- Approved/rejected images must have reviewed_by and reviewed_at.
+
+---
+
+## 7. AuthOtp
+
+Fields:
+- phone_hash
+- code_hash
+- purpose
+- attempt_count
+- expires_at
+- consumed_at
+
+purpose:
+- login
+- qr_registration
+
+Rules:
+- Never store raw OTP code.
+- In development, DEV_FIXED_OTP may be used.
+- OTP must expire.
+- OTP must be single-use.
+- Track attempt_count.
+- On successful verification, create or fetch User by phone_hash.
+- On success, issue DRF token.
+- Blocked/closed users cannot authenticate.
+
+---
+
+## 8. CharityField
+
+Fields:
+- code
+- label
+- active
+- sort_order
+
+Examples:
+- teaching
+- food_distribution
+- elderly_care
+- child_care
+- animal_welfare
+- environment
+- disaster_support
+- blood_donation
+- fundraising
+- logistics
+- cleaning
+- cooking
+
+Rules:
+- CharityField is a controlled lookup table.
+- Do not use free-text charity tags for user/event matching.
+- User interests and event charity fields reference this table.
+
+---
+
+## 9. Event
+
+Fields:
+- id
+- coordinator
+- title
+- description
+- purpose_type
+- location_name
+- landmark_text
+- start_at
+- end_at
+- application_deadline
+- status
+- acceptance_mode
+- auto_assign_enabled
+- group_size
+- leader_strategy
+- max_participants
+- meals_provided
+- lodging_provided
+- travel_support_provided
+- compensation_kind
+- compensation_note
+- onboarding_text
+- onboarding_version
+- require_onboarding_ack
+- qr_registration_enabled
+- deleted_at
+- deleted_by
+
+purpose_type:
+- charity_event
+- help_wanted_event
+
+status:
+- draft
+- published
+- active
+- completed
+- cancelled
+
+acceptance_mode:
+- auto
+- manual
+
+leader_strategy:
+- none
+- first_experienced
+- manual
+
+compensation_kind:
+- unpaid
+- arranged_outside_system
+
+Rules:
+- end_at must be greater than start_at.
+- application_deadline must be <= start_at if provided.
+- deleted_at and deleted_by must be set together or both null.
+- group_size, if set, must be > 0.
+- max_participants, if set, must be > 0.
+- onboarding_version >= 1.
+- Event.objects.visible() must exclude deleted events.
+- All non-admin list queries use visible().
+
+---
+
+## 10. EventPost
+
+Fields:
+- event
+- title
+- description
+- required_headcount
+- physical_level
+- required_skills
+- leader_needed
+- new_volunteers_allowed
+- priority
+- status
+
+physical_level:
+- none
+- light
+- medium
+- heavy
+
+status:
+- open
+- full
+- closed
+
+Rules:
+- required_headcount > 0.
+- unique title per event.
+- required_skills is a list of skill tags.
+- If required_skills is empty, any skill may match.
+- If new_volunteers_allowed is false, exclude new_to_volunteer users.
+
+---
+
+## 11. EventApplication
+
+Fields:
+- event
+- post
+- user
+- qr_token
+- source
+- status
+- applied_at
+- decided_by
+- decided_at
+- conditions_acknowledged_at
+- conditions_snapshot
+- note
+
+source:
+- browse
+- qr_walkin
+- invite
+
+status:
+- pending
+- accepted
+- waitlisted
+- rejected
+- withdrawn
+- expired
+
+Rules:
+- One active application per user per event.
+- Active statuses: pending, accepted, waitlisted.
+- source = qr_walkin requires qr_token.
+- accepted/rejected require decided_at.
+- accepted applications store conditions_snapshot.
+- Waitlist promotion is MANUAL only.
+- Do not auto-promote waitlisted applications.
+
+conditions_snapshot shape:
+{
+  "meals_provided": true,
+  "lodging_provided": false,
+  "travel_support_provided": false,
+  "compensation_kind": "unpaid",
+  "compensation_note": "...",
+  "onboarding_version": 1
+}
+
+---
+
+## 12. QrToken
+
+Fields:
+- event
+- created_by
+- purpose
+- token_hash
+- max_uses
+- used_count
+- expires_at
+- revoked_at
+
+purpose:
+- walkin_registration
+- checkin
+- join_event
+
+Rules:
+- Generate raw token with secrets.token_urlsafe().
+- Store only token_hash.
+- Return raw token once at generation time.
+- used_count <= max_uses when max_uses is not null.
+- Consume token atomically using select_for_update().
+- Reject expired/revoked/over-used tokens.
+
+---
+
+## 13. Assignment
+
+Fields:
+- event
+- post
+- user
+- application
+- group_code
+- is_group_leader
+- status
+- assigned_by
+- assigned_by_user
+- schedule_start
+- schedule_end
+- conditions_snapshot
+
+status:
+- assigned
+- confirmed
+- completed
+- cancelled
+
+assigned_by:
+- auto
+- coordinator
+- admin
+
+Rules:
+- Assignment must come from an accepted application.
+- assignment.event must equal application.event.
+- assignment.user must equal application.user.
+- assignment.post must belong to the same event if provided.
+- assigned_by = auto requires assigned_by_user = null.
+- assigned_by = coordinator/admin requires assigned_by_user to be set.
+- One active assignment per user per event.
+- One active assignment per application.
+- is_group_leader requires group_code.
+- Only one active group leader per event/group_code.
+- schedule_end > schedule_start if both set.
+
+---
+
+## 14. Attendance
+
+Fields:
+- event
+- user
+- assignment
+- qr_token
+- status
+- checkin_at
+- checkout_at
+- method
+- recorded_by
+- note
+
+status:
+- expected
+- checked_in
+- absent
+- completed
+
+method:
+- qr_scan
+- coordinator_manual
+- system
+
+Rules:
+- One attendance row per user per event.
+- Expected attendance is created when assignment is confirmed.
+- checked_in/completed require checkin_at.
+- checkout_at requires checkin_at and checkout_at >= checkin_at.
+- Check-in requires confirmed assignment.
+- Check-in requires onboarding acknowledgment if event requires it.
+- Attendance is presence evidence only.
+- Do not calculate pay or hours from attendance.
+
+---
+
+## 15. OnboardingAcknowledgment
+
+Fields:
+- user
+- event
+- onboarding_version
+- method
+- acknowledged_at
+
+method:
+- app_tick
+
+Rules:
+- Unique per user/event/onboarding_version.
+- If event.onboarding_text changes, increment onboarding_version.
+- Required acknowledgment must reference the current version.
+
+---
+
+## 16. Feedback
+
+Fields:
+- event
+- rater_user
+- target_user
+- direction
+- score
+- tags
+- comment
+- status
+
+direction:
+- coordinator_to_volunteer
+- volunteer_to_event
+- volunteer_to_coordinator
+
+status:
+- active
+- hidden
+
+Rules:
+- Feedback only after event completed.
+- Volunteer must have had an active assignment for that event.
+- volunteer_to_event: target_user must be null.
+- coordinator_to_volunteer: target_user required.
+- volunteer_to_coordinator: target_user is forced to event.coordinator.user.
+  Never trust client-provided target for this direction.
+- score 1..5.
+- One feedback per rater/event/direction/target.
+- Admin can hide feedback.
+
+---
+
+## 17. ModerationAction
+
+Fields:
+- admin_user
+- target_user
+- event
+- feedback
+- action_type
+- reason
+- expires_at
+
+action_type:
+- user_warning
+- user_block
+- user_unblock
+- account_close
+- account_reinstate
+- event_delete
+- event_restore
+- event_cancel
+- feedback_hide
+
+Rules:
+- user actions require target_user.
+- event actions require event.
+- feedback_hide requires feedback.
+- expires_at only for user_block.
+- Every moderation action writes AuditLog.
+- Every moderation action updates target state in the same transaction.
+
+---
+
+## 18. AuditLog
+
+Fields:
+- actor_user
+- action
+- entity_type
+- entity_id
+- before_data
+- after_data
+- ip_address
+- created_at
+
+Rules:
+- Append-only.
+- No update/delete from application code.
+- Admin read-only in Django admin.
+
+---
+
+## 19. Service signatures
+
+Use these exact function names.
+
+### apps/common/security.py
+- normalize_phone(phone: str) -> str
+- hash_phone(phone: str) -> str
+- encrypt_phone(phone: str) -> str
+- decrypt_phone(value: str) -> str
+- hash_otp(code: str) -> str
+- generate_raw_token() -> str
+- hash_token(raw_token: str) -> str
+
+### apps/accounts/services.py
+- request_otp(phone: str, purpose: str) -> AuthOtp
+- verify_otp(phone: str, code: str, purpose: str) -> User
+- issue_token_for_user(user: User) -> Token
+- update_profile(user: User, data: dict) -> User
+- set_charity_interests(user: User, field_codes: list[str]) -> None
+- create_verification_image(user, image_type: str, uploaded_file) -> UserVerificationImage
+- review_verification_image(image, reviewer, status: str, note: str) -> UserVerificationImage
+- apply_as_coordinator(user: User) -> CoordinatorProfile
+- approve_coordinator(profile: CoordinatorProfile, approver: User) -> CoordinatorProfile
+
+### apps/events/services.py
+- create_event(coordinator_user: User, payload: dict) -> Event
+- publish_event(event: Event, actor: User) -> Event
+- activate_event(event: Event, actor: User) -> Event
+- complete_event(event: Event, actor: User) -> Event
+- cancel_event(event: Event, actor: User) -> Event
+- soft_delete_event(event: Event, admin_user: User, reason: str) -> Event
+- restore_event(event: Event, admin_user: User) -> Event
+- apply_to_event(user, event_id, post_id=None, source="browse", qr_token=None) -> EventApplication
+- accept_application(application, actor) -> EventApplication
+- reject_application(application, actor, reason=None) -> EventApplication
+- waitlist_application(application, actor) -> EventApplication
+- withdraw_application(application, user) -> EventApplication
+
+### apps/ops/services.py
+- generate_qr_token(event, created_by, purpose, max_uses=None, expires_at=None) -> tuple[QrToken, str]
+- consume_qr_token(raw_token: str, purpose: str) -> QrToken
+- run_auto_assignment(event, actor) -> list[Assignment]
+- confirm_assignment(assignment, actor) -> Assignment
+- cancel_assignment(assignment, actor, reason=None) -> Assignment
+- check_in_user(event, user, method, actor=None, qr_token=None) -> Attendance
+- check_out_user(event, user, method, actor=None) -> Attendance
+- mark_absent(event, user, actor, reason=None) -> Attendance
+- acknowledge_onboarding(event, user) -> OnboardingAcknowledgment
+- submit_feedback(event, rater_user, direction, target_user=None, score=None, tags=None, comment=None) -> Feedback
+
+### apps/audit/services.py
+- log_action(actor, action, entity_type, entity_id, before=None, after=None, request=None) -> AuditLog
+- warn_user(admin_user, target_user, reason)
+- block_user(admin_user, target_user, reason, expires_at=None)
+- unblock_user(admin_user, target_user, reason)
+- close_account(admin_user, target_user, reason)
+- reinstate_account(admin_user, target_user, reason)
+- delete_event(admin_user, event, reason)
+- restore_event(admin_user, event, reason)
+- hide_feedback(admin_user, feedback, reason)
+
+---
+
+## 20. API contract
+
+Use these routes unless explicitly changed in the contract.
+
+### Accounts
+POST /api/v1/accounts/auth/otp/request/
+POST /api/v1/accounts/auth/otp/verify/
+POST /api/v1/accounts/auth/qr/verify/
+GET  /api/v1/accounts/me/
+PATCH /api/v1/accounts/me/
+POST /api/v1/accounts/me/verification-images/
+POST /api/v1/accounts/coordinator/apply/
+
+### Events
+GET  /api/v1/events/charity-fields/
+GET  /api/v1/events/events/
+POST /api/v1/events/events/
+GET  /api/v1/events/events/{id}/
+POST /api/v1/events/events/{id}/publish/
+POST /api/v1/events/events/{id}/activate/
+POST /api/v1/events/events/{id}/complete/
+POST /api/v1/events/events/{id}/cancel/
+POST /api/v1/events/events/{id}/posts/
+POST /api/v1/events/events/{id}/apply/
+POST /api/v1/events/applications/{id}/accept/
+POST /api/v1/events/applications/{id}/reject/
+POST /api/v1/events/applications/{id}/waitlist/
+POST /api/v1/events/applications/{id}/withdraw/
+
+### Ops
+POST /api/v1/ops/events/{event_id}/qr-tokens/
+POST /api/v1/ops/qr/scan/
+POST /api/v1/ops/events/{event_id}/assignments/auto-run/
+POST /api/v1/ops/assignments/{id}/confirm/
+POST /api/v1/ops/assignments/{id}/cancel/
+POST /api/v1/ops/events/{event_id}/attendance/check-in/
+POST /api/v1/ops/events/{event_id}/attendance/check-out/
+POST /api/v1/ops/events/{event_id}/attendance/mark-absent/
+POST /api/v1/ops/events/{event_id}/onboarding/acknowledge/
+POST /api/v1/ops/events/{event_id}/feedback/
+GET  /api/v1/ops/me/applications/
+GET  /api/v1/ops/me/assignments/
+
+### Audit/Admin
+GET  /api/v1/audit/dashboard/
+POST /api/v1/audit/users/{user_id}/warn/
+POST /api/v1/audit/users/{user_id}/block/
+POST /api/v1/audit/users/{user_id}/unblock/
+POST /api/v1/audit/events/{event_id}/delete/
+POST /api/v1/audit/events/{event_id}/restore/
+POST /api/v1/audit/feedback/{feedback_id}/hide/
+
+Rules:
+- Lifecycle changes use @action.
+- No direct status PATCH.
+- Roster and unassigned views use ORM annotations.
+- No SQL views required for Phase 1 feasibility.
+
+---
+
+## 21. Permissions
+
+- App user can edit own profile only.
+- App user can view own applications/assignments only.
+- Only approved coordinator can create events.
+- Only event coordinator or admin can publish/activate/complete/cancel.
+- Only event coordinator or admin can accept/reject/waitlist applications.
+- Only event coordinator or admin can run assignments or manual check-in.
+- Volunteer can check in self if assignment confirmed and onboarding acknowledged.
+- Only admin can moderate users/events/feedback.
+- Only admin can view audit logs.
+
+---
+
+## 22. Auto-assignment rules
+
+Deterministic rules only. No ML.
+
+For each accepted application without an active assignment:
+1. Find open posts with remaining capacity.
+2. Filter by required_skills.
+3. Filter by physical_level.
+4. Filter new_volunteers_allowed.
+5. Sort posts by priority.
+6. Create Assignment with status = assigned.
+7. If no suitable post, leave application accepted but unassigned.
+
+Grouping:
+- If group_size is set, create group_code values.
+- If leader_needed and leader_strategy = first_experienced,
+  choose a user with has_leader_experience.
+- Only one active leader per group.
+
+---
+
+## 23. UI contract — Workshift theme
+
+Use exactly:
+
+surface:  #eddab6
+border:   #a1814f
+primary:  #e6ac00
+pressed:  #674632
+text:     #1d1716
+
+Mobile:
+- Types come from generated OpenAPI types.
+- Never hand-write API response types.
+- TanStack Query for server state.
+- expo-secure-store for auth token.
+- No business logic in screens.
+- Screens only render state, call endpoints, and show error.message.
+
+---
+
+## 24. Test-first rule
+
+Every module must include tests before implementation.
+
+Required test categories:
+- model constraints
+- auth flow
+- coordinator approval
+- event lifecycle
+- application lifecycle
+- QR token safety
+- assignment safety
+- attendance safety
+- feedback rules
+- moderation
+- soft-delete filtering
+
+Never mark a module complete without green tests.

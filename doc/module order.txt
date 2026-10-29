@@ -1,0 +1,36 @@
+Do not give Flash the whole backend at once.
+Use this sequence:
+B01  common/constants + exceptions
+B02  common/security
+B03  common/permissions + pagination
+B04  common/validators
+B05  accounts model constraints
+B06  accounts services: OTP + token
+B07  accounts authentication.py
+B08  accounts auth API
+B09  accounts profile + verification upload
+B10  coordinator approval
+B11  events model constraints
+B12  event lifecycle services
+B13  event API
+B14  application services + API
+B15  ops model constraints
+B16  QR service + API
+B17  assignment + attendance + feedback API
+B18  audit/moderation
+B19  Django admin
+B20  OpenAPI schema freeze
+
+Then mobile:
+
+M01  generated API types
+M02  theme/colors
+M03  API client + auth
+M04  login/OTP screens
+M05  profile/verification screens
+M06  event list
+M07  event detail/apply
+M08  my shifts
+M09  check-in
+M10  coordinator board
+M11  admin moderation

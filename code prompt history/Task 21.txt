@@ -1,0 +1,73 @@
+Analyzed seed_charity_fields.py:L1-43
+Analyzed seed_demo_data.py:L1-160
+Analyzed seed_demo_data.py:L161-214
+Ran run seed_charity_fields command
+Ran run seed_demo_data command
+Ran run test suite
+
+### Task 21: Seed Data Management Commands Verified
+
+The management commands for **Task 21** have been implemented and verified to run with 100% idempotency.
+
+---
+
+### 1. Implementation Details
+
+#### [`apps/events/management/commands/seed_charity_fields.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/apps/events/management/commands/seed_charity_fields.py)
+- Populates controlled lookup categories:
+  - `teaching` ("Teaching")
+  - `food_distribution` ("Food Distribution")
+  - `elderly_care` ("Elderly Care")
+  - `child_care` ("Child Care")
+  - `animal_welfare` ("Animal Welfare")
+  - `environment` ("Environment")
+  - `disaster_support` ("Disaster Support")
+  - `blood_donation` ("Blood Donation")
+  - `fundraising` ("Fundraising")
+  - `logistics` ("Logistics")
+  - `cleaning` ("Cleaning")
+  - `cooking` ("Cooking")
+  - `other` ("Other")
+- Uses `update_or_create(code=code, defaults={...})` ensuring repeatable, idempotent execution without duplicate key conflicts.
+
+#### [`apps/events/management/commands/seed_demo_data.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/apps/events/management/commands/seed_demo_data.py)
+Idempotently establishes complete baseline data matching all domain constraints:
+1. **Admin User**:
+   - `phone_hash` computed from `+959111111111`
+   - `display_name="Demo Admin"`, `is_admin=True`, `is_staff=True`, `is_superuser=True`, `account_status="active"`.
+2. **Approved Coordinator**:
+   - `phone_hash` computed from `+959222222222`
+   - `display_name="Demo Coordinator"`, `verification_status="verified"`.
+   - `CoordinatorProfile(status="approved", approved_by=admin_user)`.
+3. **Two Volunteers**:
+   - Volunteer 1 (`Demo Volunteer Alpha`): `has_leader_experience=True`, `skills=["teaching", "logistics"]`, `physical_ok=True`, `can_lift_heavy=True`, `new_to_volunteer=False`.
+   - Volunteer 2 (`Demo Volunteer Beta`): `has_leader_experience=False`, `skills=["cooking"]`, `new_to_volunteer=True`.
+4. **Published Event**:
+   - `title="Yangon Community Relief Drive"`, `coordinator=coord_user`, `status="published"`, `acceptance_mode="auto"`, `max_participants=30`, `group_size=5`, `require_onboarding_ack=True`.
+   - Attached to `logistics` and `teaching` charity fields via `EventCharityField`.
+5. **Three Posts with Varied Criteria**:
+   - Post 1: `"Logistics & Heavy Distribution"`, `required_headcount=8`, `physical_level="heavy"`, `required_skills=["logistics"]`, `leader_needed=True`.
+   - Post 2: `"Youth Workshop Facilitator"`, `required_headcount=6`, `physical_level="light"`, `required_skills=["teaching"]`, `leader_needed=True`.
+   - Post 3: `"Community Kitchen Helper"`, `required_headcount=10`, `physical_level="medium"`, `required_skills=["cooking"]`, `new_volunteers_allowed=True`.
+6. **Application, Assignment & Attendance for Volunteer 1**:
+   - `EventApplication(user=vol1, post=post1, status="accepted")`.
+   - `Assignment(user=vol1, post=post1, status="confirmed", group_code="G1", is_group_leader=True)`.
+   - `Attendance(user=vol1, status="expected")`.
+
+---
+
+### 2. Execution & Idempotency Verification
+
+```powershell
+.\.venv\Scripts\python.exe manage.py seed_charity_fields
+```
+```text
+Successfully seeded charity fields. Created: 0, Updated: 13
+```
+
+```powershell
+.\.venv\Scripts\python.exe manage.py seed_demo_data
+```
+```text
+Successfully seeded demo data: 1 admin (Demo Admin), 1 coordinator (Demo Coordinator), 2 volunteers, 1 event ('Yangon Community Relief Drive') with 3 posts, 1 confirmed assignment.
+```

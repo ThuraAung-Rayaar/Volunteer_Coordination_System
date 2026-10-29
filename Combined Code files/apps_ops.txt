@@ -1,0 +1,1939 @@
+================================================================================
+C:\Users\USER\Documents\INTERN\Project\Volunteer HR Management\python stack\apps\ops\__init__.py
+----------------------------------------
+
+================================================================================
+C:\Users\USER\Documents\INTERN\Project\Volunteer HR Management\python stack\apps\ops\admin.py
+----------------------------------------
+# apps/ops/admin.py
+from django.contrib import admin
+
+from apps.audit.services import hide_feedback
+from apps.ops.models import (
+    Assignment,
+    Attendance,
+    Feedback,
+    OnboardingAcknowledgment,
+    QrToken,
+)
+
+
+@admin.register(QrToken)
+class QrTokenAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "event",
+        "purpose",
+        "used_count",
+        "max_uses",
+        "expires_at",
+        "revoked_at",
+        "created_at",
+    )
+    list_filter = ("purpose",)
+    search_fields = ("event__title", "token_hash")
+    readonly_fields = ("token_hash", "used_count", "created_at")
+
+
+@admin.register(Assignment)
+class AssignmentAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "event",
+        "user",
+        "post",
+        "status",
+        "group_code",
+        "is_group_leader",
+        "assigned_by",
+        "created_at",
+    )
+    list_filter = ("status", "assigned_by", "is_group_leader")
+    search_fields = ("user__display_name", "event__title", "group_code")
+    readonly_fields = ("created_at", "conditions_snapshot")
+
+
+@admin.register(Attendance)
+class AttendanceAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "event",
+        "user",
+        "status",
+        "checkin_at",
+        "checkout_at",
+        "method",
+        "recorded_by",
+    )
+    list_filter = ("status", "method")
+    search_fields = ("user__display_name", "event__title")
+    readonly_fields = ("checkin_at", "checkout_at", "created_at")
+
+
+@admin.register(OnboardingAcknowledgment)
+class OnboardingAcknowledgmentAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "event",
+        "user",
+        "onboarding_version",
+        "method",
+        "acknowledged_at",
+    )
+    list_filter = ("onboarding_version", "method")
+    search_fields = ("user__display_name", "event__title")
+    readonly_fields = ("acknowledged_at",)
+
+
+@admin.register(Feedback)
+class FeedbackAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "event",
+        "rater_user",
+        "target_user",
+        "direction",
+        "score",
+        "status",
+        "created_at",
+    )
+    list_filter = ("direction", "status", "score")
+    search_fields = ("rater_user__display_name", "target_user__display_name", "event__title")
+    actions = ["hide_selected_feedbacks"]
+
+    @admin.action(description="Hide selected feedbacks")
+    def hide_selected_feedbacks(self, request, queryset):
+        for fb in queryset:
+            if fb.status != "hidden":
+                try:
+                    hide_feedback(admin=request.user, feedback=fb, reason="Hidden via admin action")
+                except Exception as e:
+                    self.message_user(request, f"Error hiding feedback #{fb.id}: {e}", level="error")
+
+================================================================================
+C:\Users\USER\Documents\INTERN\Project\Volunteer HR Management\python stack\apps\ops\apps.py
+----------------------------------------
+from django.apps import AppConfig
+
+
+class OpsConfig(AppConfig):
+    default_auto_field = 'django.db.models.BigAutoField'
+    name = 'apps.ops'
+
+================================================================================
+C:\Users\USER\Documents\INTERN\Project\Volunteer HR Management\python stack\apps\ops\models.py
+----------------------------------------
+# apps/ops/models.py
+from django.core.exceptions import ValidationError
+from django.db import models
+from django.db.models import F, Q
+
+from apps.common.constants import (
+    ASSIGNMENT_ASSIGNED,
+    ASSIGNMENT_CANCELLED,
+    ASSIGNMENT_COMPLETED,
+    ASSIGNMENT_CONFIRMED,
+    ATTENDANCE_ABSENT,
+    ATTENDANCE_CHECKED_IN,
+    ATTENDANCE_COMPLETED,
+    ATTENDANCE_EXPECTED,
+    FEEDBACK_COORDINATOR_TO_VOLUNTEER,
+    FEEDBACK_VOLUNTEER_TO_COORDINATOR,
+    FEEDBACK_VOLUNTEER_TO_EVENT,
+    QR_CHECKIN,
+    QR_JOIN_EVENT,
+    QR_WALKIN_REGISTRATION,
+)
+from apps.common.fields import ChoiceArrayField
+
+
+class QrToken(models.Model):
+    PURPOSE_CHOICES = [
+        (QR_WALKIN_REGISTRATION, "Walk-in Registration"),
+        (QR_CHECKIN, "Check-in"),
+        (QR_JOIN_EVENT, "Join Event"),
+    ]
+
+    id = models.BigAutoField(primary_key=True)
+    event = models.ForeignKey(
+        "events.Event",
+        on_delete=models.CASCADE,
+        related_name="qr_tokens",
+    )
+    created_by = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.CASCADE,
+        related_name="created_qr_tokens",
+    )
+    purpose = models.CharField(max_length=30, choices=PURPOSE_CHOICES)
+    token_hash = models.CharField(max_length=128, unique=True)
+
+    max_uses = models.IntegerField(null=True, blank=True)
+    used_count = models.IntegerField(default=0)
+
+    expires_at = models.DateTimeField()
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "qr_tokens"
+        verbose_name = "QR Token"
+        verbose_name_plural = "QR Tokens"
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(max_uses__isnull=True) | Q(max_uses__gt=0),
+                name="ck_qr_max_uses",
+            ),
+            models.CheckConstraint(
+                condition=Q(used_count__gte=0),
+                name="ck_qr_used_count_nonnegative",
+            ),
+            models.CheckConstraint(
+                condition=Q(max_uses__isnull=True) | Q(used_count__lte=F("max_uses")),
+                name="ck_qr_used_count",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["event", "purpose"], name="idx_qr_event_purpose"),
+        ]
+
+    def __str__(self):
+        return f"QR Token ({self.purpose}) for {self.event.title}"
+
+    def clean(self):
+        super().clean()
+        if self.max_uses is not None and self.max_uses <= 0:
+            raise ValidationError({"max_uses": "max_uses must be greater than 0."})
+        if self.used_count < 0:
+            raise ValidationError({"used_count": "used_count cannot be negative."})
+        if self.max_uses is not None and self.used_count > self.max_uses:
+            raise ValidationError({"used_count": "used_count cannot exceed max_uses."})
+
+
+class Assignment(models.Model):
+    STATUS_CHOICES = [
+        (ASSIGNMENT_ASSIGNED, "Assigned"),
+        (ASSIGNMENT_CONFIRMED, "Confirmed"),
+        (ASSIGNMENT_COMPLETED, "Completed"),
+        (ASSIGNMENT_CANCELLED, "Cancelled"),
+    ]
+
+    ASSIGNED_BY_CHOICES = [
+        ("auto", "Auto"),
+        ("coordinator", "Coordinator"),
+        ("admin", "Admin"),
+    ]
+
+    id = models.BigAutoField(primary_key=True)
+    event = models.ForeignKey(
+        "events.Event",
+        on_delete=models.CASCADE,
+        related_name="assignments",
+    )
+    application = models.ForeignKey(
+        "events.EventApplication",
+        on_delete=models.CASCADE,
+        related_name="assignments",
+    )
+    post = models.ForeignKey(
+        "events.EventPost",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="assignments",
+    )
+    user = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.CASCADE,
+        related_name="assignments",
+    )
+
+    group_code = models.CharField(max_length=50, null=True, blank=True)
+    is_group_leader = models.BooleanField(default=False)
+
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default=ASSIGNMENT_ASSIGNED,
+    )
+    assigned_by = models.CharField(
+        max_length=20,
+        choices=ASSIGNED_BY_CHOICES,
+        default="auto",
+    )
+    assigned_by_user = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="made_assignments",
+    )
+
+    schedule_start = models.DateTimeField(null=True, blank=True)
+    schedule_end = models.DateTimeField(null=True, blank=True)
+    conditions_snapshot = models.JSONField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "assignments"
+        verbose_name = "Assignment"
+        verbose_name_plural = "Assignments"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["event", "user"],
+                condition=~Q(status=ASSIGNMENT_CANCELLED),
+                name="uq_assignment_active",
+            ),
+            models.UniqueConstraint(
+                fields=["application"],
+                condition=~Q(status=ASSIGNMENT_CANCELLED),
+                name="uq_assignment_application",
+            ),
+            models.UniqueConstraint(
+                fields=["event", "group_code"],
+                condition=Q(is_group_leader=True) & ~Q(status=ASSIGNMENT_CANCELLED),
+                name="uq_assignment_group_leader",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    Q(assigned_by="auto") & Q(assigned_by_user__isnull=True)
+                )
+                | (
+                    ~Q(assigned_by="auto") & Q(assigned_by_user__isnull=False)
+                ),
+                name="ck_assignment_actor",
+            ),
+            models.CheckConstraint(
+                condition=Q(schedule_start__isnull=True)
+                | Q(schedule_end__isnull=True)
+                | Q(schedule_end__gt=F("schedule_start")),
+                name="ck_assignment_schedule",
+            ),
+            models.CheckConstraint(
+                condition=Q(is_group_leader=False) | Q(group_code__isnull=False),
+                name="ck_assignment_leader_group",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["event", "user"], name="idx_assign_event_user"),
+        ]
+
+    def __str__(self):
+        return f"{self.user.display_name} -> {self.event.title} [{self.status}]"
+
+    def clean(self):
+        super().clean()
+        if self.assigned_by == "auto" and self.assigned_by_user is not None:
+            raise ValidationError("assigned_by_user must be null when assigned_by is 'auto'.")
+        if self.assigned_by != "auto" and self.assigned_by_user is None:
+            raise ValidationError("assigned_by_user must be set when assigned_by is not 'auto'.")
+        if self.schedule_start and self.schedule_end and self.schedule_end <= self.schedule_start:
+            raise ValidationError({"schedule_end": "schedule_end must be greater than schedule_start."})
+        if self.is_group_leader and not self.group_code:
+            raise ValidationError({"group_code": "group_code is required when is_group_leader is True."})
+
+
+class Attendance(models.Model):
+    STATUS_CHOICES = [
+        (ATTENDANCE_EXPECTED, "Expected"),
+        (ATTENDANCE_CHECKED_IN, "Checked In"),
+        (ATTENDANCE_ABSENT, "Absent"),
+        (ATTENDANCE_COMPLETED, "Completed"),
+    ]
+
+    METHOD_CHOICES = [
+        ("qr_scan", "QR Scan"),
+        ("coordinator_manual", "Coordinator Manual"),
+        ("system", "System"),
+    ]
+
+    id = models.BigAutoField(primary_key=True)
+    event = models.ForeignKey(
+        "events.Event",
+        on_delete=models.CASCADE,
+        related_name="attendances",
+    )
+    user = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.CASCADE,
+        related_name="attendances",
+    )
+    assignment = models.ForeignKey(
+        Assignment,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="attendances",
+    )
+    qr_token = models.ForeignKey(
+        QrToken,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="attendances",
+    )
+
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default=ATTENDANCE_EXPECTED,
+    )
+    checkin_at = models.DateTimeField(null=True, blank=True)
+    checkout_at = models.DateTimeField(null=True, blank=True)
+
+    method = models.CharField(
+        max_length=30,
+        choices=METHOD_CHOICES,
+        null=True,
+        blank=True,
+    )
+    recorded_by = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_column="recorded_by_user_id",
+        related_name="recorded_attendances",
+    )
+
+    note = models.TextField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "attendance"
+        verbose_name = "Attendance"
+        verbose_name_plural = "Attendances"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["event", "user"],
+                name="uq_attendance_event_user",
+            ),
+            models.CheckConstraint(
+                condition=~Q(status__in=[ATTENDANCE_CHECKED_IN, ATTENDANCE_COMPLETED])
+                | Q(checkin_at__isnull=False),
+                name="ck_attendance_checkin",
+            ),
+            models.CheckConstraint(
+                condition=Q(checkout_at__isnull=True)
+                | (
+                    Q(checkin_at__isnull=False)
+                    & Q(checkout_at__gte=F("checkin_at"))
+                ),
+                name="ck_attendance_checkout",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["event", "status"], name="idx_attend_event_status"),
+        ]
+
+    def __str__(self):
+        return f"Attendance: {self.user.display_name} @ {self.event.title} [{self.status}]"
+
+    def clean(self):
+        super().clean()
+        if self.status in [ATTENDANCE_CHECKED_IN, ATTENDANCE_COMPLETED] and self.checkin_at is None:
+            raise ValidationError({"checkin_at": "checkin_at is required when checked_in or completed."})
+        if self.checkout_at is not None:
+            if self.checkin_at is None:
+                raise ValidationError({"checkout_at": "checkin_at is required if checkout_at is set."})
+            if self.checkout_at < self.checkin_at:
+                raise ValidationError({"checkout_at": "checkout_at must be >= checkin_at."})
+
+
+class OnboardingAcknowledgment(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    user = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.CASCADE,
+        related_name="onboarding_acknowledgments",
+    )
+    event = models.ForeignKey(
+        "events.Event",
+        on_delete=models.CASCADE,
+        related_name="onboarding_acknowledgments",
+    )
+    onboarding_version = models.IntegerField()
+    method = models.CharField(max_length=30, default="app_tick")
+    acknowledged_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "onboarding_acknowledgments"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "event", "onboarding_version"],
+                name="uq_onboarding_ack",
+            ),
+        ]
+        verbose_name = "Onboarding Acknowledgment"
+        verbose_name_plural = "Onboarding Acknowledgments"
+
+    def __str__(self):
+        return f"{self.user.display_name} acknowledged event {self.event_id} (v{self.onboarding_version})"
+
+
+class Feedback(models.Model):
+    DIRECTION_CHOICES = [
+        (FEEDBACK_COORDINATOR_TO_VOLUNTEER, "Coordinator to Volunteer"),
+        (FEEDBACK_VOLUNTEER_TO_EVENT, "Volunteer to Event"),
+        (FEEDBACK_VOLUNTEER_TO_COORDINATOR, "Volunteer to Coordinator"),
+    ]
+
+    STATUS_CHOICES = [
+        ("active", "Active"),
+        ("hidden", "Hidden"),
+    ]
+
+    id = models.BigAutoField(primary_key=True)
+    event = models.ForeignKey(
+        "events.Event",
+        on_delete=models.CASCADE,
+        related_name="feedbacks",
+    )
+    rater_user = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.CASCADE,
+        related_name="given_feedbacks",
+    )
+    target_user = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="received_feedbacks",
+    )
+
+    direction = models.CharField(max_length=30, choices=DIRECTION_CHOICES)
+    score = models.IntegerField(null=True, blank=True)
+    tags = ChoiceArrayField(
+        models.CharField(max_length=50),
+        default=list,
+        blank=True,
+    )
+    comment = models.TextField(null=True, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="active")
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "feedback"
+        verbose_name = "Feedback"
+        verbose_name_plural = "Feedbacks"
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(score__gte=1) & Q(score__lte=5),
+                name="ck_feedback_score",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    Q(direction=FEEDBACK_VOLUNTEER_TO_EVENT) & Q(target_user__isnull=True)
+                )
+                | (
+                    ~Q(direction=FEEDBACK_VOLUNTEER_TO_EVENT) & Q(target_user__isnull=False)
+                ),
+                name="ck_feedback_target",
+            ),
+            models.UniqueConstraint(
+                fields=["event", "rater_user", "direction"],
+                condition=Q(target_user__isnull=True),
+                name="uq_feedback_event_once",
+            ),
+            models.UniqueConstraint(
+                fields=["event", "rater_user", "direction", "target_user"],
+                condition=Q(target_user__isnull=False),
+                name="uq_feedback_user_once",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["event"], name="idx_feedback_event"),
+            models.Index(fields=["rater_user"], name="idx_feedback_rater"),
+            models.Index(fields=["target_user"], name="idx_feedback_target"),
+        ]
+
+    def __str__(self):
+        return f"Feedback {self.direction} by {self.rater_user.display_name} ({self.score}/5)"
+
+    def clean(self):
+        super().clean()
+        if self.score is not None and not (1 <= self.score <= 5):
+            raise ValidationError({"score": "score must be between 1 and 5."})
+        if self.direction == FEEDBACK_VOLUNTEER_TO_EVENT and self.target_user is not None:
+            raise ValidationError({"target_user": "target_user must be null when direction is 'volunteer_to_event'."})
+        if self.direction != FEEDBACK_VOLUNTEER_TO_EVENT and self.target_user is None:
+            raise ValidationError({"target_user": "target_user is required when direction is not 'volunteer_to_event'."})
+
+================================================================================
+C:\Users\USER\Documents\INTERN\Project\Volunteer HR Management\python stack\apps\ops\serializers.py
+----------------------------------------
+# apps/ops/serializers.py
+from rest_framework import serializers
+
+from apps.accounts.models import User
+from apps.events.models import Event, EventApplication, EventPost
+from apps.ops.models import (
+    Assignment,
+    Attendance,
+    Feedback,
+    OnboardingAcknowledgment,
+    QrToken,
+)
+
+
+class QrTokenSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = QrToken
+        fields = [
+            "id",
+            "event",
+            "purpose",
+            "max_uses",
+            "used_count",
+            "expires_at",
+            "revoked_at",
+            "created_at",
+        ]
+        read_only_fields = ["id", "used_count", "created_at"]
+
+
+class QrTokenGenerateSerializer(serializers.Serializer):
+    purpose = serializers.ChoiceField(choices=["walkin_registration", "checkin", "join_event"])
+    max_uses = serializers.IntegerField(required=False, allow_null=True, min_value=1)
+    ttl_minutes = serializers.IntegerField(required=False, default=240, min_value=1)
+
+
+class QrTokenResolveSerializer(serializers.Serializer):
+    token = serializers.CharField(required=True)
+
+
+class QrTokenRedeemSerializer(serializers.Serializer):
+    token = serializers.CharField(required=True)
+
+
+class AssignmentSerializer(serializers.ModelSerializer):
+    user_display_name = serializers.CharField(source="user.display_name", read_only=True)
+    post_title = serializers.CharField(source="post.title", read_only=True)
+    event_title = serializers.CharField(source="event.title", read_only=True)
+
+    class Meta:
+        model = Assignment
+        fields = [
+            "id",
+            "event",
+            "event_title",
+            "application",
+            "post",
+            "post_title",
+            "user",
+            "user_display_name",
+            "group_code",
+            "is_group_leader",
+            "status",
+            "assigned_by",
+            "schedule_start",
+            "schedule_end",
+            "conditions_snapshot",
+            "created_at",
+        ]
+        read_only_fields = fields
+
+
+class ManualAssignmentSerializer(serializers.Serializer):
+    application_id = serializers.IntegerField(required=True)
+    post_id = serializers.IntegerField(required=False, allow_null=True)
+    group_code = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    is_group_leader = serializers.BooleanField(required=False, default=False)
+
+
+class AssignmentCancelSerializer(serializers.Serializer):
+    reason = serializers.CharField(required=False, allow_blank=True, default="")
+
+
+class AttendanceSerializer(serializers.ModelSerializer):
+    user_display_name = serializers.CharField(source="user.display_name", read_only=True)
+    event_title = serializers.CharField(source="event.title", read_only=True)
+
+    class Meta:
+        model = Attendance
+        fields = [
+            "id",
+            "event",
+            "event_title",
+            "user",
+            "user_display_name",
+            "assignment",
+            "qr_token",
+            "status",
+            "checkin_at",
+            "checkout_at",
+            "method",
+            "note",
+            "created_at",
+        ]
+        read_only_fields = fields
+
+
+class CheckInSerializer(serializers.Serializer):
+    user_id = serializers.IntegerField(required=False, allow_null=True)
+    method = serializers.CharField(required=False, default="qr_scan")
+    token = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+
+
+class CheckOutSerializer(serializers.Serializer):
+    user_id = serializers.IntegerField(required=False, allow_null=True)
+
+
+class MarkAbsentSerializer(serializers.Serializer):
+    user_id = serializers.IntegerField(required=True)
+
+
+class OnboardingAcknowledgmentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = OnboardingAcknowledgment
+        fields = [
+            "id",
+            "event",
+            "user",
+            "onboarding_version",
+            "acknowledged_at",
+            "method",
+        ]
+        read_only_fields = fields
+
+
+class OnboardingAcknowledgeSerializer(serializers.Serializer):
+    method = serializers.CharField(required=False, default="app_tick")
+
+
+class FeedbackSerializer(serializers.ModelSerializer):
+    rater_name = serializers.CharField(source="rater_user.display_name", read_only=True)
+    target_name = serializers.CharField(source="target_user.display_name", read_only=True)
+
+    class Meta:
+        model = Feedback
+        fields = [
+            "id",
+            "event",
+            "rater_user",
+            "rater_name",
+            "target_user",
+            "target_name",
+            "direction",
+            "score",
+            "tags",
+            "comment",
+            "status",
+            "created_at",
+        ]
+        read_only_fields = fields
+
+
+class FeedbackCreateSerializer(serializers.Serializer):
+    direction = serializers.ChoiceField(
+        choices=[
+            "coordinator_to_volunteer",
+            "volunteer_to_event",
+            "volunteer_to_coordinator",
+        ]
+    )
+    target_user_id = serializers.IntegerField(required=False, allow_null=True)
+    score = serializers.IntegerField(required=True, min_value=1, max_value=5)
+    tags = serializers.ListField(
+        child=serializers.CharField(max_length=50),
+        required=False,
+        default=list,
+    )
+    comment = serializers.CharField(required=False, allow_blank=True, default="")
+
+================================================================================
+C:\Users\USER\Documents\INTERN\Project\Volunteer HR Management\python stack\apps\ops\services.py
+----------------------------------------
+# apps/ops/services.py
+from datetime import timedelta
+from django.db import transaction
+from django.db.models import Q
+from django.utils import timezone
+
+from apps.audit.services import log_action
+from apps.common.constants import (
+    ACTIVE_ASSIGNMENT_STATUSES,
+    ASSIGNMENT_ASSIGNED,
+    ASSIGNMENT_CANCELLED,
+    ASSIGNMENT_CONFIRMED,
+    ATTENDANCE_ABSENT,
+    ATTENDANCE_CHECKED_IN,
+    ATTENDANCE_COMPLETED,
+    ATTENDANCE_EXPECTED,
+    EVENT_ACTIVE,
+    EVENT_COMPLETED,
+    FEEDBACK_COORDINATOR_TO_VOLUNTEER,
+    FEEDBACK_VOLUNTEER_TO_COORDINATOR,
+    FEEDBACK_VOLUNTEER_TO_EVENT,
+    QR_CHECKIN,
+    QR_DEFAULT_TTL_MINUTES,
+    QR_JOIN_EVENT,
+    QR_WALKIN_REGISTRATION,
+)
+from apps.common.exceptions import (
+    CapacityFullError,
+    DomainError,
+    InvalidStateError,
+    OnboardingRequiredError,
+    PermissionDeniedError,
+)
+from apps.common.permissions import (
+    ensure_active_account,
+    ensure_event_manager,
+    is_event_manager,
+)
+from apps.common.security import generate_raw_token, hash_token
+from apps.ops.models import (
+    Assignment,
+    Attendance,
+    Feedback,
+    OnboardingAcknowledgment,
+    QrToken,
+)
+
+
+def check_post_eligibility(user, post) -> bool:
+    """
+    Check if a volunteer satisfies post requirements:
+    1. If post.required_skills: user.skills must overlap post.required_skills.
+    2. If post.physical_level == 'heavy': user.physical_ok and user.can_lift_heavy must be True.
+    3. If post.physical_level == 'medium': user.physical_ok must be True.
+    4. If post.new_volunteers_allowed is False: user.new_to_volunteer must be False.
+    """
+    if post.required_skills:
+        user_skills = set(user.skills or [])
+        required = set(post.required_skills)
+        if not user_skills.intersection(required):
+            return False
+
+    if post.physical_level == "heavy":
+        if not (user.physical_ok and user.can_lift_heavy):
+            return False
+    elif post.physical_level == "medium":
+        if not user.physical_ok:
+            return False
+
+    if not post.new_volunteers_allowed and user.new_to_volunteer:
+        return False
+
+    return True
+
+
+def get_remaining_post_capacity(post) -> int:
+    active_count = Assignment.objects.filter(
+        post=post,
+        status__in=ACTIVE_ASSIGNMENT_STATUSES,
+    ).count()
+    return max(0, post.required_headcount - active_count)
+
+
+def create_assignment_from_application(application, actor=None) -> Assignment | None:
+    """
+    Create Assignment from an accepted EventApplication.
+    - If application already has an active assignment, return it.
+    - If application has a specific post, verify post eligibility and capacity.
+    - If application has no post, find first eligible open post with capacity.
+    - If no eligible post has capacity, return None.
+    - Creates Attendance(status='expected') if missing.
+    """
+    existing = Assignment.objects.filter(
+        application=application,
+        status__in=ACTIVE_ASSIGNMENT_STATUSES,
+    ).first()
+    if existing:
+        return existing
+
+    user = application.user
+    event = application.event
+
+    target_post = application.post
+    if target_post:
+        if target_post.status != "open":
+            return None
+        if not check_post_eligibility(user, target_post):
+            return None
+        if get_remaining_post_capacity(target_post) <= 0:
+            return None
+    else:
+        # Search among event's open posts ordered by priority ascending, id ascending
+        open_posts = event.posts.filter(status="open").order_by("priority", "id")
+        chosen_post = None
+        for post in open_posts:
+            if check_post_eligibility(user, post) and get_remaining_post_capacity(post) > 0:
+                chosen_post = post
+                break
+        if not chosen_post:
+            return None
+        target_post = chosen_post
+
+    assigned_by = "auto" if actor is None else ("admin" if getattr(actor, "is_admin", False) else "coordinator")
+    assigned_by_user = None if assigned_by == "auto" else actor
+
+    with transaction.atomic():
+        assignment = Assignment.objects.create(
+            event=event,
+            post=target_post,
+            user=user,
+            application=application,
+            status=ASSIGNMENT_ASSIGNED,
+            assigned_by=assigned_by,
+            assigned_by_user=assigned_by_user,
+            schedule_start=event.start_at,
+            schedule_end=event.end_at,
+            conditions_snapshot=application.conditions_snapshot or {},
+        )
+
+        Attendance.objects.get_or_create(
+            event=event,
+            user=user,
+            defaults={
+                "assignment": assignment,
+                "status": ATTENDANCE_EXPECTED,
+            },
+        )
+
+        log_action(
+            actor=actor or user,
+            action="create_assignment",
+            entity_type="assignment",
+            entity_id=assignment.id,
+            after_data={"post_id": target_post.id if target_post else None, "user_id": user.id},
+        )
+
+    return assignment
+
+
+def generate_qr_token(
+    actor,
+    event,
+    purpose: str,
+    max_uses: int = None,
+    ttl_minutes: int = 240,
+) -> tuple[QrToken, str]:
+    """
+    Generate QR Token for an event.
+    Stores token_hash (SHA-256). Raw token is returned and never persisted.
+    """
+    ensure_event_manager(actor, event)
+
+    valid_purposes = {QR_WALKIN_REGISTRATION, QR_CHECKIN, QR_JOIN_EVENT}
+    if purpose not in valid_purposes:
+        raise DomainError(f"Invalid QR token purpose: {purpose}", code="invalid_purpose")
+
+    if max_uses is not None and max_uses <= 0:
+        raise DomainError("max_uses must be greater than 0.", code="invalid_max_uses")
+
+    raw_token = generate_raw_token()
+    token_hash = hash_token(raw_token)
+
+    ttl = ttl_minutes if ttl_minutes is not None else QR_DEFAULT_TTL_MINUTES
+    expires_at = timezone.now() + timedelta(minutes=ttl)
+
+    with transaction.atomic():
+        qr_token = QrToken.objects.create(
+            event=event,
+            created_by=actor,
+            purpose=purpose,
+            token_hash=token_hash,
+            max_uses=max_uses,
+            expires_at=expires_at,
+        )
+
+        log_action(
+            actor=actor,
+            action="generate_qr_token",
+            entity_type="qr_token",
+            entity_id=qr_token.id,
+            after_data={"purpose": purpose, "max_uses": max_uses, "expires_at": str(expires_at)},
+        )
+
+    return qr_token, raw_token
+
+
+def resolve_qr_token(raw_token: str) -> dict:
+    """
+    Resolve QR token metadata without consuming it.
+    """
+    token_hash = hash_token(raw_token)
+    qr_token = QrToken.objects.select_related("event").filter(token_hash=token_hash).first()
+
+    if not qr_token:
+        raise DomainError("Invalid QR token.", code="invalid_token")
+
+    if qr_token.revoked_at is not None:
+        raise DomainError("QR token has been revoked.", code="revoked_token")
+
+    if qr_token.expires_at <= timezone.now():
+        raise DomainError("QR token has expired.", code="expired_token")
+
+    if qr_token.max_uses is not None and qr_token.used_count >= qr_token.max_uses:
+        raise CapacityFullError("QR token usage limit reached.", code="qr_limit_reached")
+
+    return {
+        "event_id": qr_token.event_id,
+        "title": qr_token.event.title,
+        "purpose": qr_token.purpose,
+        "expires_at": qr_token.expires_at,
+        "used_count": qr_token.used_count,
+        "max_uses": qr_token.max_uses,
+    }
+
+
+def redeem_qr_token(user, raw_token: str) -> dict:
+    """
+    Safely redeem a QR token within a transaction lock.
+    Dispatches according to purpose:
+    - walkin_registration -> apply_to_event(source='qr_walkin')
+    - checkin -> check_in(method='qr_scan')
+    - join_event -> apply_to_event(source='invite')
+    """
+    ensure_active_account(user)
+
+    token_hash = hash_token(raw_token)
+
+    with transaction.atomic():
+        qr_token = (
+            QrToken.objects.select_for_update()
+            .select_related("event")
+            .filter(token_hash=token_hash)
+            .first()
+        )
+
+        if not qr_token:
+            raise DomainError("Invalid QR token.", code="invalid_token")
+
+        if qr_token.revoked_at is not None:
+            raise DomainError("QR token has been revoked.", code="revoked_token")
+
+        if qr_token.expires_at <= timezone.now():
+            raise DomainError("QR token has expired.", code="expired_token")
+
+        if qr_token.max_uses is not None and qr_token.used_count >= qr_token.max_uses:
+            raise CapacityFullError("QR token usage limit reached.", code="qr_limit_reached")
+
+        qr_token.used_count += 1
+        qr_token.save(update_fields=["used_count"])
+
+        # Dispatch by purpose
+        if qr_token.purpose == QR_WALKIN_REGISTRATION:
+            from apps.events.services import apply_to_event
+            app = apply_to_event(user, qr_token.event, source="qr_walkin", qr_token=qr_token)
+            result = {
+                "action": QR_WALKIN_REGISTRATION,
+                "application_id": app.id,
+                "status": app.status,
+            }
+        elif qr_token.purpose == QR_CHECKIN:
+            att = check_in(
+                actor=user,
+                event=qr_token.event,
+                user=user,
+                method="qr_scan",
+                qr_token=qr_token,
+            )
+            result = {
+                "action": QR_CHECKIN,
+                "status": "checked_in",
+                "attendance_id": att.id,
+                "checkin_at": att.checkin_at,
+            }
+        elif qr_token.purpose == QR_JOIN_EVENT:
+            from apps.events.services import apply_to_event
+            app = apply_to_event(user, qr_token.event, source="invite")
+            result = {
+                "action": QR_JOIN_EVENT,
+                "application_id": app.id,
+                "status": app.status,
+            }
+        else:
+            raise DomainError(f"Unsupported purpose: {qr_token.purpose}", code="invalid_purpose")
+
+        log_action(
+            actor=user,
+            action="redeem_qr_token",
+            entity_type="qr_token",
+            entity_id=qr_token.id,
+            after_data={"purpose": qr_token.purpose, "used_count": qr_token.used_count},
+        )
+
+    return result
+
+
+def acknowledge_onboarding(user, event, method: str = "app_tick") -> OnboardingAcknowledgment:
+    """
+    Record onboarding acknowledgment for current event onboarding_version.
+    """
+    ensure_active_account(user)
+
+    with transaction.atomic():
+        ack, created = OnboardingAcknowledgment.objects.update_or_create(
+            event=event,
+            user=user,
+            onboarding_version=event.onboarding_version,
+            defaults={
+                "method": method,
+                "acknowledged_at": timezone.now(),
+            },
+        )
+
+        log_action(
+            actor=user,
+            action="acknowledge_onboarding",
+            entity_type="onboarding_ack",
+            entity_id=ack.id,
+            after_data={"event_id": event.id, "version": event.onboarding_version, "method": method},
+        )
+
+    return ack
+
+
+def check_in(
+    actor,
+    event,
+    user=None,
+    method: str = "qr_scan",
+    qr_token=None,
+    target_user=None,
+) -> Attendance:
+    """
+    Check-in volunteer to an active event.
+    Returns Attendance instance. Idempotent if already checked in.
+    """
+    ensure_active_account(actor)
+    target = user or target_user
+    if not target:
+        raise DomainError("Target volunteer is required.", code="user_required")
+
+    if event.status != EVENT_ACTIVE:
+        raise InvalidStateError(
+            f"Event must be active to check in. Current status: '{event.status}'."
+        )
+
+    assignment = Assignment.objects.filter(
+        event=event,
+        user=target,
+        status__in=ACTIVE_ASSIGNMENT_STATUSES,
+    ).first()
+    if not assignment:
+        raise DomainError(
+            "User does not have an active assignment for this event.",
+            code="no_active_assignment",
+        )
+
+    if event.require_onboarding_ack:
+        has_ack = OnboardingAcknowledgment.objects.filter(
+            event=event,
+            user=target,
+            onboarding_version=event.onboarding_version,
+        ).exists()
+        if not has_ack:
+            raise OnboardingRequiredError(
+                "Volunteer must acknowledge onboarding requirements before checking in."
+            )
+
+    if actor.id == target.id:
+        if method != "qr_scan":
+            raise DomainError("Volunteers can only check in via QR scan.", code="invalid_checkin_method")
+        if not qr_token or qr_token.purpose != QR_CHECKIN:
+            raise DomainError("Valid check-in QR token is required.", code="invalid_qr_token")
+    else:
+        ensure_event_manager(actor, event)
+
+    attendance = Attendance.objects.filter(event=event, user=target).first()
+    if attendance and attendance.status == ATTENDANCE_CHECKED_IN:
+        return attendance
+
+    now = timezone.now()
+    with transaction.atomic():
+        if not attendance:
+            attendance = Attendance.objects.create(
+                event=event,
+                user=target,
+                assignment=assignment,
+                qr_token=qr_token,
+                status=ATTENDANCE_CHECKED_IN,
+                checkin_at=now,
+                method=method,
+                recorded_by=actor,
+            )
+        else:
+            attendance.assignment = assignment
+            attendance.qr_token = qr_token
+            attendance.status = ATTENDANCE_CHECKED_IN
+            attendance.checkin_at = now
+            attendance.method = method
+            attendance.recorded_by = actor
+            attendance.save()
+
+        log_action(
+            actor=actor,
+            action="check_in",
+            entity_type="attendance",
+            entity_id=attendance.id,
+            after_data={"method": method, "target_user_id": target.id},
+        )
+
+    return attendance
+
+
+def check_out(actor, event, user=None, target_user=None) -> Attendance:
+    """
+    Check-out volunteer from an active event.
+    """
+    ensure_active_account(actor)
+    target = user or target_user
+    if not target:
+        raise DomainError("Target volunteer is required.", code="user_required")
+
+    if actor.id != target.id:
+        ensure_event_manager(actor, event)
+
+    attendance = Attendance.objects.filter(event=event, user=target).first()
+    if not attendance or attendance.status != ATTENDANCE_CHECKED_IN:
+        raise InvalidStateError("Volunteer is not currently checked in.", code="not_checked_in")
+
+    with transaction.atomic():
+        attendance.checkout_at = timezone.now()
+        attendance.save(update_fields=["checkout_at"])
+
+        log_action(
+            actor=actor,
+            action="check_out",
+            entity_type="attendance",
+            entity_id=attendance.id,
+            after_data={"checkout_at": str(attendance.checkout_at), "target_user_id": target.id},
+        )
+
+    return attendance
+
+
+def mark_absent(actor, event, user=None, target_user=None) -> Attendance:
+    """
+    Coordinator or Admin marks volunteer absent.
+    """
+    ensure_event_manager(actor, event)
+    target = user or target_user
+    if not target:
+        raise DomainError("Target volunteer is required.", code="user_required")
+
+    attendance = Attendance.objects.filter(event=event, user=target).first()
+    if attendance and attendance.status in (ATTENDANCE_CHECKED_IN, ATTENDANCE_COMPLETED):
+        raise InvalidStateError(
+            f"Cannot mark absent because attendance is already '{attendance.status}'.",
+            code="invalid_state",
+        )
+
+    assignment = Assignment.objects.filter(
+        event=event,
+        user=target,
+        status__in=ACTIVE_ASSIGNMENT_STATUSES,
+    ).first()
+
+    with transaction.atomic():
+        if not attendance:
+            attendance = Attendance.objects.create(
+                event=event,
+                user=target,
+                assignment=assignment,
+                status=ATTENDANCE_ABSENT,
+                recorded_by=actor,
+            )
+        else:
+            attendance.status = ATTENDANCE_ABSENT
+            attendance.recorded_by = actor
+            attendance.save(update_fields=["status", "recorded_by"])
+
+        log_action(
+            actor=actor,
+            action="mark_absent",
+            entity_type="attendance",
+            entity_id=attendance.id,
+            after_data={"target_user_id": target.id},
+        )
+
+    return attendance
+
+
+def submit_feedback(
+    user,
+    event,
+    direction: str,
+    target_user=None,
+    score: int = None,
+    tags=None,
+    comment: str = "",
+) -> Feedback:
+    """
+    Submit feedback between coordinator and volunteer or for the event.
+    Requirements:
+    - Event must be completed.
+    - Score must be between 1 and 5.
+    - If coordinator_to_volunteer: rater is coordinator/admin, target_user required and had active assignment.
+    - If volunteer_to_event: rater had active assignment, target_user must be None.
+    - If volunteer_to_coordinator: rater had active assignment, target_user forced to event.coordinator.
+    """
+    ensure_active_account(user)
+
+    if event.status != EVENT_COMPLETED:
+        raise InvalidStateError(
+            "Feedback can only be submitted for completed events.",
+            code="event_not_completed",
+        )
+
+    if score is None or not (1 <= int(score) <= 5):
+        raise DomainError("Feedback score is required and must be between 1 and 5.", code="invalid_score")
+
+    valid_directions = {
+        FEEDBACK_COORDINATOR_TO_VOLUNTEER,
+        FEEDBACK_VOLUNTEER_TO_EVENT,
+        FEEDBACK_VOLUNTEER_TO_COORDINATOR,
+    }
+    if direction not in valid_directions:
+        raise DomainError(f"Invalid feedback direction: {direction}", code="invalid_direction")
+
+    final_target = target_user
+
+    if direction == FEEDBACK_COORDINATOR_TO_VOLUNTEER:
+        if not is_event_manager(user, event):
+            raise PermissionDeniedError("Only event coordinators or admins can rate volunteers.")
+        if not final_target:
+            raise DomainError("Target volunteer is required.", code="target_user_required")
+        had_assignment = Assignment.objects.filter(
+            event=event,
+            user=final_target,
+        ).exclude(status=ASSIGNMENT_CANCELLED).exists()
+        if not had_assignment:
+            raise DomainError("Target volunteer had no assignment for this event.", code="invalid_target_user")
+
+    elif direction == FEEDBACK_VOLUNTEER_TO_EVENT:
+        had_assignment = Assignment.objects.filter(
+            event=event,
+            user=user,
+        ).exclude(status=ASSIGNMENT_CANCELLED).exists()
+        if not had_assignment:
+            raise PermissionDeniedError("Only participating volunteers can submit event feedback.")
+        final_target = None
+
+    elif direction == FEEDBACK_VOLUNTEER_TO_COORDINATOR:
+        had_assignment = Assignment.objects.filter(
+            event=event,
+            user=user,
+        ).exclude(status=ASSIGNMENT_CANCELLED).exists()
+        if not had_assignment:
+            raise PermissionDeniedError("Only participating volunteers can submit coordinator feedback.")
+        final_target = event.coordinator
+
+    # Check duplicate feedback
+    if final_target is None:
+        if Feedback.objects.filter(event=event, rater_user=user, direction=direction, target_user__isnull=True).exists():
+            raise DomainError("Feedback has already been submitted for this event.", code="duplicate_feedback")
+    else:
+        if Feedback.objects.filter(event=event, rater_user=user, direction=direction, target_user=final_target).exists():
+            raise DomainError("Feedback has already been submitted for this user.", code="duplicate_feedback")
+
+    with transaction.atomic():
+        feedback = Feedback.objects.create(
+            event=event,
+            rater_user=user,
+            target_user=final_target,
+            direction=direction,
+            score=int(score),
+            tags=tags or [],
+            comment=comment or "",
+            status="active",
+        )
+
+        log_action(
+            actor=user,
+            action="submit_feedback",
+            entity_type="feedback",
+            entity_id=feedback.id,
+            after_data={
+                "direction": direction,
+                "score": int(score),
+                "target_user_id": final_target.id if final_target else None,
+            },
+        )
+
+    return feedback
+
+
+def run_auto_assignment(actor, event) -> list[Assignment]:
+    """
+    Coordinator or Admin runs automated assignment algorithm.
+    1. Lock event.
+    2. Get accepted applications without active assignment.
+    3. For each application, call create_assignment_from_application.
+    4. Build groups: group by post, group size = event.group_size. Code format "G1", "G2" per post.
+    5. Leader assignment: if post.leader_needed or event.leader_strategy in ("first_experienced", "experienced_preferred"),
+       choose first member with has_leader_experience=True. Ensure only one leader per group.
+    """
+    ensure_event_manager(actor, event)
+
+    from apps.events.models import Event, EventApplication, EventPost
+
+    created_assignments = []
+
+    with transaction.atomic():
+        locked_event = Event.objects.select_for_update().get(id=event.id)
+
+        # Get accepted applications without active assignment
+        unassigned_apps = (
+            EventApplication.objects.select_for_update()
+            .filter(event=locked_event, status="accepted")
+            .filter(~Q(assignments__status__in=ACTIVE_ASSIGNMENT_STATUSES))
+            .distinct()
+            .order_by("applied_at", "id")
+        )
+
+        for app in unassigned_apps:
+            assignment = create_assignment_from_application(app, actor=None)
+            if assignment:
+                created_assignments.append(assignment)
+
+        # Group organization and leader assignment
+        group_size = locked_event.group_size
+        posts = locked_event.posts.all().order_by("priority", "id")
+
+        group_seq = 1
+        for post in posts:
+            post_assignments = list(
+                Assignment.objects.select_for_update()
+                .filter(event=locked_event, post=post, status__in=ACTIVE_ASSIGNMENT_STATUSES)
+                .select_related("user")
+                .order_by("id")
+            )
+
+            if not post_assignments:
+                continue
+
+            chunk_size = group_size if (group_size and group_size > 0) else len(post_assignments)
+
+            for i in range(0, len(post_assignments), chunk_size):
+                chunk = post_assignments[i : i + chunk_size]
+                group_code = f"G{group_seq}"
+                group_seq += 1
+
+                # Check if group already has an active leader
+                has_existing_leader = any(a.is_group_leader for a in chunk)
+                leader_assigned = has_existing_leader
+
+                should_assign_leader = post.leader_needed or locked_event.leader_strategy in (
+                    "first_experienced",
+                    "experienced_preferred",
+                )
+
+                for a in chunk:
+                    a.group_code = group_code
+                    if should_assign_leader and not leader_assigned and a.user.has_leader_experience:
+                        a.is_group_leader = True
+                        leader_assigned = True
+                    elif not has_existing_leader and not a.is_group_leader:
+                        a.is_group_leader = False
+                    a.save(update_fields=["group_code", "is_group_leader"])
+
+        log_action(
+            actor=actor,
+            action="run_auto_assignment",
+            entity_type="event",
+            entity_id=locked_event.id,
+            after_data={"assignments_created": len(created_assignments)},
+        )
+
+    return created_assignments
+
+
+def assign_manually(
+    actor,
+    application,
+    post=None,
+    group_code=None,
+    is_group_leader: bool = False,
+) -> Assignment:
+    """
+    Coordinator or Admin manually assigns or updates volunteer assignment.
+    """
+    ensure_event_manager(actor, application.event)
+
+    target_post = post or application.post
+
+    with transaction.atomic():
+        if application.status != "accepted":
+            application.status = "accepted"
+            application.decided_by = actor
+            application.decided_at = timezone.now()
+            if target_post:
+                application.post = target_post
+            application.save()
+
+        # Check existing active assignment
+        assignment = Assignment.objects.filter(
+            application=application,
+            status__in=ACTIVE_ASSIGNMENT_STATUSES,
+        ).first()
+
+        if is_group_leader and not group_code:
+            raise DomainError(
+                "Group leader must have a group code assigned.",
+                code="group_code_required",
+            )
+
+        if is_group_leader and group_code:
+            existing_leader = (
+                Assignment.objects.filter(
+                    event=application.event,
+                    group_code=group_code,
+                    is_group_leader=True,
+                )
+                .exclude(id=assignment.id if assignment else None)
+                .filter(status__in=ACTIVE_ASSIGNMENT_STATUSES)
+                .exists()
+            )
+            if existing_leader:
+                raise DomainError(
+                    f"Group '{group_code}' already has an active leader.",
+                    code="duplicate_group_leader",
+                )
+
+        assigned_by = "admin" if getattr(actor, "is_admin", False) else "coordinator"
+
+        if not assignment:
+            assignment = Assignment.objects.create(
+                event=application.event,
+                post=target_post,
+                user=application.user,
+                application=application,
+                status=ASSIGNMENT_ASSIGNED,
+                assigned_by=assigned_by,
+                assigned_by_user=actor,
+                group_code=group_code,
+                is_group_leader=is_group_leader,
+                schedule_start=application.event.start_at,
+                schedule_end=application.event.end_at,
+                conditions_snapshot=application.conditions_snapshot or {},
+            )
+            Attendance.objects.get_or_create(
+                event=application.event,
+                user=application.user,
+                defaults={
+                    "assignment": assignment,
+                    "status": ATTENDANCE_EXPECTED,
+                },
+            )
+        else:
+            assignment.post = target_post
+            assignment.group_code = group_code
+            assignment.is_group_leader = is_group_leader
+            assignment.assigned_by = assigned_by
+            assignment.assigned_by_user = actor
+            assignment.save()
+
+        log_action(
+            actor=actor,
+            action="assign_manually",
+            entity_type="assignment",
+            entity_id=assignment.id,
+            after_data={"post_id": target_post.id if target_post else None, "group_code": group_code},
+        )
+
+    return assignment
+
+
+def confirm_assignment(user, assignment: Assignment) -> Assignment:
+    """
+    Volunteer confirms own assignment.
+    """
+    if assignment.user_id != user.id:
+        raise PermissionDeniedError("Cannot confirm another volunteer's assignment.")
+
+    if assignment.status not in (ASSIGNMENT_ASSIGNED,):
+        if assignment.status == ASSIGNMENT_CONFIRMED:
+            return assignment
+        raise InvalidStateError(f"Cannot confirm assignment in status '{assignment.status}'.")
+
+    with transaction.atomic():
+        assignment.status = ASSIGNMENT_CONFIRMED
+        assignment.save(update_fields=["status"])
+
+        log_action(
+            actor=user,
+            action="confirm_assignment",
+            entity_type="assignment",
+            entity_id=assignment.id,
+        )
+
+    return assignment
+
+
+def cancel_assignment(actor, assignment: Assignment, reason: str = "") -> Assignment:
+    """
+    Coordinator, Admin, or Volunteer cancels an assignment.
+    """
+    if assignment.user_id != actor.id:
+        ensure_event_manager(actor, assignment.event)
+
+    if assignment.status == ASSIGNMENT_CANCELLED:
+        return assignment
+
+    with transaction.atomic():
+        assignment.status = ASSIGNMENT_CANCELLED
+        assignment.save(update_fields=["status"])
+
+        log_action(
+            actor=actor,
+            action="cancel_assignment",
+            entity_type="assignment",
+            entity_id=assignment.id,
+            after_data={"reason": reason},
+        )
+
+    return assignment
+
+================================================================================
+C:\Users\USER\Documents\INTERN\Project\Volunteer HR Management\python stack\apps\ops\tests.py
+----------------------------------------
+from django.test import TestCase
+
+# Create your tests here.
+
+================================================================================
+C:\Users\USER\Documents\INTERN\Project\Volunteer HR Management\python stack\apps\ops\urls.py
+----------------------------------------
+# apps/ops/urls.py
+from django.urls import path
+
+from apps.ops.views import (
+    AssignmentCancelView,
+    AssignmentConfirmView,
+    EventAutoRunAssignmentView,
+    EventCheckInView,
+    EventCheckOutView,
+    EventFeedbackView,
+    EventManualAssignmentView,
+    EventMarkAbsentView,
+    EventOnboardingAcknowledgeView,
+    EventQrGenerateView,
+    MeApplicationsListView,
+    MeAssignmentsListView,
+    QrRedeemView,
+    QrResolveView,
+)
+
+urlpatterns = [
+    # QR Tokens
+    path("events/<int:pk>/qr/", EventQrGenerateView.as_view(), name="event-qr-generate"),
+    path("qr/resolve/", QrResolveView.as_view(), name="qr-resolve"),
+    path("qr/redeem/", QrRedeemView.as_view(), name="qr-redeem"),
+
+    # Assignments
+    path("events/<int:pk>/assignments/auto-run/", EventAutoRunAssignmentView.as_view(), name="event-assignments-autorun"),
+    path("events/<int:pk>/assignments/manual/", EventManualAssignmentView.as_view(), name="event-assignments-manual"),
+    path("assignments/<int:pk>/confirm/", AssignmentConfirmView.as_view(), name="assignment-confirm"),
+    path("assignments/<int:pk>/cancel/", AssignmentCancelView.as_view(), name="assignment-cancel"),
+
+    # Attendance / Onboarding / Feedback
+    path("events/<int:pk>/check-in/", EventCheckInView.as_view(), name="event-check-in"),
+    path("events/<int:pk>/check-out/", EventCheckOutView.as_view(), name="event-check-out"),
+    path("events/<int:pk>/mark-absent/", EventMarkAbsentView.as_view(), name="event-mark-absent"),
+    path("events/<int:pk>/onboarding/acknowledge/", EventOnboardingAcknowledgeView.as_view(), name="event-onboarding-ack"),
+    path("events/<int:pk>/feedback/", EventFeedbackView.as_view(), name="event-feedback"),
+
+    # Me Endpoints
+    path("me/applications/", MeApplicationsListView.as_view(), name="me-applications"),
+    path("me/assignments/", MeAssignmentsListView.as_view(), name="me-assignments"),
+]
+
+================================================================================
+C:\Users\USER\Documents\INTERN\Project\Volunteer HR Management\python stack\apps\ops\views.py
+----------------------------------------
+# apps/ops/views.py
+from django.shortcuts import get_object_or_404
+from rest_framework import generics, status
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
+from apps.accounts.models import User
+from apps.common.security import hash_token
+from apps.events.models import Event, EventApplication, EventPost
+from apps.events.serializers import EventApplicationSerializer
+from apps.ops.models import Assignment, Attendance, Feedback, QrToken
+from apps.ops.serializers import (
+    AssignmentCancelSerializer,
+    AssignmentSerializer,
+    AttendanceSerializer,
+    CheckInSerializer,
+    CheckOutSerializer,
+    FeedbackCreateSerializer,
+    FeedbackSerializer,
+    ManualAssignmentSerializer,
+    MarkAbsentSerializer,
+    OnboardingAcknowledgeSerializer,
+    OnboardingAcknowledgmentSerializer,
+    QrTokenGenerateSerializer,
+    QrTokenRedeemSerializer,
+    QrTokenResolveSerializer,
+    QrTokenSerializer,
+)
+from apps.ops.services import (
+    acknowledge_onboarding,
+    assign_manually,
+    cancel_assignment,
+    check_in,
+    check_out,
+    confirm_assignment,
+    generate_qr_token,
+    mark_absent,
+    redeem_qr_token,
+    resolve_qr_token,
+    run_auto_assignment,
+    submit_feedback,
+)
+
+
+class EventQrGenerateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        event = get_object_or_404(Event, pk=pk)
+        serializer = QrTokenGenerateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        qr_token, raw_token = generate_qr_token(
+            actor=request.user,
+            event=event,
+            purpose=serializer.validated_data["purpose"],
+            max_uses=serializer.validated_data.get("max_uses"),
+            ttl_minutes=serializer.validated_data.get("ttl_minutes", 240),
+        )
+
+        return Response(
+            {
+                "raw_token": raw_token,
+                "token": raw_token,
+                "qr_token": QrTokenSerializer(qr_token).data,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class QrResolveView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = QrTokenResolveSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        preview = resolve_qr_token(raw_token=serializer.validated_data["token"])
+        return Response(preview, status=status.HTTP_200_OK)
+
+
+class QrRedeemView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = QrTokenRedeemSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        res = redeem_qr_token(user=request.user, raw_token=serializer.validated_data["token"])
+        return Response(res, status=status.HTTP_200_OK)
+
+
+class EventAutoRunAssignmentView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        event = get_object_or_404(Event, pk=pk)
+        assignments = run_auto_assignment(actor=request.user, event=event)
+        return Response(
+            AssignmentSerializer(assignments, many=True).data,
+            status=status.HTTP_200_OK,
+        )
+
+
+class EventManualAssignmentView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        event = get_object_or_404(Event, pk=pk)
+        serializer = ManualAssignmentSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        application = get_object_or_404(
+            EventApplication,
+            pk=serializer.validated_data["application_id"],
+            event=event,
+        )
+
+        post = None
+        if serializer.validated_data.get("post_id"):
+            post = get_object_or_404(
+                EventPost,
+                pk=serializer.validated_data["post_id"],
+                event=event,
+            )
+
+        assignment = assign_manually(
+            actor=request.user,
+            application=application,
+            post=post,
+            group_code=serializer.validated_data.get("group_code"),
+            is_group_leader=serializer.validated_data.get("is_group_leader", False),
+        )
+
+        return Response(AssignmentSerializer(assignment).data, status=status.HTTP_200_OK)
+
+
+class AssignmentConfirmView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        assignment = get_object_or_404(Assignment, pk=pk)
+        updated = confirm_assignment(user=request.user, assignment=assignment)
+        return Response(AssignmentSerializer(updated).data, status=status.HTTP_200_OK)
+
+
+class AssignmentCancelView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        assignment = get_object_or_404(Assignment, pk=pk)
+        serializer = AssignmentCancelSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        cancelled = cancel_assignment(
+            actor=request.user,
+            assignment=assignment,
+            reason=serializer.validated_data.get("reason", ""),
+        )
+        return Response(AssignmentSerializer(cancelled).data, status=status.HTTP_200_OK)
+
+
+class EventCheckInView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        event = get_object_or_404(Event, pk=pk)
+        serializer = CheckInSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        target_user = request.user
+        if serializer.validated_data.get("user_id"):
+            target_user = get_object_or_404(User, pk=serializer.validated_data["user_id"])
+
+        qr_token = None
+        raw_token = serializer.validated_data.get("token")
+        if raw_token:
+            qr_token = QrToken.objects.filter(token_hash=hash_token(raw_token)).first()
+
+        attendance = check_in(
+            actor=request.user,
+            event=event,
+            user=target_user,
+            method=serializer.validated_data.get("method", "qr_scan"),
+            qr_token=qr_token,
+        )
+        return Response(AttendanceSerializer(attendance).data, status=status.HTTP_200_OK)
+
+
+class EventCheckOutView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        event = get_object_or_404(Event, pk=pk)
+        serializer = CheckOutSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        target_user = request.user
+        if serializer.validated_data.get("user_id"):
+            target_user = get_object_or_404(User, pk=serializer.validated_data["user_id"])
+
+        attendance = check_out(actor=request.user, event=event, user=target_user)
+        return Response(AttendanceSerializer(attendance).data, status=status.HTTP_200_OK)
+
+
+class EventMarkAbsentView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        event = get_object_or_404(Event, pk=pk)
+        serializer = MarkAbsentSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        target_user = get_object_or_404(User, pk=serializer.validated_data["user_id"])
+        attendance = mark_absent(actor=request.user, event=event, user=target_user)
+        return Response(AttendanceSerializer(attendance).data, status=status.HTTP_200_OK)
+
+
+class EventOnboardingAcknowledgeView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        event = get_object_or_404(Event, pk=pk)
+        serializer = OnboardingAcknowledgeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        ack = acknowledge_onboarding(
+            user=request.user,
+            event=event,
+            method=serializer.validated_data.get("method", "app_tick"),
+        )
+        return Response(OnboardingAcknowledgmentSerializer(ack).data, status=status.HTTP_200_OK)
+
+
+class EventFeedbackView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        event = get_object_or_404(Event, pk=pk)
+        serializer = FeedbackCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        target_user = None
+        if serializer.validated_data.get("target_user_id"):
+            target_user = get_object_or_404(User, pk=serializer.validated_data["target_user_id"])
+
+        feedback = submit_feedback(
+            user=request.user,
+            event=event,
+            direction=serializer.validated_data["direction"],
+            target_user=target_user,
+            score=serializer.validated_data["score"],
+            tags=serializer.validated_data.get("tags", []),
+            comment=serializer.validated_data.get("comment", ""),
+        )
+        return Response(FeedbackSerializer(feedback).data, status=status.HTTP_201_CREATED)
+
+
+class MeApplicationsListView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = EventApplicationSerializer
+
+    def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False) or not getattr(self.request.user, "is_authenticated", False):
+            return EventApplication.objects.none()
+        return (
+            EventApplication.objects.filter(user=self.request.user)
+            .select_related("event", "post")
+            .order_by("-applied_at")
+        )
+
+
+class MeAssignmentsListView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = AssignmentSerializer
+
+    def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False) or not getattr(self.request.user, "is_authenticated", False):
+            return Assignment.objects.none()
+        return (
+            Assignment.objects.filter(user=self.request.user)
+            .select_related("event", "post", "user")
+            .order_by("-created_at")
+        )

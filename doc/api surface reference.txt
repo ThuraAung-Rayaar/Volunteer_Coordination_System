@@ -1,0 +1,83 @@
+All endpoints are under /api/v1/.
+Auth
+
+POST /auth/otp/request/
+POST /auth/otp/verify/
+
+Me
+GET   /me/
+PATCH /me/
+GET   /me/charity-interests/
+PUT   /me/charity-interests/
+GET   /me/verification-images/
+POST  /me/verification-images/
+GET   /me/coordinator/
+POST  /me/coordinator/
+GET   /me/applications/
+GET   /me/assignments/
+
+Lookup
+
+GET /charity-fields/
+Events
+GET   /events/
+GET   /events/{id}/
+GET   /coordinator/events/
+POST  /coordinator/events/
+PATCH /coordinator/events/{id}/
+POST  /events/{id}/publish/
+POST  /events/{id}/activate/
+POST  /events/{id}/complete/
+POST  /events/{id}/cancel/
+GET   /events/{id}/posts/
+POST  /events/{id}/posts/
+PATCH /posts/{id}/
+POST  /events/{id}/apply/
+GET   /events/{id}/applications/
+GET   /events/{id}/roster/
+GET   /events/{id}/unassigned/
+
+
+
+Applications
+
+POST /applications/{id}/accept/
+POST /applications/{id}/reject/
+POST /applications/{id}/waitlist/
+POST /applications/{id}/withdraw/
+
+
+Assignments
+POST /events/{id}/assignments/auto-run/
+POST /events/{id}/assignments/manual/
+POST /assignments/{id}/confirm/
+POST /assignments/{id}/cancel/
+
+
+Attendance / Onboarding / Feedback
+POST /events/{id}/check-in/
+POST /events/{id}/check-out/
+POST /events/{id}/mark-absent/
+POST /events/{id}/onboarding/acknowledge/
+POST /events/{id}/feedback/
+
+
+QR
+POST /events/{id}/qr/          coordinator generates QR token
+POST /qr/resolve/              public preview only
+POST /qr/redeem/               authenticated redemption
+
+
+Admin
+
+GET  /admin/dashboard/
+POST /admin/users/{id}/warn/
+POST /admin/users/{id}/block/
+POST /admin/users/{id}/unblock/
+POST /admin/users/{id}/close/
+POST /admin/users/{id}/reinstate/
+POST /admin/events/{id}/delete/
+POST /admin/events/{id}/restore/
+POST /admin/events/{id}/cancel/
+POST /admin/feedback/{id}/hide/
+
