@@ -181,3 +181,93 @@ class AttendanceGeoAttempts(models.Model):
     class Meta:
         managed = False
         db_table = "attendance_geo_attempts"
+
+
+
+# ---------------------------------------------------------------------------
+# Read-only models bound to operational views (managed = False)
+# ---------------------------------------------------------------------------
+
+class VEventCheckinBoard(models.Model):
+    assignment_id = models.BigIntegerField(primary_key=True)
+    event_id = models.BigIntegerField()
+    user_id = models.BigIntegerField()
+    display_name = models.TextField()
+    post_id = models.BigIntegerField(blank=True, null=True)
+    post_title = models.TextField(blank=True, null=True)
+    group_code = models.TextField(blank=True, null=True)
+    is_group_leader = models.BooleanField()
+    assignment_status = models.TextField()
+    attendance_id = models.BigIntegerField(blank=True, null=True)
+    attendance_status = models.TextField(blank=True, null=True)
+    method = models.TextField(blank=True, null=True)
+    walk_in_flag = models.BooleanField(blank=True, null=True)
+    checkin_at = models.DateTimeField(blank=True, null=True)
+    checkin_distance_m = models.DecimalField(max_digits=10, decimal_places=1, blank=True, null=True)
+    confirmation_status = models.TextField(blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = "v_event_checkin_board"
+
+
+class VEventCheckinStatus(models.Model):
+    """Alias view of v_event_checkin_board; always query scoped by event_id."""
+    user_id = models.BigIntegerField(primary_key=True)
+    event_id = models.BigIntegerField()
+    display_name = models.TextField()
+    post_id = models.BigIntegerField(blank=True, null=True)
+    post_title = models.TextField(blank=True, null=True)
+    group_code = models.TextField(blank=True, null=True)
+    is_group_leader = models.BooleanField()
+    attendance_status = models.TextField()
+    checkin_at = models.DateTimeField(blank=True, null=True)
+    checkin_method = models.TextField(blank=True, null=True)
+    walk_in_flag = models.BooleanField(blank=True, null=True)
+    confirmation_status = models.TextField(blank=True, null=True)
+    checkin_distance_m = models.DecimalField(max_digits=10, decimal_places=1, blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = "v_event_checkin_status"
+
+
+class VPendingConfirmations(models.Model):
+    attendance_id = models.BigIntegerField(primary_key=True)
+    event_id = models.BigIntegerField()
+    event_title = models.TextField()
+    owner_id = models.BigIntegerField()
+    current_coordinator_id = models.BigIntegerField()
+    user_id = models.BigIntegerField()
+    volunteer_name = models.TextField()
+    checkin_at = models.DateTimeField(blank=True, null=True)
+    checkin_latitude = models.DecimalField(max_digits=9, decimal_places=6, blank=True, null=True)
+    checkin_longitude = models.DecimalField(max_digits=9, decimal_places=6, blank=True, null=True)
+    checkin_accuracy_m = models.DecimalField(max_digits=7, decimal_places=1, blank=True, null=True)
+    checkin_distance_m = models.DecimalField(max_digits=10, decimal_places=1, blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = "v_pending_confirmations"
+
+
+class VGeoAttemptsReview(models.Model):
+    id = models.BigIntegerField(primary_key=True)
+    event_id = models.BigIntegerField()
+    event_title = models.TextField()
+    user_id = models.BigIntegerField()
+    display_name = models.TextField()
+    attempted_at = models.DateTimeField()
+    result = models.TextField()
+    distance_m = models.DecimalField(max_digits=10, decimal_places=1, blank=True, null=True)
+    radius_m = models.IntegerField(blank=True, null=True)
+    accuracy_m = models.DecimalField(max_digits=7, decimal_places=1, blank=True, null=True)
+    device_mocked = models.BooleanField()
+    review_status = models.TextField()
+    reviewed_by_user_id = models.BigIntegerField(blank=True, null=True)
+    reviewed_at = models.DateTimeField(blank=True, null=True)
+    review_note = models.TextField(blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = "v_geo_attempts_review"

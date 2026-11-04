@@ -1,0 +1,891 @@
+Understood. We will not fix, modify, normalize, or redesign the SQL prototype.
+
+The SQL file `updated_volunteer_coordination_system_Database.sql` is the authoritative technical baseline for the next iteration. The business rules must be written to describe what this particular SQL version actually supports.
+
+This changes the approach slightly:
+
+- The SQL determines the available entities, relationships, constraints, functions, triggers, views and state transitions.
+- The business specification provides the intended operational workflows and business meaning.
+- Where the specification and SQL differ, we adapt the business-rule declaration to the SQL prototype rather than changing the SQL to satisfy the older specification.
+- Django services will orchestrate the existing SQL capabilities, not introduce a competing implementation.
+
+We are treating this as an intentional prototype iteration, not a database correction exercise.
+
+# Revised full development plan — SQL prototype v0.5.2
+
+
+
+SQL-first implementation strategy
+
+Next development stage
+
+
+
+## 1. Establish the development baseline
+
+We will use the following authority hierarchy:
+
+| Priority | Source                                               | Responsibility                                   |
+| -------- | ---------------------------------------------------- | ------------------------------------------------ |
+| 1        | `updated_volunteer_coordination_system_Database.sql` | Actual system capabilities and enforceable rules |
+| 2        | `Database_report.md`                                 | Explanation of the SQL implementation            |
+| 3        | v0.5.2 Business Rules Specification                  | Business meaning and workflow requirements       |
+| 4        | Existing Django backend                              | Current application implementation               |
+
+If a workflow in the business specification describes something that the SQL prototype does not implement, we will not pretend that it already exists. We will classify it as an application-level workflow, a prototype limitation, or a future capability.
+
+### Existing SQL capabilities we will preserve
+
+# 22
+
+Tables
+
+Existing relational schema
+
+# \~40
+
+Functions
+
+Database operations and helpers
+
+# \~50
+
+Triggers
+
+Integrity and workflow enforcement
+
+# 11
+
+Views
+
+Read-oriented database projections
+
+These are the expected object counts documented by the database report.
+
+## 2. Declare business rules based on the SQL
+
+This is the most important part of the next stage.
+
+Instead of taking the 20 business domains and independently inventing rules, we will derive each domain from the SQL schema.
+
+### Domain 1 — Authentication, OTP and session context
+
+SQL objects:
+
+- `users`
+- `auth_otp`
+- `app_settings`
+
+Database functions:
+
+- `request_otp()`
+- `verify_otp()`
+- `app_user_id()`
+- `app_ip()`
+- `assert_actor()`
+- `purge_expired_otps()`
+
+Business rules to declare:
+
+1. Users are identified internally through BIGINT IDs and externally through UUIDv7.
+2. Account statuses are `active`, `blocked`, and `closed`.
+3. OTP purposes are `login` and `qr_registration`.
+4. OTP expiration, attempt limits and request limits follow the database configuration.
+5. An OTP must be verified before the corresponding authentication action succeeds.
+6. Authenticated request context must be propagated into PostgreSQL transactions.
+7. Closed or blocked accounts must follow the account guards implemented in SQL.
+
+Service: `auth_service.py`
+
+### Domain 2 — User profiles and capability profiling
+
+SQL objects:
+
+- `users`
+- `user_charity_interests`
+- `charity_fields`
+
+Business rules:
+
+- Maintain user profile information.
+- Maintain normalized skill tags.
+- Maintain charity interests.
+- Validate profile field combinations.
+- Enforce the database's blood type and donation-related constraints.
+- Expose UUID-based public identification rather than internal sequential IDs.
+- Protect private user information according to the actual database access model.
+
+Service: `profile_service.py`
+
+### Domain 3 — Volunteer availability
+
+SQL objects:
+
+- `volunteer_availability_rules`
+- `volunteer_availability_exceptions`
+
+Database functions:
+
+- `is_user_available()`
+- `user_has_schedule_conflict()`
+
+Business rules:
+
+- Volunteers can define recurring weekly availability.
+- Volunteers can define date-specific availability exceptions.
+- Availability must respect valid time ranges and dates.
+- Assignments must be checked against availability.
+- Schedule conflicts must be evaluated using the database's existing rules.
+
+Service: `availability_service.py`
+
+### Domain 4 — Identity verification
+
+SQL objects:
+
+- `user_verification_images`
+- `users`
+
+Database function:
+
+\- `recompute_user_verification()`
+
+Business rules:
+
+- Supported image types are `mock_selfie`, `id_license`, and `driver_license`.
+- Image format is JPEG.
+- Verification states are `pending`, `approved`, and `rejected`.
+- Comparison states are `pending`, `match`, `no_match`, and `needs_review`.
+- Review decisions must contain reviewer and timestamp information.
+- User verification status is recalculated using the database's verification logic.
+
+Service: `verification_service.py`
+
+### Domain 5 — Coordinator approval and lifecycle
+
+SQL objects:
+
+- `coordinator_profiles`
+- `users`
+
+Business rules:
+
+- A user can apply for coordinator status.
+- Coordinator states are `pending`, `approved`, `suspended`, and `revoked`.
+- Only approved coordinators satisfy the database's approved-coordinator check.
+- Coordinator profile changes must respect the SQL state-transition guards.
+- Approval and suspension actions must retain the relevant administrative information.
+
+Service: `coordinator_service.py`
+
+### Domain 6 — Event lifecycle, ownership and handover
+
+SQL objects:
+
+- `events`
+- `event_coordinator_history`
+- `event_charity_fields`
+
+Database functions:
+
+- `is_event_manager()`
+- `change_event_coordinator()`
+
+Business rules:
+
+- Events have five states: `draft`, `published`, `active`, `completed`, and `cancelled`.
+- Event ownership and current operational coordination are separate.
+- The original owner is not replaced by coordinator handover.
+- Coordinator handovers must preserve historical records.
+- Events must satisfy their date, location, capacity and configuration constraints.
+- Deleted events must respect the database's soft-deletion design.
+- Only authorized actors may manage events.
+
+Service: `event_service.py`
+
+### Domain 7 — Event posts and volunteer roles
+
+SQL objects:
+
+- `event_posts`
+- `events`
+
+Database functions:
+
+\- `application_remaining_capacity()`
+
+Database views:
+
+\- `v_event_post_capacity`
+
+Business rules:
+
+- Posts define the positions available at an event.
+- Posts have required headcount and skill requirements.
+- Physical requirements are `none`, `light`, `medium`, and `heavy`.
+- Post status is `open`, `full`, or `closed`.
+- Capacity changes must be reflected through the database's trigger logic.
+- Closed posts cannot be treated as open recruitment positions.
+
+Service: `event_post_service.py`
+
+### Domain 8 — Recruitment and applications
+
+SQL objects:
+
+- `event_applications`
+- `events`
+- `event_posts`
+- `qr_tokens`
+
+Business rules:
+
+- Applications can originate from `browse`, `qr_walkin`, or `invite`.
+- Application statuses are `pending`, `accepted`, `waitlisted`, `rejected`, `withdrawn`, and `expired`.
+- Applications must be associated with the appropriate event and post.
+- Walk-in applications must retain their QR token reference.
+- Acceptance and rejection decisions must retain decision information.
+- Capacity, eligibility and scheduling checks must follow SQL enforcement.
+
+Service: `application_service.py`
+
+### Domain 9 — Smart assignment and team grouping
+
+SQL objects:
+
+- `assignments`
+- `event_applications`
+- `event_posts`
+- `events`
+
+Database functions:
+
+- `create_assignment_from_application()`
+- `run_auto_assignment()`
+- `assign_manually()`
+
+Business rules:
+
+- Accepted applications are the basis for assignment.
+- Assignment creation must respect event and post capacity.
+- Volunteer scheduling conflicts must be checked.
+- Assignment status is `assigned`, `confirmed`, `completed`, or `cancelled`.
+- Assignment source is `auto`, `coordinator`, or `admin`.
+- Assignment changes must follow database transition enforcement.
+- Assignment creation must not bypass existing database validation.
+
+Service: `assignment_service.py`
+
+### Domain 10 — Pre-work digital onboarding
+
+SQL objects:
+
+- `onboarding_acknowledgments`
+- `events`
+- `assignments`
+
+Business rules:
+
+- Volunteers acknowledge the applicable event onboarding version.
+- Acknowledgments are append-only.
+- The acknowledgment must be associated with the relevant user and event.
+- Onboarding completion must be evaluated against the event's configured onboarding version.
+
+Service: `onboarding_service.py`
+
+### Domain 11 — QR token management
+
+SQL objects:
+
+\- `qr_tokens`
+
+Database functions:
+
+- `consume_qr_token()`
+- `qr_token_status()`
+- `qr_check_in()`
+- `qr_walkin_apply()`
+
+Business rules:
+
+- Store token hashes rather than raw tokens.
+- Support `walkin_registration`, `checkin`, and `join_event` purposes.
+- Enforce token expiration.
+- Enforce maximum usage and usage counters.
+- Respect revoked-token status.
+- Separate token creation, preview and redemption.
+- Prevent unauthorized token reuse.
+
+Service: `qr_service.py`
+
+### Domain 12 — Attendance and manual check-in
+
+SQL objects:
+
+- `attendance`
+- `assignments`
+
+Database functions:
+
+- `confirm_attendance()`
+- `reject_attendance()`
+
+Business rules:
+
+- Attendance states are `expected`, `checked_in`, `absent`, `completed`, and `cancelled`.
+- Attendance methods are `qr_scan`, `coordinator_manual`, `geo`, and `system`.
+- Attendance confirmation states are `not_required`, `pending`, `confirmed`, and `rejected`.
+- Manual attendance must respect coordinator authorization.
+- Check-in and check-out must follow the database transition rules.
+- Attendance must remain associated with the appropriate assignment.
+
+Service: `attendance_service.py`
+
+### Domain 13 — GPS geolocation check-in
+
+SQL objects:
+
+- `attendance_geo_attempts`
+- `attendance`
+- `events`
+
+Database function:
+
+\- `geo_check_in()`
+
+Database views:
+
+- `v_geo_attempts_review`
+- `v_event_checkin_status`
+
+Business rules:
+
+- GPS validation is server-side.
+- The server calculates distance using the event coordinates.
+- The client's claimed distance is not authoritative.
+- GPS accuracy and fix age must satisfy configured thresholds.
+- The event geofence radius must be respected.
+- Failed attempts must be recorded.
+- GPS evidence must follow the database retention policy.
+
+Service: `geo_service.py`
+
+### Domain 14 — Two-way feedback
+
+SQL objects:
+
+- `feedback`
+- `assignments`
+- `users`
+
+Business rules:
+
+- Feedback is associated with the relevant participation relationship.
+- Feedback states are `active` and `hidden`.
+- Feedback visibility must follow the database's feedback guards.
+- Feedback moderation must respect authorized actors.
+- Feedback records must remain traceable.
+
+Service: `feedback_service.py`
+
+### Domain 15 — Admin moderation and governance
+
+SQL objects:
+
+- `moderation_actions`
+- `users`
+- `events`
+- `feedback`
+
+Database views:
+
+- `v_user_moderation_summary`
+- `v_admin_dashboard`
+
+Business rules:
+
+- Administrative moderation is performed through recorded moderation actions.
+- Insertion of a moderation action applies the corresponding action through database logic.
+- Moderation must respect administrator authorization.
+- Moderation history must remain traceable.
+- User and event governance must follow the database's existing guard functions.
+
+Service: `moderation_service.py`
+
+### Domain 16 — Scheduled system maintenance
+
+Database functions:
+
+- `release_expired_blocks()`
+- `expire_stale_applications()`
+- `purge_expired_otps()`
+- `purge_geo_evidence()`
+
+Business rules:
+
+- Expired blocks must be processed according to their configured expiration.
+- Stale applications must be expired.
+- Expired OTP records must be purged.
+- Old GPS evidence must follow the configured retention period.
+- Maintenance operations must be safe to rerun.
+
+Service: `maintenance_service.py`
+
+### Domain 17 — Audit trail and compliance
+
+SQL objects:
+
+- `audit_logs`
+- `event_coordinator_history`
+
+Database functions:
+
+- `trg_audit_row()`
+- `trg_block_mutation()`
+
+Business rules:
+
+- Relevant record mutations must produce audit records.
+- Audit records are append-only.
+- Audit records cannot be truncated through ordinary application operations.
+- Coordinator history is append-only.
+- Audit records must preserve actor, operation and relevant change information.
+
+Service: `audit_service.py`
+
+### Domain 18 — Dashboards, browsing and reporting
+
+Database views:
+
+- `v_public_events`
+- `v_event_post_capacity`
+- `v_event_summary`
+- `v_accepted_unassigned`
+- `v_event_checkin_board`
+- `v_event_checkin_status`
+- `v_pending_confirmations`
+- `v_geo_attempts_review`
+- `v_event_coordinator_history`
+- `v_user_moderation_summary`
+- `v_admin_dashboard`
+
+Business rules:
+
+- Public browsing uses the public event projection.
+- Event capacity is retrieved through the capacity projection.
+- Coordinators receive event-scoped operational information.
+- Administrators receive authorized governance information.
+- Check-in boards and confirmation queues use their dedicated views.
+- Read operations must not bypass privacy and authorization requirements.
+
+Service: `query_service.py`
+
+## 3. Cross-cutting business rules
+
+These are not separate business domains. They apply across all 18 domains.
+
+| Category              | Implementation responsibility                                |
+| --------------------- | ------------------------------------------------------------ |
+| Authentication        | Identify the actor and validate account state                |
+| Authorization         | Validate role, coordinator approval and event ownership      |
+| Privacy               | Restrict access to private information                       |
+| Transaction integrity | Execute multi-step operations atomically                     |
+| Concurrency           | Respect database locking and constraint enforcement          |
+| Idempotency           | Prevent duplicate execution of sensitive operations          |
+| Error handling        | Translate PostgreSQL business errors into application errors |
+| Audit                 | Preserve traceability of relevant operations                 |
+| Security context      | Propagate user ID and IP into the database transaction       |
+
+Important: The SQL prototype remains authoritative for rules it already enforces. Django will add request-level validation and orchestration, not duplicate or override database enforcement.
+
+## 4. Proposed Django services architecture
+
+We will use your existing `backend/services/` directory, expanding it gradually.
+
+```
+backend/
+│
+├── apps/
+│   ├── accounts/
+│   ├── events/
+│   ├── coordination/
+│   ├── attendance/
+│   └── audit/
+│
+├── common/
+│   ├── db_context.py
+│   ├── exceptions.py
+│   ├── permissions.py
+│   ├── security.py
+│   ├── privacy.py
+│   ├── transactions.py
+│   ├── idempotency.py
+│   └── utils.py
+│
+├── services/
+│   ├── auth_service.py
+│   ├── profile_service.py
+│   ├── availability_service.py
+│   ├── verification_service.py
+│   ├── coordinator_service.py
+│   ├── event_service.py
+│   ├── event_post_service.py
+│   ├── application_service.py
+│   ├── assignment_service.py
+│   ├── onboarding_service.py
+│   ├── qr_service.py
+│   ├── attendance_service.py
+│   ├── geo_service.py
+│   ├── feedback_service.py
+│   ├── moderation_service.py
+│   ├── maintenance_service.py
+│   ├── audit_service.py
+│   └── query_service.py
+│
+├── bff/
+│   ├── auth/
+│   ├── volunteer/
+│   ├── coordinator/
+│   └── checkin/
+│
+└── admin_portal/
+```
+
+This is the target architecture, not a request to create all these files immediately.
+
+## 5. Service-to-SQL integration contract
+
+This is an important design rule for the entire implementation.
+
+| Service      | SQL integration                                                                      |
+| ------------ | ------------------------------------------------------------------------------------ |
+| Auth         | `request_otp()`, `verify_otp()`                                                      |
+| Availability | `is_user_available()`, `user_has_schedule_conflict()`                                |
+| Verification | `recompute_user_verification()`                                                      |
+| Coordinator  | `is_approved_coordinator()`, `change_event_coordinator()`                            |
+| Event        | `is_event_manager()`                                                                 |
+| Event post   | `application_remaining_capacity()`                                                   |
+| Application  | ORM operations with database triggers enforcing rules                                |
+| Assignment   | `run_auto_assignment()`, `assign_manually()`, `create_assignment_from_application()` |
+| QR           | `consume_qr_token()`, `qr_token_status()`, `qr_check_in()`, `qr_walkin_apply()`      |
+| Attendance   | `confirm_attendance()`, `reject_attendance()`                                        |
+| Geolocation  | `geo_check_in()`                                                                     |
+| Maintenance  | The four maintenance functions                                                       |
+| Query        | The eleven existing views                                                            |
+| Moderation   | Insert into `moderation_actions`, allowing its trigger to apply the action           |
+
+A few rules are especially important:
+
+1. Do not reimplement assignment algorithms in Python if PostgreSQL already provides them.
+2. Do not manually change post capacity if SQL triggers maintain it.
+3. Do not implement a second attendance state machine in Django.
+4. Do not bypass moderation triggers by directly updating user or event status.
+5. Do not calculate GPS acceptance using a client-provided distance.
+6. Do not write audit logs independently when the SQL triggers already create them.
+
+# 6. Full implementation roadmap
+
+I recommend retaining the original eight coding phases, but adjusting their implementation order and responsibilities to match the actual SQL prototype.
+
+## Phase P1 — Core infrastructure and security context
+
+First implementation phase
+
+Directories: `common/`, `config/settings/`
+
+Implement:
+
+- Database transaction context.
+- `SET LOCAL app.user_id` and `SET LOCAL app.ip`.
+- Authentication context propagation.
+- PostgreSQL error translation.
+- Permission infrastructure.
+- Privacy guards.
+- Transaction utilities.
+- Structured logging.
+
+Deliverable: A secure application foundation capable of communicating with the SQL prototype correctly.
+
+## Phase P2 — Public browsing and read services
+
+Domains: 18
+
+Implement:
+
+- Public event browsing.
+- Event details.
+- Event post capacity.
+- Charity field browsing.
+- Event summaries.
+- Public UUID lookup.
+- Appropriate privacy filtering.
+
+SQL dependencies: `v_public_events`, `v_event_post_capacity`, `v_event_summary`.
+
+Deliverable: Functional public read APIs.
+
+## Phase P3 — Authentication, profiles and availability
+
+Domains: 1, 2, 3
+
+Implement:
+
+- OTP request and verification.
+- Login and logout.
+- User profile retrieval and updates.
+- Charity interests.
+- Skills and capability profiles.
+- Availability rules.
+- Availability exceptions.
+- UUID-based user lookup.
+
+SQL dependencies: OTP functions, account guards, availability functions.
+
+Deliverable: Fully functioning user identity and volunteer profile foundation.
+
+## Phase P4 — Verification and coordinator lifecycle
+
+Domains: 4, 5
+
+Implement:
+
+- Verification image upload.
+- Image validation and storage.
+- Verification review.
+- Verification status retrieval.
+- Coordinator applications.
+- Coordinator approval.
+- Coordinator suspension and revocation.
+
+SQL dependencies: Verification triggers, `recompute_user_verification()` and coordinator guards.
+
+Deliverable: Working trust and coordinator approval workflows.
+
+## Phase P5 — Event lifecycle and management
+
+Domains: 6, 7
+
+Implement:
+
+- Event creation.
+- Event editing.
+- Event publishing.
+- Event activation.
+- Event completion and cancellation.
+- Event posts.
+- Role and skill requirements.
+- Capacity management.
+- Coordinator handover.
+- Owner-as-Monitor and ownership-related access according to the implemented SQL rules.
+
+SQL dependencies: Event and post triggers, `change_event_coordinator()`.
+
+Deliverable: Complete event management functionality.
+
+## Phase P6 — Recruitment and assignment
+
+Domains: 8, 9
+
+Implement:
+
+- Volunteer applications.
+- Coordinator invitations.
+- Application decisions.
+- Waitlisting.
+- Withdrawal.
+- Application expiration.
+- Automatic assignment.
+- Manual assignment.
+- Assignment confirmation.
+- Assignment cancellation.
+
+SQL dependencies: Application triggers, assignment triggers, `run_auto_assignment()`, `assign_manually()`.
+
+Deliverable: Complete recruitment and volunteer allocation functionality.
+
+## Phase P7 — Onboarding, QR and attendance
+
+Domains: 10, 11, 12, 13
+
+Implement:
+
+- Onboarding acknowledgments.
+- QR token creation and preview.
+- QR check-in.
+- QR walk-in application.
+- Manual attendance.
+- GPS check-in.
+- Attendance confirmation.
+- Attendance rejection.
+- Coordinator attendance board.
+
+SQL dependencies: QR functions, `geo_check_in()`, attendance functions and views.
+
+Deliverable: Complete event-day operational workflows.
+
+## Phase P8 — Feedback, moderation, audit and maintenance
+
+Domains: 14, 15, 16, 17, 18
+
+Implement:
+
+- Volunteer feedback.
+- Coordinator feedback.
+- Feedback moderation.
+- Administrative moderation.
+- User governance.
+- Audit access.
+- Administrative dashboards.
+- Scheduled maintenance commands.
+- Operational reporting.
+
+SQL dependencies: Feedback and moderation triggers, audit tables, dashboard views and maintenance functions.
+
+Deliverable: Complete prototype backend functionality.
+
+## 7. Testing strategy
+
+Testing should be developed alongside each phase, not postponed until P8.
+
+| Test category        | What must be verified                               |
+| -------------------- | --------------------------------------------------- |
+| Unit tests           | Service inputs, outputs and orchestration           |
+| Database integration | Actual SQL function execution                       |
+| Business-rule tests  | Allowed and prohibited operations                   |
+| Permission tests     | Actor and role restrictions                         |
+| State-machine tests  | Valid and invalid transitions                       |
+| Transaction tests    | Rollback and consistency                            |
+| Concurrency tests    | Simultaneous applications and assignments           |
+| Security tests       | IDOR, unauthorized access and private data exposure |
+| Workflow tests       | End-to-end volunteer and coordinator journeys       |
+
+We should also run the existing SQL `self_test()` as part of database setup verification.
+
+## 8. Documentation deliverables
+
+Before implementation, I recommend producing three documents rather than one oversized document.
+
+Document 1
+
+Business Rules Declaration
+
+`v0_6_0_business_rules_declaration.md`
+
+Contains all business rules, conditions, actors, permitted operations, state transitions and expected outcomes across the 18 domains.
+
+Document 2
+
+Service Architecture and Responsibility Mapping
+
+`v0_6_0_services_architecture.md`
+
+Contains service responsibilities, dependencies, SQL integration, inputs, outputs, exceptions and service interaction flows.
+
+Document 3
+
+Implementation and Testing Plan
+
+`v0_6_0_backend_implementation_plan.md`
+
+Contains implementation phases, development sequence, test cases, acceptance criteria and completion tracking.
+
+## 9. How we will declare each business rule
+
+Every business rule should follow one consistent template.
+
+For example:
+
+## BR-ASSIGN-001 — Volunteer schedule conflict prevention
+
+Assignment domain
+
+SQL enforced
+
+Business objective
+
+Prevent volunteers from being assigned to conflicting event schedules.
+
+Actor
+
+System / authorized coordinator.
+
+Preconditions
+
+- Volunteer has an accepted application.
+- Event and post are valid.
+- Assignment operation is authorized.
+
+Business rule
+
+A volunteer must not receive an assignment that conflicts with another applicable assignment.
+
+System execution
+
+1. Receive assignment request.
+2. Validate actor authorization.
+3. Invoke the appropriate assignment workflow.
+4. PostgreSQL evaluates scheduling and assignment constraints.
+5. Return success or a structured business error.
+
+SQL references
+
+- `user_has_schedule_conflict()`
+- `is_user_available()`
+- Assignment triggers.
+- `assignments` table.
+
+Service responsibility
+
+`assignment_service.py`
+
+Expected outcomes
+
+- Success: assignment created.
+- Failure: database rejects the conflicting operation.
+
+Test scenarios
+
+- Assign a volunteer with no conflicting schedule.
+- Attempt an overlapping assignment.
+- Attempt an assignment outside declared availability.
+- Attempt unauthorized manual assignment.
+
+This is how we will make the business specification directly implementable.
+
+# 10. Final development decision
+
+The revised workflow is:
+
+Step 1 — Model Declaration
+
+Completed foundation
+
+Existing Django models and SQL schema.
+
+Step 2 — Business Rules Declaration
+
+Next
+
+Declare the actual business behavior supported by the SQL prototype.
+
+Step 3 — Services Architecture Declaration
+
+Map each rule to Django services and SQL objects.
+
+Step 4 — Services Implementation
+
+Implement the business logic and orchestration.
+
+Step 5 — BFF Implementation
+
+Connect application services to user-facing APIs.
+
+Step 6 — Integration and Testing
+
+Verify the complete system against its business rules.
+
+My recommendation: Start with Document 1, the complete Business Rules Declaration. It should cover all 18 SQL-aligned domains, derive its rules from the 22 tables and their associated functions, triggers and views, and preserve the intended workflows from the v0.5.2 specification wherever they are supported.
+
+Once that document is approved, we move to the service architecture. That way, we have a clear contract for every service before writing its implementation.
+
+No SQL changes are part of this plan.

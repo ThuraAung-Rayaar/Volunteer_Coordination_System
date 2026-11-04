@@ -123,3 +123,37 @@ class AppSettings(models.Model):
     class Meta:
         managed = False
         db_table = "app_settings"
+
+
+class VUserModerationSummary(models.Model):
+    user_id = models.BigIntegerField(primary_key=True)
+    warning_count = models.BigIntegerField()
+    last_warning_at = models.DateTimeField(blank=True, null=True)
+    block_count = models.BigIntegerField()
+    last_block_at = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = "v_user_moderation_summary"
+
+
+class VAdminDashboard(models.Model):
+    active_users = models.BigIntegerField(primary_key=True)
+    blocked_users = models.BigIntegerField(blank=True, null=True)
+    users_pending_verification = models.BigIntegerField(blank=True, null=True)
+    images_pending_review = models.BigIntegerField(blank=True, null=True)
+    coordinators_pending_approval = models.BigIntegerField(blank=True, null=True)
+    coordinators_approved = models.BigIntegerField(blank=True, null=True)
+    events_draft = models.BigIntegerField(blank=True, null=True)
+    events_published = models.BigIntegerField(blank=True, null=True)
+    events_active = models.BigIntegerField(blank=True, null=True)
+    events_completed = models.BigIntegerField(blank=True, null=True)
+    events_cancelled = models.BigIntegerField(blank=True, null=True)
+    events_deleted = models.BigIntegerField(blank=True, null=True)
+    pending_checkin_confirmations = models.BigIntegerField(blank=True, null=True)
+    warnings_last_30d = models.BigIntegerField(blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = "v_admin_dashboard"
+

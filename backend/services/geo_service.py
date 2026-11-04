@@ -1,15 +1,78 @@
-import math
+"""
+services/geo_service.py
 
-def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    """Calculate geodesic distance between two points in meters using Haversine formula."""
-    r = 6371000  # Earth radius in meters
-    phi1, phi2 = math.radians(lat1), math.radians(lat2)
-    delta_phi = math.radians(lat2 - lat1)
-    delta_lambda = math.radians(lon2 - lon1)
+GPS geolocation check-in orchestration around the SQL geo_check_in() function.
 
-    a = math.sin(delta_phi / 2)**2 + math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda / 2)**2
-    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-    return r * c
+Database-first rules honoured here:
+- The server (PostgreSQL) computes the authoritative distance via Haversine.
+  The client's claimed distance is NEVER trusted or used.
+- geo_check_in() returns one of 13 result codes and logs every attempt to
+  attendance_geo_attempts. This service returns the code without raising so
+  the telemetry row commits; the BFF maps it to an HTTP status.
+- No independent geofence algorithm is implemented in Python.
+"""
+from __future__ import annotations
 
-def is_within_geofence(lat: float, lon: float, fence_lat: float, fence_lon: float, radius_meters: float) -> bool:
-    return haversine_distance(lat, lon, fence_lat, fence_lon) <= radius_meters
+import logging
+
+from django.db import connection
+
+logger = logging.getLogger(__name__)
+
+# Result codes considered successful (HTTP 200); all others map to HTTP 400.
+SUCCESS_RESULTS = ("accepted", "already_checked_in")
+
+GEO_RESULT_MESSAGES = {
+    "accepted": "Check-in successful.",
+    "already_checked_in": "You are already checked in.",
+    "invalid_fix": "The GPS coordinates are invalid.",
+    "low_accuracy": "Your location signal is not accurate enough. Move to open sky and retry.",
+    "stale_fix": "Your location fix is too old. Refresh your GPS and retry.",
+    "mock_location": "Mock location detected. Check-in rejected.",
+    "outside_geofence": "You are outside the event check-in area.",
+    "window_closed": "Geo check-in is not open yet or has closed.",
+    "event_not_active": "This event is not currently active.",
+    "geo_disabled": "Geo check-in is not enabled for this event.",
+    "not_assigned": "You do not have an active shift for this event.",
+    "not_eligible": "Walk-in volunteers must check in by QR or with the coordinator.",
+    "onboarding_required": "Please acknowledge the pre-shift briefing before checking in.",
+}
+
+
+def submit_geo_check_in(
+    user,
+    event_id: int,
+    latitude: float,
+    longitude: float,
+    accuracy_m: float | None = None,
+    captured_at=None,
+    is_mocked: bool = False,
+) -> dict:
+    """
+    Call the SQL geo_check_in() and return its result code, distance, and
+    confirmation status. Does NOT raise on geofence/accuracy failures so the
+    attempt telemetry commits.
+    """
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT * FROM geo_check_in(%s, %s, %s, %s, %s, %s, %s)",
+            [event_id, user.id, latitude, longitude, accuracy_m, captured_at, is_mocked],
+        )
+        row = cursor.fetchone()
+
+    out_result, out_attendance_id, out_distance_m, out_confirmation = row
+
+    result = {
+        "result": out_result,
+        "attendance_id": out_attendance_id,
+        "distance_m": float(out_distance_m) if out_distance_m is not None else None,
+        "confirmation_status": out_confirmation,
+        "message": GEO_RESULT_MESSAGES.get(out_result, "Geo check-in processed."),
+        "success": out_result in SUCCESS_RESULTS,
+    }
+
+    logger.info(
+        "Geo check-in attempt",
+        extra={"event_id": event_id, "user_id": user.id, "result": out_result},
+    )
+    return result

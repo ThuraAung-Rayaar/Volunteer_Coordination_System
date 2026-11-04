@@ -121,7 +121,8 @@ INSERT INTO charity_fields (code, label, sort_order) VALUES
 
 CREATE TABLE users (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-
+    uuid UUID NOT NULL DEFAULT uuidv7(),
+    
     phone_hash   TEXT NOT NULL,                 -- keyed hash (HMAC) of the phone number
     phone_enc    TEXT NOT NULL,                 -- encrypted phone number
     password     TEXT,                          -- admin web login only (hash); NULL for OTP-only users

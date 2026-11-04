@@ -147,3 +147,21 @@ class Assignments(models.Model):
                 name="uq_assignment_group_leader",
             ),
         ]
+
+
+class VEventCoordinatorHistory(models.Model):
+    event_id = models.BigIntegerField(primary_key=True)
+    event_title = models.TextField(blank=True, null=True)
+    from_coordinator_id = models.BigIntegerField(blank=True, null=True)
+    from_name = models.TextField(blank=True, null=True)
+    to_coordinator_id = models.BigIntegerField(blank=True, null=True)
+    to_name = models.TextField(blank=True, null=True)
+    changed_by_user_id = models.BigIntegerField(blank=True, null=True)
+    changed_by_name = models.TextField(blank=True, null=True)
+    reason = models.TextField(blank=True, null=True)
+    changed_at = models.DateTimeField()
+
+    class Meta:
+        managed = False
+        db_table = "v_event_coordinator_history"
+

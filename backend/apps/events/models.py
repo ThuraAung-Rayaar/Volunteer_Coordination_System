@@ -284,3 +284,87 @@ class EventCharityFields(models.Model):
                 name="uq_event_charity_field",
             )
         ]
+
+
+# ---------------------------------------------------------------------------
+# Read-only models bound to PostgreSQL operational views (managed = False).
+# These never create tables; they map to views built by the SQL schema.
+# ---------------------------------------------------------------------------
+
+class VEventPostCapacity(models.Model):
+    post_id = models.BigIntegerField(primary_key=True)
+    event_id = models.BigIntegerField()
+    title = models.TextField()
+    status = models.TextField()
+    required_headcount = models.IntegerField()
+    assigned_count = models.BigIntegerField()
+    remaining = models.BigIntegerField()
+
+    class Meta:
+        managed = False
+        db_table = "v_event_post_capacity"
+
+
+class VPublicEvents(models.Model):
+    event_id = models.BigIntegerField(primary_key=True)
+    title = models.TextField()
+    description = models.TextField(blank=True, null=True)
+    purpose_type = models.TextField()
+    location_name = models.TextField(blank=True, null=True)
+    landmark_text = models.TextField(blank=True, null=True)
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, blank=True, null=True)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, blank=True, null=True)
+    geo_radius_m = models.IntegerField(blank=True, null=True)
+    geo_checkin_enabled = models.BooleanField()
+    map_provider = models.TextField()
+    start_at = models.DateTimeField()
+    end_at = models.DateTimeField()
+    application_deadline = models.DateTimeField(blank=True, null=True)
+    status = models.TextField()
+    acceptance_mode = models.TextField()
+    max_participants = models.IntegerField(blank=True, null=True)
+    meals_provided = models.BooleanField()
+    lodging_provided = models.BooleanField()
+    travel_support_provided = models.BooleanField()
+    compensation_kind = models.TextField()
+    current_coordinator_id = models.BigIntegerField()
+    coordinator_name = models.TextField()
+    charity_fields = ArrayField(models.TextField(), default=list)
+    spots_remaining = models.BigIntegerField()
+
+    class Meta:
+        managed = False
+        db_table = "v_public_events"
+
+    @property
+    def id(self):
+        return self.event_id
+
+
+class VEventSummary(models.Model):
+    event_id = models.BigIntegerField(primary_key=True)
+    title = models.TextField()
+    status = models.TextField()
+    owner_id = models.BigIntegerField()
+    current_coordinator_id = models.BigIntegerField()
+    start_at = models.DateTimeField()
+    end_at = models.DateTimeField()
+    acceptance_mode = models.TextField()
+    auto_assign_enabled = models.BooleanField()
+    max_participants = models.IntegerField(blank=True, null=True)
+    geo_checkin_enabled = models.BooleanField()
+    map_provider = models.TextField()
+    pending_count = models.BigIntegerField()
+    accepted_count = models.BigIntegerField()
+    waitlisted_count = models.BigIntegerField()
+    assignment_count = models.BigIntegerField()
+    checked_in_count = models.BigIntegerField()
+    pending_confirmations = models.BigIntegerField()
+
+    class Meta:
+        managed = False
+        db_table = "v_event_summary"
+
+    @property
+    def id(self):
+        return self.event_id

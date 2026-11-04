@@ -1,3 +1,5 @@
+import uuid
+
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
@@ -30,6 +32,7 @@ class Users(AbstractBaseUser):
         REJECTED = 'rejected', 'Rejected'
 
     id = models.BigAutoField(primary_key=True)
+    uuid = models.UUIDField(unique=True, default=uuid.uuid4, editable=False)
     phone_hash = models.CharField(unique=True, max_length=128)
     phone_enc = models.TextField()
     password = models.TextField(blank=True, null=True)

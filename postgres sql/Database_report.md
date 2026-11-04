@@ -57,6 +57,7 @@ The entire schema is wrapped in a single `BEGIN ... COMMIT` transaction. **Any e
 | **Machine-coded errors** | Business errors are raised with a code prefix, e.g. `capacity_full: ...`. Expected business *failures* (wrong OTP, outside geofence) are returned as result codes, not raised. |
 | **Session context** | Set once per request transaction via `SET LOCAL app.user_id = '<id>'` and `SET LOCAL app.ip = '<ip>'`. When set, triggers enforce permissions. When unset, the session is treated as trusted system/maintenance work. |
 | **Foreign key policy** | `ON DELETE RESTRICT` everywhere (history is never cascaded away), except pure child rows (charity interests, event charity fields) which use `CASCADE`. |
+| **Dual-identifier pattern** | Internal relational integrity, foreign key references, and joins rely on compact `BIGINT` surrogate keys (`users.id`). Public-facing APIs, URLs, mobile clients, and external tokens reference immutable, time-ordered `UUIDv7` (`users.uuid`) generated via `uuidv7()` to eliminate sequential ID enumeration (IDOR) attacks while maintaining B-tree clustering locality. |
 
 ---
 
@@ -120,13 +121,14 @@ Seeded with 13 fields: `teaching`, `food_distribution`, `elderly_care`, `child_c
 
 #### `users` — Custom Auth User Model
 
-The central identity table. Phone OTP for mobile, optional password for admin web login.
+The central identity table. Phone OTP for mobile, optional password for admin web login. Implements a **dual-identifier pattern**: internal joins and relational constraints use `id` (`BIGINT`), while public-facing APIs, mobile clients, and external systems reference `uuid` (`UUIDv7`).
 
 **Key columns:**
 
 | Column | Type | Notes |
 |---|---|---|
-| `id` | BIGINT | Identity PK |
+| `id` | BIGINT | Identity PK (internal surrogate key for high-speed foreign keys and joins) |
+| `uuid` | UUID | Public/external identifier. NOT NULL, DEFAULT `uuidv7()`. Time-ordered UUID (RFC 9562) |
 | `phone_hash` | TEXT | HMAC hash of phone. UNIQUE, immutable |
 | `phone_enc` | TEXT | Fernet-encrypted phone number |
 | `password` | TEXT | Nullable (NULL for OTP-only users) |
@@ -140,6 +142,19 @@ The central identity table. Phone OTP for mobile, optional password for admin we
 | Capability flags | BOOLEAN | `physical_ok`, `good_eyesight`, `needs_glasses`, `can_lift_heavy`, `can_work_outdoor`, `has_leader_experience`, `new_to_volunteer` |
 | Donation flags | BOOLEAN | `is_willing_to_donate`, `_blood`, `_items` |
 | Support flags | BOOLEAN | `needs_meal_support`, `needs_travel_support`, `accepts_unpaid` |
+
+##### UUIDv7 Field Architecture & Strategy
+
+- **Enumeration Attack (IDOR) Mitigation:** Exposing sequential auto-increment integers (`id`) in API responses or deep links leaks registration metrics and allows malicious actors to systematically enumerate records. The `uuid` field serves as the opaque, non-guessable external identity token.
+- **B-Tree Locality & Index Efficiency:** Unlike random UUIDv4 (which causes index page fragmentation and random I/O thrashing under heavy write load), UUIDv7 embeds a 48-bit UNIX millisecond timestamp in the high-order bits. Consecutive inserts are monotonically ordered, allowing PostgreSQL to append into B-tree leaves identically to sequential integers.
+- **Dual-Identifier Separation:**
+  - `id` (BIGINT): Used internally across all relational foreign keys (`coordinator_profiles.user_id`, `assignments.user_id`, `audit_logs.actor_user_id`, etc.) to keep join overhead low and foreign-key indexes compact (8 bytes vs 16 bytes).
+  - `uuid` (UUID): Used externally in REST/GraphQL payloads, client session headers, QR payloads, and external URLs.
+- **Django ORM Representation:** Defined in `backend/apps/accounts/models.py` as:
+  ```python
+  uuid = models.UUIDField(unique=True, editable=False, db_default=models.Value("uuidv7()"))
+  ```
+- **PostgreSQL Compatibility:** Native in PostgreSQL 17+ (`DEFAULT uuidv7()`). For PostgreSQL 14–16, provided via the `pg_uuidv7` extension or a compatible PL/pgSQL function.
 
 **Constraints (13):**
 
@@ -159,7 +174,7 @@ The central identity table. Phone OTP for mobile, optional password for admin we
 | `ck_users_skills` | Skills array is normalized |
 | `ck_users_verification_status` | Valid verification enum |
 
-**Indexes:** `idx_users_account_status`, `idx_users_verification_status`, `idx_users_is_admin` (partial), `idx_users_blood_donors` (partial), `idx_users_skills_gin` (GIN), `idx_users_blocked_until` (partial).
+**Indexes:** `idx_users_account_status`, `idx_users_verification_status`, `idx_users_is_admin` (partial), `idx_users_blood_donors` (partial), `idx_users_skills_gin` (GIN), `idx_users_blocked_until` (partial), and unique constraint/index on `uuid` (`uq_users_uuid`) for external lookups.
 
 #### `user_charity_interests`
 
@@ -526,7 +541,7 @@ Triggers fire in alphabetical order within a kind, hence numeric prefixes:
 
 | Table | Key Trigger(s) | What It Enforces |
 |---|---|---|
-| `users` | `trg_users_guard` | Syncs `is_active`; only admins change privilege/account fields; `phone_hash` immutable |
+| `users` | `trg_users_guard` | Syncs `is_active`; only admins change privilege/account fields; `phone_hash` and `uuid` immutable |
 | `coordinator_profiles` | `trg_coordinator_guard` | Status machine; approval requires admin approver + verified active user |
 | `user_verification_images` | `trg_vimg_guard`, `trg_vimg_after` | Immutable uploads; admin-only review; recomputes user verification |
 | `auth_otp` | `trg_otp_rate_limit` | Max requests per phone per hour |
