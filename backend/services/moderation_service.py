@@ -15,10 +15,11 @@ from __future__ import annotations
 
 import logging
 
-from django.db import IntegrityError, InternalError, ProgrammingError, connection
+from django.db import IntegrityError, InternalError, ProgrammingError, connection, transaction
 from apps.audit.models import Feedback, ModerationActions
 from apps.events.models import Events
 from apps.accounts.models import Users
+from common.db_context import get_db_session_context, set_db_session_context
 from common.exceptions import DomainError, PermissionDeniedError, ResourceMaskedNotFound, translate_db_exception
 
 logger = logging.getLogger(__name__)
@@ -67,6 +68,7 @@ def _require_admin(actor, require_superuser: bool = False) -> None:
         raise ResourceMaskedNotFound(message="This action is not available.")
 
 
+@transaction.atomic
 def record_moderation_action(
     admin_user,
     action_type: str,
@@ -147,10 +149,8 @@ def record_moderation_action(
             code="no_self_moderation",
         )
 
-    # Set app.user_id to ensure trigger actor validation succeeds
-    with connection.cursor() as cursor:
-        cursor.execute("SELECT set_config('app.user_id', %s, true)", [str(admin_user.id)])
-
+    prev_user_id, prev_ip = get_db_session_context()
+    set_db_session_context(admin_user.id)
     try:
         action = ModerationActions.objects.create(
             admin_user=admin_user,
@@ -163,6 +163,8 @@ def record_moderation_action(
         )
     except (ProgrammingError, IntegrityError, InternalError) as exc:
         raise translate_db_exception(exc) from exc
+    finally:
+        set_db_session_context(prev_user_id, prev_ip)
 
     logger.info(
         "Moderation action recorded",
@@ -191,4 +193,28 @@ def get_moderation_history(actor, target_user_id: int | None = None) -> list[dic
         }
         for m in qs
     ]
+
+
+def get_moderation_action_detail(actor, action_id: int) -> dict:
+    """Retrieve details for a single moderation action (admin only)."""
+    _require_admin(actor)
+    action = ModerationActions.objects.filter(id=action_id).first()
+    if action is None:
+        raise ResourceMaskedNotFound(message="Moderation action not found.")
+    return {
+        "id": action.id,
+        "action_type": action.action_type,
+        "admin_user_id": action.admin_user_id,
+        "target_user_id": action.target_user_id,
+        "event_id": action.event_id,
+        "feedback_id": action.feedback_id,
+        "reason": action.reason,
+        "expires_at": action.expires_at,
+        "created_at": action.created_at,
+    }
+
+
+# Function aliases for specification compatibility
+list_moderation_actions = get_moderation_history
+
 

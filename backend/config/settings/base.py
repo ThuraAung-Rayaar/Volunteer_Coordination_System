@@ -117,7 +117,7 @@ REST_FRAMEWORK = {
         'common.authentication.BlockedAwareTokenAuthentication',
     ],
     'EXCEPTION_HANDLER': 'common.exceptions.custom_exception_handler',
-    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'DEFAULT_SCHEMA_CLASS': 'common.schema.CleanAutoSchema',
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 50,
 }
@@ -126,6 +126,7 @@ SPECTACULAR_SETTINGS = {
     'TITLE': 'Volunteer Coordination System API',
     'VERSION': '0.6.0',
     'SERVE_INCLUDE_SCHEMA': False,
+    'PREPROCESSING_HOOKS': ['common.schema.clean_endpoints_hook'],
 }
 
 LANGUAGE_CODE = 'en-us'

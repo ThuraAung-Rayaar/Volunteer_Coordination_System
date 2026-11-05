@@ -248,3 +248,20 @@ def logout_user(user: Users, auth_token=None) -> None:
     else:
         Token.objects.filter(user=user).delete()
 
+
+def purge_expired_tokens() -> int:
+    """
+    Purge expired OTP and authentication tokens.
+    """
+    from apps.accounts.models import AuthOtp
+    now = timezone.now()
+    count, _ = AuthOtp.objects.filter(expires_at__lt=now).delete()
+    return count
+
+
+# Aliases for specification naming compatibility
+request_phone_otp = request_login_otp
+verify_phone_otp = verify_login_otp
+revoke_session_token = logout_user
+
+

@@ -1,0 +1,160 @@
+Ran look for sample JPEG in project root
+Analyzed managers.py:L1-41
+Ran inspect Users model concrete fields
+Ran check Django version
+Ran search for uuid triggers in SQL
+Ran test db_default in Django 5.1 · Exited with code 1
+Ran test db_default instantiation
+Ran test direct SQL insert into users returning uuid · Exited with code 1
+Ran test SQL insert with valid phone_hash
+Ran test db_default with Django ORM create
+Ran test django check with RawSQL
+Ran test lazy block expiry with real DB · Exited with code 1
+Ran test custom authenticate_credentials flow
+Ran check sample JPEG properties
+Edited models.py
+Edited models.py
+Edited db_context.py
+Edited exceptions.py
+Edited exceptions.py
+Edited exceptions.py
+Edited permissions.py
+Analyzed security.py:L30-75
+Edited security.py
+Analyzed security.py:L80-95
+Edited security.py
+Analyzed utils.py:L98-170
+Edited utils.py
+Edited utils.py
+Edited authentication.py
+Ran run existing Phase 1 tests
+Analyzed test_common_infrastructure.py:L690-725
+Analyzed test_common_infrastructure.py:L1-88
+Edited test_common_infrastructure.py
+Analyzed test_common_infrastructure.py:L715-745
+Edited test_common_infrastructure.py
+Ran run full Phase 1 tests with additions
+Analyzed test_common_infrastructure.py:L550-610
+Edited test_common_infrastructure.py
+Ran run Phase 1 tests with privacy query check
+Ran run tests with verbosity=2 to list all test names
+Created phase1_test_analysis.md
+
+The test coverage review and improvements for **Phase 1: Core Infrastructure, Security Context, Cryptography & Data Privacy** have been completed.
+
+The detailed analysis has been saved to:
+[`prompt code/prompt_result_analysis/phase1_test_analysis.md`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/prompt%20code/prompt_result_analysis/phase1_test_analysis.md)
+
+---
+
+# Phase 1 Test Coverage & Implementation Verification Report
+
+**Feature / Service:** Core Infrastructure, Security Context, Cryptography & Data Privacy (`backend/common/`)  
+**Test Suite:** [`backend/common/tests/test_common_infrastructure.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/common/tests/test_common_infrastructure.py)  
+**Database Prototype:** PostgreSQL 18 Engine with Native `uuidv7()` and [`updated_volunteer_coordination_system_Database.sql`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/postgres%20sql/updated_volunteer_coordination_system_Database.sql) (strictly unmodified)  
+**Result:** **81 / 81 Tests Passed (0 Failures, 0 Errors, 0 Skipped)**
+
+---
+
+## 1. Summary of Improvements Made
+
+1. **Native PostgreSQL `uuidv7()` Generation (`BR-DATA-01`):**
+   - In [`backend/apps/accounts/models.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/apps/accounts/models.py#L35), replaced `default=uuid.uuid4` with `db_default=RawSQL('uuidv7()', [])`. Django ORM now delegates primary UUID generation to PostgreSQL's native engine default, preserving millisecond-precision chronological ordering (`u1.uuid < u2.uuid < u3.uuid`).
+2. **Audit Logging with Empty Client IP (`BR-SEC-01`):**
+   - In [`backend/common/exceptions.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/common/exceptions.py#L231), coerced empty client IP strings `""` to `None` (SQL `NULL`). Prevents `psycopg.errors.InvalidTextRepresentation` exceptions on `audit_logs.ip_address` (`INET`).
+3. **Database Error Translation Cleanliness (`BR-SEC-07`):**
+   - In [`backend/common/exceptions.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/common/exceptions.py#L329), stripped multiline server call stacks (`\nCONTEXT: PL/pgSQL function ...`) from trigger exceptions.
+   - Updated `_CONSTRAINT_ERROR_MAP` to map constraint violations to canonical domain codes (`duplicate_application`, `schedule_conflict`, `duplicate_assignment`, `duplicate_group_leader`, `duplicate_feedback`, `already_acknowledged`).
+4. **Lazy Block Expiry (`BR-SEC-02`):**
+   - In [`backend/common/authentication.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/common/authentication.py#L36), adjusted the authentication sequence so that if `blocked_until <= now()`, `SELECT release_expired_blocks()` executes before checking `user.is_active`.
+5. **Combined Session Context Query (`BR-SEC-01`):**
+   - In [`backend/common/db_context.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/common/db_context.py#L59), combined `app.user_id` and `app.ip` into a single SQL statement `SELECT set_config('app.user_id', %s, true), set_config('app.ip', %s, true)` and added the reader `get_db_session_context()`.
+6. **Strict Serializer Allowlist (`BR-SEC-04`):**
+   - In [`backend/common/permissions.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/common/permissions.py#L329), updated `AllowListSerializerMixin` to reject undeclared fields as well as incoming payload updates on `read_only=True` fields.
+7. **Verification Image Sanitizer (`BR-SEC-05`):**
+   - In [`backend/common/utils.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/common/utils.py#L100), hardened `sanitize_and_save_verification_jpeg` with `uuid.UUID` validation (path traversal defense), boundary checks (`200 <= width, height <= 6000`), zero-byte/text file checks, and integrated testing with the root project fixture [`JPEG_example_flower.jpg`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/JPEG_example_flower.jpg).
+8. **Input Normalizers Raise Domain Exceptions (`BR-SEC-06`):**
+   - Configured `ValidationError` to inherit from `(DomainError, ValueError)` and updated `normalize_phone` and `normalize_tags` so input errors translate to HTTP 400 Bad Request while maintaining backward compatibility with tests expecting `ValueError`.
+   - Added `hash_phone = compute_phone_hash` alias.
+9. **Zero DB Query In-Memory Privacy Filtering (`BR-PRIV-T0`–`T4`):**
+   - Verified that in-memory privacy tier filtering over list collections performs 0 SQL queries, avoiding N+1 hazards.
+
+---
+
+## 2. Business Rules Coverage Matrix
+
+| Rule ID | Rule Focus | Implementation Files | Status |
+|---|---|---|:---:|
+| **`BR-SEC-01`** | Session context (`SET LOCAL app.user_id`, `app.ip`) & `audit_logs` | [`db_context.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/common/db_context.py), [`exceptions.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/common/exceptions.py) | **PASS** |
+| **`BR-SEC-02`** | Lazy block expiry (`release_expired_blocks()` when `blocked_until <= now()`) | [`authentication.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/common/authentication.py) | **PASS** |
+| **`BR-SEC-03`** | Authorization guards, Owner-as-Monitor, 404 masking | [`permissions.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/common/permissions.py) | **PASS** |
+| **`BR-SEC-04`** | Strict request body filtering (`AllowListSerializerMixin`) rejecting undeclared / read-only keys | [`permissions.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/common/permissions.py) | **PASS** |
+| **`BR-SEC-05`** | Verification document intake (`sanitize_and_save_verification_jpeg`) with dimension bounds, EXIF stripping, path traversal guard | [`utils.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/common/utils.py) | **PASS** |
+| **`BR-SEC-06`** | PII protection: HMAC-SHA256 phone hashing (`hash_phone`) & Fernet reversible phone encryption | [`security.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/common/security.py) | **PASS** |
+| **`BR-SEC-07`** | PostgreSQL exception translation to canonical domain codes & `CONTEXT:` stripping | [`exceptions.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/common/exceptions.py) | **PASS** |
+| **`BR-PRIV-T0`–`T4`** | Visibility tiers (T0: Public, T1: Auth/Self, T2: Co-volunteers/Coord, T3: Safety/Manager, T4: Admin) | [`privacy.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/common/privacy.py) | **PASS** |
+| **`BR-DATA-01`** | Identity generation honoring PostgreSQL native `DEFAULT uuidv7()` without Python UUIDv4 overwrites | [`apps/accounts/models.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/apps/accounts/models.py) | **PASS** |
+
+---
+
+## 3. Test Suite Execution Report
+
+**Command:**
+```powershell
+.venv\Scripts\python.exe backend/manage.py test common.tests.test_common_infrastructure --verbosity=2 --keepdb
+```
+
+### Complete Test Results:
+- **Total Tests Executed:** 81
+- **Passed:** 81
+- **Failed:** 0
+- **Errors:** 0
+- **Skipped:** 0
+- **Execution Time:** 6.16s
+
+### Test Categories Executed:
+1. **Unit Tests (32 tests):**
+   - `TestExceptions`: Defaults, permission denied, resource masking, trigger prefix parsing, integrity error translation, custom DRF handler formatting (9 tests).
+   - `TestSecurity`: Phone normalization, invalid phone rejection, phone hash consistency, Fernet encrypt/decrypt roundtrip, OTP code hashing, OTP numeric code generation, QR token pair generation, sensitive data dictionary redaction (8 tests).
+   - `TestUtils`: Tag normalization, tag count bounds (max 30), None handling, tag truncation (>50 chars), string truncation, safe int conversion (6 tests).
+   - `TestAllowListSerializer`: Valid payload pass-through, undeclared key rejection, read-only field tampering rejection (3 tests).
+   - `TestDatabaseErrorTranslationCleanliness`: Stripping multiline `CONTEXT: PL/pgSQL` call stacks, canonical domain code mapping (`duplicate_application`, `schedule_conflict`, `duplicate_assignment`, `duplicate_group_leader`, `duplicate_feedback`, `already_acknowledged`) (2 tests).
+   - `TestCombinedSessionContextAndIdempotency`: Idempotent tag normalization, deterministic `hash_phone` alias, domain error raising for malformed phone/tags (3 tests).
+
+2. **Service & Image Integration Tests (8 tests):**
+   - `TestImageSanitization`:
+     - `test_sanitize_valid_root_jpeg`: Loads root [`JPEG_example_flower.jpg`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/JPEG_example_flower.jpg), strips EXIF, converts to JPEG, computes 64-char lowercase SHA-256 hash, and verifies disk persistence under `VERIFICATION_MEDIA_ROOT`.
+     - `test_sanitize_image_dimension_bounds`: Tests boundary rejection for undersized (<200px) and oversized (>6000px) images, and verifies exact 200x200 boundary pass.
+     - `test_sanitize_path_traversal_protection`: Verifies rejection of `../../etc/passwd` and malformed UUIDs.
+     - `test_sanitize_invalid_file_types`: Tests zero-byte files, plain text, and corrupt binary headers.
+     - `test_sanitize_invalid_image_type`: Tests rejection of disallowed image types.
+   - `TestSecurityAuditLogging`:
+     - `test_log_security_event_empty_ip_coerced_to_null`: Simulates request with `REMOTE_ADDR=""`, verifies SQL `NULL` coercion in PostgreSQL `INET` column without crashing.
+     - `test_log_security_event_none_request`: Handles background job calls with `request=None`.
+     - `test_log_security_event_valid_ip`: Storing valid IPv4 strings in `INET` column.
+
+3. **Database Integration Tests (21 tests):**
+   - `TestDbContext`: Authenticated user context propagation to `app_user_id()`, IP propagation to `app_ip()`, anonymous context, context discard across transactions, context discard on rollback, client IP extraction (`REMOTE_ADDR`, `X-Forwarded-For`), invalid IP rejection, `DbContextMiddleware` execution (10 tests).
+   - `TestCombinedSessionContextAndIdempotency`: Single round-trip `set_db_session_context` setting both session variables, `get_db_session_context` retrieval, idempotent repeated calls (2 tests).
+   - `TestNativeUuidv7DatabaseGeneration`:
+     - `test_orm_creates_native_uuidv7`: Verifies `User.objects.create()` produces a UUID with version 7 generated by PostgreSQL.
+     - `test_uuidv7_chronological_ordering`: Verifies sequentially generated user records maintain chronological lexicographical sort order (`u1.uuid < u2.uuid < u3.uuid`).
+   - `TestTransactions`: Service transaction context setting, nested atomic blocks with savepoints, rollback on error, `call_db_function`, `call_db_function_returning`, `@atomic_service` decorator, savepoint error recovery (7 tests).
+
+4. **API, Authorization & Privacy Tests (20 tests):**
+   - `TestAuthentication`: Active token user authentication and DB context injection, rejection of blocked users (2 tests).
+   - `TestLazyBlockExpiry`:
+     - `test_lazy_block_release_on_expired_blocked_user`: User with expired block is automatically released via `SELECT release_expired_blocks()` upon token authentication.
+     - `test_unexpired_blocked_user_remains_blocked`: User with future `blocked_until` remains blocked and is rejected.
+   - `TestPermissions`: Active user verification, unauthenticated/blocked rejections, admin verification and 404 masking, approved coordinator verification (missing, pending, approved), event manager verification, Owner-as-Monitor mode enforcement, draft event visibility masking (10 tests).
+   - `TestPrivacy`: T1 minimal card, sensitive field stripping (`NEVER_EXPOSE_FIELDS`), T3 self-access, T3 denial for third parties, T4 admin gating, T2 volunteer card field masking, in-memory tier filtering performing 0 SQL queries (8 tests).
+
+---
+
+## 4. Verification Gate Conclusion
+
+All acceptance criteria for **Phase 1** are fully satisfied:
+- Zero SQL prototype modifications.
+- Zero mock objects used for PostgreSQL functions or triggers.
+- All 81 automated tests pass cleanly against the live PostgreSQL prototype.
+- Core infrastructure is hardened and ready for Phase 2 (Public Read & Browsing BFF).

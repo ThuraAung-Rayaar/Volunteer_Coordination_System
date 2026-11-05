@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Optional
 
 from django.conf import settings
-from django.db import connection
+from django.db import connection, transaction
 from django.utils import timezone
 
 from apps.accounts.models import UserVerificationImages, Users
@@ -101,6 +101,7 @@ def _validate_image_dimensions(uploaded_file) -> None:
         )
 
 
+@transaction.atomic
 def upload_verification_image(
     user: Users, image_type: str, uploaded_file
 ) -> UserVerificationImages:
@@ -196,6 +197,7 @@ def recompute_verification(user_id: int) -> str:
 
 # --- Admin review -----------------------------------------------------------
 
+@transaction.atomic
 def review_verification_image(
     actor: Users,
     image_id: int,
@@ -265,12 +267,20 @@ def review_verification_image(
     return image
 
 
-def get_pending_images_for_admin(actor: Users) -> list[dict]:
-    """List current pending images for the admin review queue."""
+def get_pending_images_for_admin(
+    actor: Users,
+    status: Optional[str] = "pending",
+    image_type: Optional[str] = None,
+) -> list[dict]:
+    """List verification images for the admin review queue with optional filtering."""
     _require_admin(actor)
+    qs = UserVerificationImages.objects.filter(is_current=True)
+    if status and status != "all":
+        qs = qs.filter(status=status)
+    if image_type:
+        qs = qs.filter(image_type=image_type)
     return list(
-        UserVerificationImages.objects.filter(status="pending", is_current=True)
-        .order_by("created_at")
+        qs.order_by("created_at")
         .values(
             "id", "user_id", "image_type", "status", "comparison_status",
             "is_current", "created_at",
@@ -292,4 +302,11 @@ def resolve_private_image_path(image: UserVerificationImages) -> Path:
     if not target.exists():
         raise ResourceMaskedNotFound(message="Image file not found.")
     return target
+
+
+# --- Method Aliases for Alternate Service Naming Conventions ----------------
+list_verification_images_for_user = get_user_verification_images
+list_admin_verification_queue = get_pending_images_for_admin
+get_verification_image_for_streaming = resolve_private_image_path
+
 

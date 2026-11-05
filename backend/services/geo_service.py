@@ -17,6 +17,8 @@ import logging
 
 from django.db import connection
 
+from common.db_context import get_db_session_context, set_db_session_context
+
 logger = logging.getLogger(__name__)
 
 # Result codes considered successful (HTTP 200); all others map to HTTP 400.
@@ -53,12 +55,17 @@ def submit_geo_check_in(
     confirmation status. Does NOT raise on geofence/accuracy failures so the
     attempt telemetry commits.
     """
-    with connection.cursor() as cursor:
-        cursor.execute(
-            "SELECT * FROM geo_check_in(%s, %s, %s, %s, %s, %s, %s)",
-            [event_id, user.id, latitude, longitude, accuracy_m, captured_at, is_mocked],
-        )
-        row = cursor.fetchone()
+    prev_user_id, prev_ip = get_db_session_context()
+    set_db_session_context(user.id)
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT * FROM geo_check_in(%s, %s, %s, %s, %s, %s, %s)",
+                [event_id, user.id, latitude, longitude, accuracy_m, captured_at, is_mocked],
+            )
+            row = cursor.fetchone()
+    finally:
+        set_db_session_context(prev_user_id, prev_ip)
 
     out_result, out_attendance_id, out_distance_m, out_confirmation = row
 
@@ -76,3 +83,6 @@ def submit_geo_check_in(
         extra={"event_id": event_id, "user_id": user.id, "result": out_result},
     )
     return result
+
+
+process_geo_check_in = submit_geo_check_in

@@ -78,3 +78,9 @@ class LogoutView(APIView):
     def post(self, request):
         auth_service.logout_user(request.user, request.auth)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+# Aliases for specification naming compatibility
+RequestOtpView = OtpRequestView
+VerifyOtpView = OtpVerifyView
+

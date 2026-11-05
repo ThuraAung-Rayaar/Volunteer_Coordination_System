@@ -14,7 +14,9 @@ from django.db import transaction
 
 from apps.accounts.models import UserCharityInterests, Users
 from apps.events.models import CharityFields
-from common.exceptions import DomainError
+from common.exceptions import DomainError, ResourceMaskedNotFound
+from common.permissions import can_coordinator_read_t2, get_event_for_manager_or_404
+from common.privacy import get_minimal_public_card, get_t2_volunteer_card
 from common.utils import decrypt_phone, encrypt_phone, normalize_tags
 
 logger = logging.getLogger(__name__)
@@ -251,4 +253,52 @@ def get_charity_interests(user: Users) -> list[str]:
         UserCharityInterests.objects.filter(user=user)
         .values_list("field_code_id", flat=True)
     )
+
+
+# ---------------------------------------------------------------------------
+# Public UUID Lookup & Coordinator Scan (W23, W24)
+# ---------------------------------------------------------------------------
+
+def lookup_user_by_uuid(actor: Users, target_uuid: str, event_id: Optional[int] = None) -> dict:
+    """
+    Look up a user by their public UUID (W23, W24).
+
+    Rules:
+      1. Target must exist and have account_status='active' and is_active=True,
+         else raise ResourceMaskedNotFound (404).
+      2. If event_id is supplied and actor is an event manager (or admin) with T2 access
+         for an accepted volunteer on that event, return the T2 card + assignment status.
+      3. Otherwise, return strictly the T1 Minimal Public Card ({uuid, display_name}).
+    """
+    target = Users.objects.filter(uuid=target_uuid, account_status="active", is_active=True).first()
+    if target is None:
+        raise ResourceMaskedNotFound("User not found.")
+
+    if event_id is not None:
+        try:
+            event = get_event_for_manager_or_404(actor, event_id, require_write=False)
+            if can_coordinator_read_t2(actor, target.id, event):
+                card = get_t2_volunteer_card(target)
+                card["uuid"] = str(target.uuid)
+
+                # Attach shift/assignment status if available
+                from apps.coordination.models import Assignments
+                assignment = Assignments.objects.filter(
+                    event_id=event.id,
+                    user_id=target.id,
+                ).exclude(status="cancelled").first()
+
+                card["assignment_status"] = assignment.status if assignment else None
+                card["event_id"] = event.id
+                return card
+        except ResourceMaskedNotFound:
+            pass  # Fall back to T1 Minimal Public Card
+
+    return get_minimal_public_card(target)
+
+
+# Specification alias
+update_profile = update_user_profile
+
+
 

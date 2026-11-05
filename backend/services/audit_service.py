@@ -91,3 +91,35 @@ def get_event_coordinator_history(actor, event_id: int | None = None) -> list[di
         for h in qs
     ]
 
+
+def get_audit_log_detail(actor, log_id: int) -> dict:
+    """Retrieve detail of a single audit log (Super Admin only)."""
+    _require_admin(actor, require_superuser=True)
+    log = AuditLogs.objects.filter(id=log_id).first()
+    if log is None:
+        raise ResourceMaskedNotFound(message="Audit log record not found.")
+    return {
+        "id": log.id,
+        "actor_user_id": log.actor_user_id,
+        "action": log.action,
+        "entity_type": log.entity_type,
+        "entity_id": log.entity_id,
+        "before_data": log.before_data,
+        "after_data": log.after_data,
+        "ip_address": log.ip_address,
+        "created_at": log.created_at,
+    }
+
+
+def list_geo_attempts_review(actor, limit: int = 200) -> list[dict]:
+    """Retrieve telemetry log from v_geo_attempts_review for admin inspection."""
+    _require_admin(actor)
+    from apps.attendance.models import VGeoAttemptsReview
+    rows = VGeoAttemptsReview.objects.all().order_by("-attempted_at")[:limit]
+    return list(rows.values())
+
+
+# Function aliases for specification compatibility
+list_audit_logs = get_audit_records
+
+

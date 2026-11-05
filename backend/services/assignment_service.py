@@ -16,10 +16,11 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-from django.db import connection
+from django.db import connection, transaction
 
 from apps.coordination.models import Assignments
 from apps.events.models import EventApplications, VEventPostCapacity
+from common.db_context import set_db_session_context
 from common.exceptions import DomainError, ResourceMaskedNotFound
 from common.permissions import get_event_for_manager_or_404
 
@@ -30,6 +31,7 @@ logger = logging.getLogger(__name__)
 # Automatic Assignment
 # ---------------------------------------------------------------------------
 
+@transaction.atomic
 def run_event_auto_assignment(actor, event_id: int) -> dict:
     """
     Run the automatic assignment algorithm for an event.
@@ -87,6 +89,7 @@ def run_event_auto_assignment(actor, event_id: int) -> dict:
 # Manual Assignment
 # ---------------------------------------------------------------------------
 
+@transaction.atomic
 def assign_volunteer_manually(
     actor,
     application_id: int,
@@ -145,6 +148,7 @@ def assign_volunteer_manually(
 # Assignment from Accepted Application
 # ---------------------------------------------------------------------------
 
+@transaction.atomic
 def create_assignment_from_accepted(actor, application_id: int) -> dict:
     """
     Create an assignment from an accepted application using the
@@ -193,6 +197,7 @@ def create_assignment_from_accepted(actor, application_id: int) -> dict:
 # Assignment Lifecycle
 # ---------------------------------------------------------------------------
 
+@transaction.atomic
 def confirm_assignment(user, assignment_id: int) -> Assignments:
     """
     Volunteer confirms their own assigned shift.
@@ -218,6 +223,7 @@ def confirm_assignment(user, assignment_id: int) -> Assignments:
             status_code=400,
         )
 
+    set_db_session_context(user.id)
     assignment.status = "confirmed"
     assignment.save()
     assignment.refresh_from_db()
@@ -229,6 +235,7 @@ def confirm_assignment(user, assignment_id: int) -> Assignments:
     return assignment
 
 
+@transaction.atomic
 def cancel_assignment(
     actor,
     assignment_id: int,
@@ -258,6 +265,7 @@ def cancel_assignment(
     if assignment.status == "cancelled":
         return assignment  # Idempotent
 
+    set_db_session_context(actor.id)
     assignment.status = "cancelled"
     assignment.cancel_reason = reason
     assignment.save()
@@ -387,3 +395,8 @@ def get_unassigned_accepted(actor, event_id: int) -> list[dict]:
         rows = cursor.fetchall()
 
     return [dict(zip(columns, row)) for row in rows]
+
+
+get_user_assignments = get_own_assignments
+get_unassigned_accepted_volunteers = get_unassigned_accepted
+

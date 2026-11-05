@@ -25,7 +25,12 @@ from common.security import (
     compute_phone_hash,
     decrypt_phone,
     encrypt_phone,
+    generate_otp_code,
+    generate_raw_qr_token,
+    hash_phone,
+    hash_qr_token,
     normalize_phone,
+    redact_sensitive_data,
 )
 
 logger = logging.getLogger(__name__)
@@ -64,13 +69,15 @@ def normalize_tags(tags: Optional[list[str]]) -> list[str]:
         Normalized list of tags.
 
     Raises:
-        ValueError: If more than 30 tags after normalization.
+        ValidationError: If more than 30 tags after normalization (inherits from DomainError and ValueError).
     """
+    from common.exceptions import ValidationError
+
     if tags is None:
         return []
 
     if not isinstance(tags, list):
-        raise ValueError("Tags must be a list")
+        raise ValidationError("Tags must be a list", code="invalid_tags")
 
     seen = set()
     result = []
@@ -88,7 +95,7 @@ def normalize_tags(tags: Optional[list[str]]) -> list[str]:
             result.append(normalized)
 
     if len(result) > 30:
-        raise ValueError("Maximum 30 tags allowed")
+        raise ValidationError("Maximum 30 tags allowed", code="invalid_tags")
 
     return result
 
@@ -106,11 +113,14 @@ def sanitize_and_save_verification_jpeg(
     Sanitize an uploaded verification image and save as JPEG.
 
     Process:
-    1. Open with Pillow and verify it's a valid image
-    2. Convert to RGB (strips all EXIF metadata)
-    3. Encode as JPEG (quality=90)
-    4. Compute SHA-256 hash of the JPEG bytes
-    5. Save to VERIFICATION_MEDIA_ROOT / {user_uuid}/{image_type}_{random}.jpg
+    1. Validate user_uuid against path traversal using UUID format
+    2. Validate image_type against allowed types
+    3. Open with Pillow and verify it's a valid image
+    4. Validate dimensions against bounds (VERIFICATION_MIN_DIMENSION to VERIFICATION_MAX_DIMENSION)
+    5. Convert to RGB (strips all EXIF metadata)
+    6. Encode as JPEG (quality=90)
+    7. Compute SHA-256 hash of the JPEG bytes
+    8. Save to VERIFICATION_MEDIA_ROOT / {user_uuid}/{image_type}_{random}.jpg
 
     Args:
         user_uuid: The user's UUID string (for directory organization).
@@ -123,18 +133,55 @@ def sanitize_and_save_verification_jpeg(
         sha256_hex: 64-character lowercase hex SHA-256 hash.
 
     Raises:
-        ValueError: If the file is not a valid image.
+        ValidationError: If the file is invalid, out of dimension bounds, or uuid is malformed.
     """
     from PIL import Image, UnidentifiedImageError
+    from common.exceptions import ValidationError
+
+    # Strict UUID validation to prevent directory traversal
+    try:
+        clean_uuid = str(uuid_module.UUID(str(user_uuid)))
+    except (ValueError, AttributeError, TypeError):
+        raise ValidationError("Invalid user UUID format", code="invalid_uuid")
+
+    valid_types = ("mock_selfie", "id_license", "driver_license")
+    if image_type not in valid_types:
+        raise ValidationError(
+            f"Invalid image type. Must be one of: {', '.join(valid_types)}",
+            code="invalid_image_type",
+        )
 
     try:
+        if hasattr(uploaded_file, "seek"):
+            uploaded_file.seek(0, io.SEEK_END)
+            size = uploaded_file.tell()
+            uploaded_file.seek(0)
+            if size == 0:
+                raise ValidationError("Uploaded image file is empty", code="empty_file")
+
         img = Image.open(uploaded_file)
         img.verify()
     except (UnidentifiedImageError, Exception) as e:
-        raise ValueError(f"Invalid image file: {e}")
+        if isinstance(e, ValidationError):
+            raise
+        raise ValidationError(f"Invalid image file: {e}", code="invalid_image")
 
     uploaded_file.seek(0)
     img = Image.open(uploaded_file)
+
+    min_dim = getattr(settings, "VERIFICATION_MIN_DIMENSION", 200)
+    max_dim = getattr(settings, "VERIFICATION_MAX_DIMENSION", 6000)
+
+    if img.width < min_dim or img.height < min_dim:
+        raise ValidationError(
+            f"Image dimensions ({img.width}x{img.height}) below minimum allowed ({min_dim}x{min_dim}px)",
+            code="image_too_small",
+        )
+    if img.width > max_dim or img.height > max_dim:
+        raise ValidationError(
+            f"Image dimensions ({img.width}x{img.height}) exceed maximum allowed ({max_dim}x{max_dim}px)",
+            code="image_too_large",
+        )
 
     if img.mode != "RGB":
         img = img.convert("RGB")
@@ -147,10 +194,10 @@ def sanitize_and_save_verification_jpeg(
 
     random_suffix = uuid_module.uuid4().hex[:8]
     filename = f"{image_type}_{random_suffix}.jpg"
-    relative_path = f"{user_uuid}/{filename}"
+    relative_path = f"{clean_uuid}/{filename}"
 
     verification_root = Path(settings.VERIFICATION_MEDIA_ROOT)
-    target_dir = verification_root / user_uuid
+    target_dir = verification_root / clean_uuid
     target_dir.mkdir(parents=True, exist_ok=True)
     target_path = target_dir / filename
 

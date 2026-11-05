@@ -68,30 +68,32 @@ def set_db_session_context(
     so SET LOCAL values persist for the duration of the request and are
     automatically discarded when the transaction commits or rolls back.
 
+    Executes a single database round-trip setting both app.user_id and app.ip.
+
     Args:
         user_id: The authenticated user's database ID, or None for anonymous/system.
         ip_address: The client IP address string, or None/empty to skip.
     """
     with connection.cursor() as cursor:
-        if user_id is not None:
-            cursor.execute(
-                "SELECT set_config('app.user_id', %s, true)",
-                [str(user_id)],
-            )
-        else:
-            cursor.execute(
-                "SELECT set_config('app.user_id', '', true)",
-            )
+        cursor.execute(
+            "SELECT set_config('app.user_id', %s, true), set_config('app.ip', %s, true)",
+            [str(user_id) if user_id is not None else "", ip_address or ""],
+        )
 
-        if ip_address:
-            cursor.execute(
-                "SELECT set_config('app.ip', %s, true)",
-                [ip_address],
-            )
-        else:
-            cursor.execute(
-                "SELECT set_config('app.ip', '', true)",
-            )
+
+def get_db_session_context() -> tuple[Optional[int], Optional[str]]:
+    """
+    Read the current transaction-local PostgreSQL session context.
+
+    Returns:
+        tuple of (app_user_id: int | None, app_ip: str | None)
+    """
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT app_user_id(), host(app_ip())")
+        row = cursor.fetchone()
+        user_id = row[0] if row else None
+        ip_addr = row[1] if row and row[1] else None
+        return (user_id, ip_addr)
 
 
 def clear_db_session_context() -> None:

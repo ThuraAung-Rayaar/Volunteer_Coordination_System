@@ -4,6 +4,9 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.events.models import VPublicEvents
+from common.permissions import get_visible_event_or_404
+from common.privacy import can_access_event_t2
 from services import (
     application_service,
     assignment_service,
@@ -24,13 +27,17 @@ from .serializers import (
     AvailabilityCheckSerializer,
     AvailabilityExceptionSerializer,
     AvailabilityRulesReplaceSerializer,
+    CharityFieldSerializer,
     CharityInterestsSerializer,
     CoordinatorApplySerializer,
     CoordinatorProfileSerializer,
     ProfileUpdateSerializer,
+    PublicEventDetailSerializer,
     PublicEventPostSerializer,
     PublicEventSerializer,
     UserProfileSerializer,
+    UserPublicCardSerializer,
+    UserT2CoordinatorCardSerializer,
     VerificationImageSerializer,
     VerificationImageUploadSerializer,
 )
@@ -43,13 +50,27 @@ class PublicEventPagination(PageNumberPagination):
     page_query_param = "page"
 
 
-class PublicEventListView(APIView):
-    """GET /api/v1/events/ — public event browsing (T0)."""
+class CharityFieldsListView(APIView):
+    """GET /api/v1/charity-fields/ — active charity fields taxonomy (T0 - W161)."""
     permission_classes = [AllowAny]
-    authentication_classes = []
 
     def get(self, request):
-        flat = {k: v[0] for k, v in request.query_params.lists()}
+        fields = query_service.list_active_charity_fields()
+        serializer = CharityFieldSerializer(fields, many=True)
+        return Response(serializer.data)
+
+
+class PublicEventListView(APIView):
+    """GET /api/v1/events/ — public event browsing (T0 - W158)."""
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        flat = {}
+        for k, v in request.query_params.lists():
+            if k == "charity_field":
+                flat[k] = ",".join(v)
+            else:
+                flat[k] = v[0]
         queryset = query_service.list_public_events(flat)
         paginator = PublicEventPagination()
         page = paginator.paginate_queryset(queryset, request, view=self)
@@ -58,25 +79,67 @@ class PublicEventListView(APIView):
 
 
 class PublicEventDetailView(APIView):
-    """GET /api/v1/events/{id}/ — public event detail with posts (T0)."""
+    """GET /api/v1/events/{id}/ — public event detail with posts and conditional T2 fields (W159)."""
     permission_classes = [AllowAny]
-    authentication_classes = []
 
     def get(self, request, event_id):
-        event = query_service.get_public_event(event_id)
-        posts = query_service.get_event_posts(event_id)
-        data = PublicEventSerializer(event).data
-        data["posts"] = PublicEventPostSerializer(posts, many=True).data
-        return Response(data)
+        event = get_visible_event_or_404(request.user, event_id)
+        pub_event = VPublicEvents.objects.filter(event_id=event.id).first()
+        if pub_event is not None:
+            base_data = PublicEventSerializer(pub_event).data
+        else:
+            # Fallback for authorized manager/participant viewing draft or cancelled event
+            coord_name = ""
+            if event.current_coordinator and hasattr(event.current_coordinator, "user"):
+                coord_name = getattr(event.current_coordinator.user, "display_name", "")
+            charity_codes = list(event.charity_fields.values_list("field_code_id", flat=True))
+            base_data = {
+                "id": event.id,
+                "title": event.title,
+                "description": event.description,
+                "purpose_type": event.purpose_type,
+                "location_name": event.location_name,
+                "landmark_text": event.landmark_text,
+                "latitude": str(event.latitude) if event.latitude is not None else None,
+                "longitude": str(event.longitude) if event.longitude is not None else None,
+                "geo_radius_m": event.geo_radius_m,
+                "geo_checkin_enabled": event.geo_checkin_enabled,
+                "map_provider": event.map_provider,
+                "start_at": event.start_at.isoformat() if event.start_at else None,
+                "end_at": event.end_at.isoformat() if event.end_at else None,
+                "application_deadline": event.application_deadline.isoformat() if event.application_deadline else None,
+                "status": event.status,
+                "acceptance_mode": event.acceptance_mode,
+                "max_participants": event.max_participants,
+                "meals_provided": event.meals_provided,
+                "lodging_provided": event.lodging_provided,
+                "travel_support_provided": event.travel_support_provided,
+                "compensation_kind": event.compensation_kind,
+                "coordinator_name": coord_name,
+                "charity_fields": charity_codes,
+                "spots_remaining": event.max_participants or 0,
+            }
+
+        posts = query_service.get_event_posts(event.id, verified_visible=True)
+        data = dict(base_data)
+        data["posts"] = posts
+        has_t2 = can_access_event_t2(request.user, event)
+        if has_t2:
+            data["onboarding_text"] = event.onboarding_text
+            data["onboarding_version"] = event.onboarding_version
+            data["compensation_note"] = event.compensation_note
+
+        serializer = PublicEventDetailSerializer(data, context={"can_access_t2": has_t2})
+        return Response(serializer.data)
 
 
 class PublicEventPostsView(APIView):
-    """GET /api/v1/events/{id}/posts/ — public post list with capacity (T0)."""
+    """GET /api/v1/events/{id}/posts/ — public post list with capacity (T0 - W160)."""
     permission_classes = [AllowAny]
-    authentication_classes = []
 
     def get(self, request, event_id):
-        posts = query_service.get_event_posts(event_id)
+        event = get_visible_event_or_404(request.user, event_id)
+        posts = query_service.get_event_posts(event.id, verified_visible=True)
         return Response(PublicEventPostSerializer(posts, many=True).data)
 
 
@@ -121,12 +184,41 @@ class MeCharityInterestsView(APIView):
 
 
 class MeAvailabilityView(APIView):
-    """GET /api/v1/me/availability/ — list rules and exceptions."""
+    """GET /api/v1/me/availability/ — list rules and exceptions; PUT replaces rules."""
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         data = availability_service.get_user_availability(request.user.id)
         return Response(data)
+
+    def put(self, request):
+        serializer = AvailabilityRulesReplaceSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        rules = availability_service.set_weekly_availability_rules(
+            request.user.id, serializer.validated_data["rules"]
+        )
+        return Response({"rules": rules}, status=status.HTTP_200_OK)
+
+
+class UserByUuidView(APIView):
+    """GET /api/v1/users/by-uuid/{uuid}/ — Public UUID lookup & coordinator scan (W24)."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, uuid):
+        event_id = request.query_params.get("event_id")
+        parsed_event_id = int(event_id) if event_id and event_id.isdigit() else None
+        data = profile_service.lookup_user_by_uuid(
+            actor=request.user,
+            target_uuid=uuid,
+            event_id=parsed_event_id,
+        )
+        return Response(data, status=status.HTTP_200_OK)
+
+
+# Aliases for specification naming compatibility
+ProfileView = MeProfileView
+AvailabilityView = MeAvailabilityView
+
 
 
 class MeAvailabilityRulesView(APIView):
@@ -342,4 +434,16 @@ class MeCoordinatorView(APIView):
         )
         profile = coordinator_service.get_coordinator_profile(request.user)
         return Response({"coordinator": CoordinatorProfileSerializer(profile).data})
+
+
+# Alias for alternative view naming conventions
+MyVerificationImagesView = MeVerificationImagesView
+VolunteerApplyEventView = EventApplyView
+VolunteerMyApplicationsView = MyApplicationsView
+VolunteerWithdrawApplicationView = ApplicationWithdrawView
+VolunteerMyAssignmentsView = MyAssignmentsView
+VolunteerConfirmAssignmentView = AssignmentConfirmView
+VolunteerCancelAssignmentView = AssignmentCancelView
+
+
 

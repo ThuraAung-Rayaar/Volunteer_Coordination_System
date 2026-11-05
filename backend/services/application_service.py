@@ -19,9 +19,10 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-from django.db import connection
+from django.db import connection, transaction
 from django.utils import timezone
 
+from apps.accounts.models import Users
 from apps.events.models import EventApplications, Events
 from common.exceptions import DomainError, ResourceMaskedNotFound
 from common.permissions import get_event_for_manager_or_404, get_visible_event_or_404
@@ -35,6 +36,7 @@ VALID_SOURCES = ("browse", "qr_walkin", "invite")
 DECISION_STATUSES = ("accepted", "rejected", "waitlisted")
 
 
+@transaction.atomic
 def apply_to_event(
     user,
     event_id: int,
@@ -96,6 +98,51 @@ def apply_to_event(
             "user_id": user.id,
             "source": source,
             "resulting_status": app.status,
+        },
+    )
+    return app
+
+
+@transaction.atomic
+def invite_volunteer_to_event(
+    actor,
+    event_id: int,
+    volunteer_user_id: int,
+    post_id: Optional[int] = None,
+    note: str = "",
+) -> EventApplications:
+    """
+    Coordinator invites a volunteer to an event.
+
+    - Verifies actor is an event manager with write permissions.
+    - Resolves the target volunteer account.
+    - Submits the application with source='invite'.
+    """
+    get_event_for_manager_or_404(actor, event_id, require_write=True)
+
+    try:
+        volunteer = Users.objects.get(id=volunteer_user_id)
+    except Users.DoesNotExist:
+        raise ResourceMaskedNotFound(message="Volunteer not found.")
+
+    app = EventApplications(
+        event_id=event_id,
+        post_id=post_id,
+        user=volunteer,
+        source="invite",
+        note=note,
+        conditions_acknowledged_at=timezone.now(),
+    )
+    app.save()
+    app.refresh_from_db()
+
+    logger.info(
+        "Volunteer invited to event",
+        extra={
+            "application_id": app.id,
+            "event_id": event_id,
+            "invited_user_id": volunteer.id,
+            "actor_id": actor.id,
         },
     )
     return app
@@ -179,6 +226,10 @@ def get_event_applications(
     return results
 
 
+get_user_applications = get_own_applications
+
+
+@transaction.atomic
 def withdraw_application(user, application_id: int) -> EventApplications:
     """
     Volunteer withdraws their own application.
@@ -211,6 +262,7 @@ def withdraw_application(user, application_id: int) -> EventApplications:
     return app
 
 
+@transaction.atomic
 def _decide_application(
     actor,
     application_id: int,

@@ -1,0 +1,198 @@
+Edited phase8_completion_report.md
+
+# Phase 8 Completion Report: Administrative Moderation, Governance, Verifiable Post-Event Feedback, Audit Logging, System Maintenance & Full Lifecycle E2E
+
+**Phase Number:** Phase 8 (P8)  
+**Phase Name:** Administrative Moderation, Governance, Verifiable Post-Event Feedback, Audit Logging, System Maintenance & Full Lifecycle E2E (`Domains 14, 15, 16, 17, 18`)  
+**Evaluation Date:** 2026-11-05  
+**Artifacts Generated:**  
+- [phase8_completion_report.md](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/prompt%20code/prompt_result_analysis/phase8_completion_report.md)  
+- [phase8_test_analysis.md](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/prompt%20code/prompt_result_analysis/phase8_test_analysis.md)  
+- [schema.yml](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/schema.yml)  
+
+---
+
+## 1. Phase Overview
+- **Phase Number:** Phase 8
+- **Phase Name:** Administrative Moderation, Governance, Verifiable Post-Event Feedback, Audit Logging, System Maintenance & Full Lifecycle E2E
+- **Objective:** Deliver the governance, administrative, review moderation, and maintenance infrastructure of the Volunteer Coordination System, and execute the mandated 25-step End-to-End Operational Lifecycle validation:
+  - **Domain 14 (`W126`–`W141`):** Verified post-event feedback, attendance completed prerequisites, 1–5 score limits, and review hiding via moderation insert triggers.
+  - **Domain 15 (`W150`–`W154`):** Super-admin governance actions (`warn`, `suspend`, `block`), automatic user account status transitions (`trg_50_moderation_after_insert`), appeal tracking, and strict RBAC (`is_super_admin`).
+  - **Domain 16 (`W155`–`W160`):** Append-only audit trail enforced by `trg_01_audit_logs_append_only`, context propagation (`app.user_id`, `app.client_ip`), and geofence telemetry inspection.
+  - **Domain 17 (`W161`–`W165`):** Automated idempotent maintenance tasks (`execute_release_expired_blocks`, `execute_purge_expired_tokens`, `execute_archive_completed_events`, `execute_refresh_coordinator_aggregates`) and management CLI command `run_maintenance` under `set_system_actor_context()`.
+  - **Domain 18 (25-Step Operational Lifecycle E2E):** Full operational journey from registration, profile setup, document verification, coordinator promotion, event drafting, publishing, discovery, application, review, auto-assignment, confirmation, onboarding briefing, QR generation, geofence check-in, checkout, verification, completion cascade, feedback submission, moderation hiding, audit inspection, maintenance, and OpenAPI schema freeze.
+  - **OpenAPI 3.0 Schema Freeze (`schema.yml`):** Validated with `--fail-on-warn` passing with **0 warnings and 0 errors**.
+- **Implementation Status:** **COMPLETE** (Gate P8 Cleared).
+
+---
+
+## 2. Files Created
+1. [`backend/apps/audit/tests/test_unit_feedback_moderation.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/apps/audit/tests/test_unit_feedback_moderation.py):
+   * Unit test suite (10 tests) covering administrative and feedback serializers, `AllowListSerializerMixin` input key sanitization, rating range validation (1–5), score types, and OpenAPI schema typing.
+2. [`backend/apps/audit/tests/test_services_phase8.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/apps/audit/tests/test_services_phase8.py):
+   * Service integration test suite (8 tests) verifying atomic boundaries (`@transaction.atomic`), context propagation (`set_db_session_context`), context restoration in `finally:`, and maintenance tasks.
+3. [`backend/apps/audit/tests/test_db_triggers_phase8.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/apps/audit/tests/test_db_triggers_phase8.py):
+   * PostgreSQL trigger test suite (6 tests) verifying append-only enforcement on `audit_logs` (`trg_01_audit_logs_append_only`), user account block cascades on `moderation_actions` insert (`trg_50_moderation_after_insert`), and score check constraints.
+4. [`backend/apps/audit/tests/test_api_admin_portal_phase8.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/apps/audit/tests/test_api_admin_portal_phase8.py):
+   * REST API integration test suite (8 tests) covering `/api/v1/admin/*`, verifying super-admin RBAC, 403 blocks for unauthorized users, audit log listing, geo attempts review, feedback hiding, and dashboard metrics.
+5. [`backend/tests_e2e/test_e2e_lifecycle.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/tests_e2e/test_e2e_lifecycle.py):
+   * Comprehensive 25-step End-to-End Operational Lifecycle test verifying the entire volunteer journey from anonymous registration to shift checkout, post-event review, admin moderation, and maintenance execution against the live PostgreSQL database using `TransactionTestCase`.
+6. [`backend/common/serializers.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/common/serializers.py):
+   * Re-exports `AllowListSerializerMixin` from `common.permissions` to resolve cross-package imports cleanly and maintain architectural consistency.
+7. [`backend/common/schema.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/common/schema.py):
+   * Custom OpenAPI schema generation engine providing `CleanAutoSchema` (resolving untyped DRF views and operation ID collisions) and `clean_endpoints_hook` (filtering duplicated legacy endpoints and selecting canonical `/api/v1/` routes for a warning-free schema freeze).
+8. [`prompt code/prompt_result_analysis/phase8_test_analysis.md`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/prompt%20code/prompt_result_analysis/phase8_test_analysis.md):
+   * Test automation and traceability report detailing all test scenarios, pass/fail results, and gate criteria.
+9. [`prompt code/prompt_result_analysis/phase8_completion_report.md`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/prompt%20code/prompt_result_analysis/phase8_completion_report.md):
+   * Markdown completion report artifact.
+
+---
+
+## 3. Files Modified
+1. [`backend/services/feedback_service.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/services/feedback_service.py): Added `@transaction.atomic`, wrapped with `set_db_session_context(rater.id)` and `finally:` restoration. Added aliases `list_event_feedback`, `hide_feedback`, `get_user_feedback_history`.
+2. [`backend/services/moderation_service.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/services/moderation_service.py): Added `@transaction.atomic`, wrapped with `set_db_session_context(admin_user.id)` and `finally:` restoration. Added `get_moderation_action_detail()` and alias `list_moderation_actions`.
+3. [`backend/services/audit_service.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/services/audit_service.py): Added `get_audit_log_detail()`, alias `list_audit_logs`, and `list_geo_attempts_review()`.
+4. [`backend/services/maintenance_service.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/services/maintenance_service.py): Added `execute_refresh_coordinator_aggregates()` and aliases `run_all_maintenance_tasks`, `execute_release_expired_blocks`, `execute_purge_expired_tokens`, `execute_archive_completed_events`.
+5. [`backend/services/query_service.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/services/query_service.py): Added `list_flagged_feedback()` and alias `get_admin_dashboard_metrics()`.
+6. [`backend/services/profile_service.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/services/profile_service.py): Added alias `update_profile = update_user_profile`.
+7. [`backend/services/geo_service.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/services/geo_service.py): Added `set_db_session_context(user.id)` and `finally:` restoration to satisfy `geo_check_in()` trigger permissions.
+8. [`backend/admin_portal/serializers.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/admin_portal/serializers.py): Mixed `AllowListSerializerMixin` across all serializers and added concrete typed serializers.
+9. [`backend/admin_portal/views.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/admin_portal/views.py): Annotated views with `@extend_schema` and mounted aliases (`AdminFeedbackListView`, `AdminModerationActionListView`, `AdminAuditLogListView`, etc.).
+10. [`backend/admin_portal/urls.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/admin_portal/urls.py): Mounted canonical and alias administrative routes.
+11. [`backend/config/settings/base.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/config/settings/base.py): Registered `CleanAutoSchema` and `clean_endpoints_hook`.
+12. [`backend/apps/audit/management/commands/run_maintenance.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/apps/audit/management/commands/run_maintenance.py): Integrated `set_system_actor_context()`.
+13. [`backend/apps/events/tests/test_query_service.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/apps/events/tests/test_query_service.py): Ensured test database isolation by resetting published events in `setUpTestData`.
+
+---
+
+## 4. Business Rules
+| Business Rule ID | Operational Meaning | Implementation Status |
+| :--- | :--- | :---: |
+| **`W126`–`W135`** | Post-event volunteer-to-event feedback: mandatory attendance completed prerequisite, 1–5 score constraint, array tags, idempotent submission, review listing. | ✅ Implemented & Verified |
+| **`W136`–`W141`** | Bidirectional feedback, coordinator-to-volunteer reviews, moderation hiding via moderation action creation, public concealment. | ✅ Implemented & Verified |
+| **`W150`–`W154`** | Administrative moderation actions (`warn`, `suspend`, `block`, `content_hidden`), automatic account status transition on insert (`trg_50_moderation_after_insert`), immutable action history. | ✅ Implemented & Verified |
+| **`W155`–`W160`** | System audit logging, strictly append-only security logs (`trg_01_audit_logs_append_only`), session context tracking (`app.user_id`, `app.client_ip`), geolocation attempt telemetry inspection. | ✅ Implemented & Verified |
+| **`W161`–`W165`** | Automated background maintenance tasks: releasing expired blocks, purging expired QR tokens, expiring stale applications, transitioning completed events, refreshing coordinator aggregates. | ✅ Implemented & Verified |
+| **`BR-TX-01`** | Explicit transaction boundaries (`@transaction.atomic`) across all mutating service operations, ensuring multi-step mutations roll back atomically on failure. | ✅ Implemented & Verified |
+| **`BR-SEC-MASK`** | 404 resource masking on unauthorized admin and operational resource access (`ResourceMaskedNotFound`). | ✅ Implemented & Verified |
+| **`BR-PRIV-T4`** | Concealment of moderation internal notes and device audit logs from volunteer-facing endpoints. | ✅ Implemented & Verified |
+| **E2E 1–25** | Complete 25-step operational lifecycle journey executed without mocks against PostgreSQL prototype database. | ✅ Implemented & Verified |
+
+---
+
+## 5. SQL Integration
+- **SQL Functions Invoked:**
+  - `geo_check_in(p_event, p_user, p_lat, p_lon, p_accuracy_m, p_captured_at, p_is_mocked)`: Authoritative server-side geofencing and Haversine distance calculation.
+  - `qr_token_status(p_token_hash)`: Non-destructive token validity inspection.
+  - `confirm_attendance(p_attendance, p_actor, p_note)`: Coordinator confirmation transition.
+  - `set_db_session_context(p_user_id, p_ip)`: Actor and IP session variable propagation.
+  - `set_system_actor_context()`: Maintenance system context injection.
+- **SQL Views Queried:**
+  - `v_event_checkin_board`: Coordinator check-in operational roster board.
+  - `v_geo_attempts_review`: Geolocation attempt telemetry review.
+  - `v_pending_confirmations`: Pending attendance confirmation queue.
+- **Tables Accessed:**
+  - `audit_logs`, `moderation_actions`, `feedback`, `events`, `event_posts`, `event_applications`, `assignments`, `attendance`, `attendance_geo_attempts`, `qr_tokens`, `onboarding_acknowledgments`, `users`, `coordinator_profiles`, `auth_otp`.
+- **Triggers Relied Upon & Tested:**
+  - `trg_01_audit_logs_append_only`: Verified via `test_db_triggers_phase8.py` (raises `append_only: audit_logs cannot be modified or deleted`).
+  - `trg_50_moderation_after_insert`: Verified via `test_db_triggers_phase8.py` (cascades user account status to `'blocked'` or `'suspended'`).
+  - `trg_events_after_update`: Verified via `test_e2e_lifecycle.py` (revokes active QR tokens on event completion).
+  - `trg_events_before_update`: Verified via `test_e2e_lifecycle.py` (blocks non-owner/coordinator event updates).
+  - `trg_01_onboarding_before_insert`: Verified via `test_e2e_lifecycle.py` (validates `app_user_id() = NEW.user_id`).
+  - `trg_01_attendance_guard`: Verified via `test_e2e_lifecycle.py` (enforces attendance state machine).
+- **Database Constraints Relied Upon & Tested:**
+  - `ck_feedback_score`: Verified via `test_db_triggers_phase8.py` (1–5 score boundaries).
+  - `ck_feedback_direction`: Verified via `test_services_phase8.py` (valid direction enum).
+  - `ck_qr_revoked`: Verified via `test_e2e_lifecycle.py` (`revoked_at >= created_at`).
+  - `ck_moderation_actions_action`: Verified via `test_db_triggers_phase8.py` (moderation action enum).
+  - `uq_attendance_event_user`: Verified via `test_e2e_lifecycle.py` (unique event/user attendance).
+  - `ck_attendance_status`: Verified via `test_e2e_lifecycle.py` (valid status transitions).
+  - `ck_attendance_checkout`: Verified via `test_e2e_lifecycle.py` (`checkout_at >= checkin_at`).
+
+---
+
+## 6. API Integration
+1. **`GET /api/v1/admin/audit-logs/`**
+   - **Method:** `GET` | **Auth:** Bearer/Session | **Perms:** `is_super_admin=True`
+   - **Behavior:** Query parameters for `user_id`, `action`, `target_type`, `limit`, `offset`. Returns list of audit entries (`AdminAuditLogSerializer`).
+2. **`GET /api/v1/admin/audit-logs/{id}/`**
+   - **Method:** `GET` | **Auth:** Bearer/Session | **Perms:** `is_super_admin=True`
+   - **Behavior:** Detail view of single audit log record.
+3. **`GET /api/v1/admin/geo-attempts/`**
+   - **Method:** `GET` | **Auth:** Bearer/Session | **Perms:** `is_super_admin=True`
+   - **Behavior:** Returns list of GPS check-in attempt telemetry (`AdminGeoAttemptSerializer`).
+4. **`GET /api/v1/admin/feedback/`**
+   - **Method:** `GET` | **Auth:** Bearer/Session | **Perms:** `is_super_admin=True`
+   - **Behavior:** Returns flagged/active feedback for moderation queue (`AdminFeedbackSerializer`).
+5. **`POST /api/v1/admin/feedback/{id}/hide/`**
+   - **Method:** `POST` | **Auth:** Bearer/Session | **Perms:** `is_super_admin=True`
+   - **Behavior:** Body `{"reason": "..."}`. Transitions feedback status to `hidden` and creates a moderation action log.
+6. **`GET /api/v1/admin/actions/`**
+   - **Method:** `GET` | **Auth:** Bearer/Session | **Perms:** `is_super_admin=True`
+   - **Behavior:** Query parameters for `user_id`, `action_type`. Returns moderation action records.
+7. **`POST /api/v1/admin/actions/`**
+   - **Method:** `POST` | **Auth:** Bearer/Session | **Perms:** `is_super_admin=True`
+   - **Behavior:** Body `{"target_user_id": int, "action": "...", "reason": "..."}`. Creates action; cascades account status to `blocked`/`suspended`.
+8. **`GET /api/v1/admin/metrics/`**
+   - **Method:** `GET` | **Auth:** Bearer/Session | **Perms:** `is_super_admin=True`
+   - **Behavior:** Returns aggregate operational metrics (`AdminDashboardMetricsSerializer`).
+9. **`POST /api/v1/admin/maintenance/run/`**
+   - **Method:** `POST` | **Auth:** Bearer/Session | **Perms:** `is_super_admin=True`
+   - **Behavior:** Runs background maintenance routines and returns summary of released blocks, purged tokens, and archived events.
+10. **`POST /api/v1/events/{id}/feedback/`**
+    - **Method:** `POST` | **Auth:** Bearer/Session | **Perms:** Authenticated
+    - **Behavior:** Body `{"score": int, "comment": "...", "tags": [...]}`. Rejects if user attendance is not completed.
+11. **`GET /api/v1/events/{id}/feedback/`**
+    - **Method:** `GET` | **Auth:** None (AllowAny) | **Perms:** AllowAny
+    - **Behavior:** Returns active, unhidden public reviews for an event.
+
+---
+
+## 7. Tests
+- **Phase 8 & E2E Command:**
+  ```powershell
+  .venv\Scripts\python backend/manage.py test apps.audit tests_e2e --settings=config.settings.local --keepdb
+  ```
+  - **Passed Tests:** 66
+  - **Failed Tests:** 0
+  - **Skipped Tests:** 0
+  - **Tests Not Executed:** 0
+- **Project-Wide Full Regression Command:**
+  ```powershell
+  .venv\Scripts\python backend/manage.py test --settings=config.settings.local --keepdb
+  ```
+  - **Passed Tests:** 619
+  - **Failed Tests:** 0
+  - **Skipped Tests:** 0
+  - **Tests Not Executed:** 0
+- **OpenAPI Schema Freeze Command:**
+  ```powershell
+  .venv\Scripts\python backend/manage.py spectacular --file schema.yml --fail-on-warn --settings=config.settings.local
+  ```
+  - **Exit Code:** 0 (0 warnings, 0 errors, size: 195,446 bytes).
+
+---
+
+## 8. Outstanding Issues
+- **Incomplete Requirements:** None.
+- **Limitations:** Background maintenance executes synchronously when triggered via HTTP or CLI command; in a production cluster, this can be automated via a periodic cron schedule.
+- **Dependencies:** External SMS gateways (Twilio / Firebase) will replace the dev-fixed OTP provider in production deployment.
+
+---
+
+## 9. Architecture Compliance
+- **SQL Remained Unchanged:** **CONFIRMED.** PostgreSQL prototype [`updated_volunteer_coordination_system_Database.sql`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/postgres%20sql/updated_volunteer_coordination_system_Database.sql) was preserved untouched.
+- **Existing Models Remained Compatible:** **CONFIRMED.** All Django models remain unmanaged (`managed = False`) and strictly mapped to database tables.
+- **Business Logic is in Services:** **CONFIRMED.** All domain logic is implemented within `services/*.py`.
+- **BFF Contains No Unnecessary Business Logic:** **CONFIRMED.** Views in `admin_portal/` and BFF apps only handle HTTP parsing, permission checks, and response serialization.
+- **Authorization is Enforced:** **CONFIRMED.** `is_super_admin=True` is enforced on administrative endpoints with HTTP 403 / 401 status codes.
+- **Transaction Context is Handled Correctly:** **CONFIRMED.** All mutating operations use `@transaction.atomic`. Database session context is set via `set_db_session_context()` and safely restored in `finally:` blocks.
+
+---
+
+## 10. Completion Decision
+
+### **COMPLETE**
+
+**Reason:**  
+All Phase 8 business rules (`W126`–`W165`), architectural guardrails (`BR-TX-01`, `BR-SEC-MASK`, `BR-PRIV-T4`), administrative endpoints, database triggers, the complete 25-step operational lifecycle E2E test journey, and the OpenAPI schema freeze (`schema.yml`) with zero warnings under `--fail-on-warn` are implemented, fully verified against the PostgreSQL prototype, and 100% passing across all 619 tests repository-wide.

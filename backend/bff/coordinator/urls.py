@@ -2,6 +2,10 @@ from django.urls import path
 
 from .views import (
     ApplicationDecisionView,
+    CoordinatorApplicationAcceptView,
+    CoordinatorApplicationRejectView,
+    CoordinatorApplicationView,
+    CoordinatorApplicationWaitlistView,
     CoordinatorEventApplicationsView,
     CoordinatorEventDetailView,
     CoordinatorEventListCreateView,
@@ -23,6 +27,9 @@ from .views import (
 )
 
 urlpatterns = [
+    # Coordinator Application (W34)
+    path("apply/", CoordinatorApplicationView.as_view(), name="coordinator-apply-direct"),
+
     # Summary (backward compatible with Phase 2)
     path("events/<int:event_id>/summary/", EventSummaryView.as_view(), name="event-summary"),
     path("coordinator/events/<int:event_id>/summary/", EventSummaryView.as_view(), name="coordinator-event-summary"),
@@ -52,10 +59,20 @@ urlpatterns = [
     path("events/<int:event_id>/applications/", CoordinatorEventApplicationsView.as_view(), name="coordinator-event-applications-mount"),
     path("applications/<int:application_id>/<str:action>/", ApplicationDecisionView.as_view(), name="application-decision"),
     path("coordinator/applications/<int:application_id>/<str:action>/", ApplicationDecisionView.as_view(), name="coordinator-application-decision"),
+    path("applications/<int:application_id>/accept/", CoordinatorApplicationAcceptView.as_view(), name="application-accept"),
+    path("applications/<int:application_id>/reject/", CoordinatorApplicationRejectView.as_view(), name="application-reject"),
+    path("applications/<int:application_id>/waitlist/", CoordinatorApplicationWaitlistView.as_view(), name="application-waitlist"),
+    path("coordinator/applications/<int:application_id>/accept/", CoordinatorApplicationAcceptView.as_view(), name="coordinator-application-accept"),
+    path("coordinator/applications/<int:application_id>/reject/", CoordinatorApplicationRejectView.as_view(), name="coordinator-application-reject"),
+    path("coordinator/applications/<int:application_id>/waitlist/", CoordinatorApplicationWaitlistView.as_view(), name="coordinator-application-waitlist"),
     path("coordinator/events/<int:event_id>/auto-assign/", EventAutoAssignView.as_view(), name="event-auto-assign"),
     path("events/<int:event_id>/auto-assign/", EventAutoAssignView.as_view(), name="event-auto-assign-mount"),
+    path("coordinator/events/<int:event_id>/assignments/auto-run/", EventAutoAssignView.as_view(), name="coordinator-event-assignments-auto-run"),
+    path("events/<int:event_id>/assignments/auto-run/", EventAutoAssignView.as_view(), name="event-assignments-auto-run"),
     path("coordinator/events/<int:event_id>/manual-assign/", EventManualAssignView.as_view(), name="event-manual-assign"),
     path("events/<int:event_id>/manual-assign/", EventManualAssignView.as_view(), name="event-manual-assign-mount"),
+    path("coordinator/events/<int:event_id>/assignments/manual/", EventManualAssignView.as_view(), name="coordinator-event-assignments-manual"),
+    path("events/<int:event_id>/assignments/manual/", EventManualAssignView.as_view(), name="event-assignments-manual"),
     path("coordinator/events/<int:event_id>/assignments/", EventAssignmentsView.as_view(), name="event-assignments"),
     path("events/<int:event_id>/assignments/", EventAssignmentsView.as_view(), name="event-assignments-mount"),
     path("coordinator/events/<int:event_id>/unassigned/", EventUnassignedView.as_view(), name="event-unassigned"),

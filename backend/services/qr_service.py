@@ -17,7 +17,7 @@ import logging
 import secrets
 from datetime import timedelta
 
-from django.db import IntegrityError, InternalError, ProgrammingError, connection
+from django.db import IntegrityError, InternalError, ProgrammingError, connection, transaction
 from django.utils import timezone
 
 from apps.attendance.models import QrTokens
@@ -38,6 +38,7 @@ def _hash_token(raw_token: str) -> str:
 # Creation & Revocation
 # ---------------------------------------------------------------------------
 
+@transaction.atomic
 def create_event_qr_token(
     actor,
     event_id: int,
@@ -61,14 +62,17 @@ def create_event_qr_token(
     raw_token = secrets.token_urlsafe(32)
     token_hash = _hash_token(raw_token)
 
-    qr = QrTokens.objects.create(
-        event_id=event_id,
-        created_by=actor,
-        purpose=purpose,
-        token_hash=token_hash,
-        max_uses=max_uses,
-        expires_at=timezone.now() + timedelta(minutes=ttl_minutes),
-    )
+    try:
+        qr = QrTokens.objects.create(
+            event_id=event_id,
+            created_by=actor,
+            purpose=purpose,
+            token_hash=token_hash,
+            max_uses=max_uses,
+            expires_at=timezone.now() + timedelta(minutes=ttl_minutes),
+        )
+    except (ProgrammingError, IntegrityError, InternalError) as exc:
+        raise translate_db_exception(exc) from exc
 
     # Never log raw_token.
     logger.info(
@@ -84,6 +88,7 @@ def create_event_qr_token(
     }
 
 
+@transaction.atomic
 def revoke_event_qr_token(actor, qr_token_id: int) -> QrTokens:
     """Revoke an active QR token. Idempotent if already revoked."""
     qr = QrTokens.objects.filter(id=qr_token_id).first()
@@ -96,7 +101,10 @@ def revoke_event_qr_token(actor, qr_token_id: int) -> QrTokens:
         return qr
 
     qr.revoked_at = timezone.now()
-    qr.save(update_fields=["revoked_at"])
+    try:
+        qr.save(update_fields=["revoked_at"])
+    except (ProgrammingError, IntegrityError, InternalError) as exc:
+        raise translate_db_exception(exc) from exc
     logger.info("QR token revoked", extra={"qr_id": qr.id, "event_id": qr.event_id})
     return qr
 
@@ -128,6 +136,17 @@ def preview_qr_token(raw_token: str) -> dict:
     }
 
 
+@transaction.atomic
+def consume_qr_token(user, token_id: int, purpose: str) -> None:
+    """Consume a QR token by calling SQL consume_qr_token()."""
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT consume_qr_token(%s, %s)", [token_id, purpose])
+    except (ProgrammingError, IntegrityError, InternalError) as exc:
+        raise translate_db_exception(exc) from exc
+
+
+@transaction.atomic
 def redeem_qr_token(user, raw_token: str) -> dict:
     """
     Redeem a QR token, dispatching by purpose:
@@ -175,11 +194,7 @@ def redeem_qr_token(user, raw_token: str) -> dict:
         }
 
     # join_event: consume the token, then create a browse application.
-    try:
-        with connection.cursor() as cursor:
-            cursor.execute("SELECT consume_qr_token(%s, %s)", [status["token_id"], "join_event"])
-    except (ProgrammingError, IntegrityError, InternalError) as exc:
-        raise translate_db_exception(exc) from exc
+    consume_qr_token(user, status["token_id"], "join_event")
     event = get_visible_event_or_404(user, status["event_id"])
     try:
         application = EventApplications.objects.create(
@@ -198,6 +213,7 @@ def redeem_qr_token(user, raw_token: str) -> dict:
     }
 
 
+@transaction.atomic
 def qr_check_in(user, raw_token: str) -> dict:
     """Check-in-only redemption. Rejects tokens whose purpose is not 'checkin'."""
     status = preview_qr_token(raw_token)

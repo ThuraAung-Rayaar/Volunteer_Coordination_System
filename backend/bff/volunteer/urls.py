@@ -4,6 +4,7 @@ from .views import (
     ApplicationWithdrawView,
     AssignmentCancelView,
     AssignmentConfirmView,
+    CharityFieldsListView,
     EventApplyView,
     EventCheckAvailabilityView,
     MeAvailabilityExceptionDetailView,
@@ -19,10 +20,12 @@ from .views import (
     PublicEventDetailView,
     PublicEventListView,
     PublicEventPostsView,
+    UserByUuidView,
 )
 
 urlpatterns = [
-    # Public Events (Phase 2)
+    # Public Events & Taxonomy (Phase 2)
+    path("charity-fields/", CharityFieldsListView.as_view(), name="charity-fields-list"),
     path("events/", PublicEventListView.as_view(), name="public-event-list"),
     path("events/<int:event_id>/", PublicEventDetailView.as_view(), name="public-event-detail"),
     path("events/<int:event_id>/posts/", PublicEventPostsView.as_view(), name="public-event-posts"),
@@ -31,6 +34,7 @@ urlpatterns = [
     path("me/", MeProfileView.as_view(), name="me-profile"),
     path("profile/", MeProfileView.as_view(), name="profile"),
     path("me/charity-interests/", MeCharityInterestsView.as_view(), name="me-charity-interests"),
+    path("users/by-uuid/<uuid:uuid>/", UserByUuidView.as_view(), name="user-by-uuid"),
 
     # Volunteer Availability & Conflicts (Phase 3)
     path("me/availability/", MeAvailabilityView.as_view(), name="me-availability"),
@@ -51,6 +55,7 @@ urlpatterns = [
     ),
     path("me/availability/check/", EventCheckAvailabilityView.as_view(), name="me-availability-check"),
     path("availability/check/", EventCheckAvailabilityView.as_view(), name="availability-check"),
+    path("events/check-availability/", EventCheckAvailabilityView.as_view(), name="events-check-availability"),
 
     # Identity Verification & Coordinator (Phase 4)
     path("me/verification-images/", MeVerificationImagesView.as_view(), name="me-verification-images"),

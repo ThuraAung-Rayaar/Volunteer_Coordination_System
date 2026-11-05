@@ -15,6 +15,8 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
+from django.db import transaction
+
 from apps.events.models import EventPosts, VEventPostCapacity
 from common.exceptions import DomainError
 from common.permissions import get_event_for_manager_or_404
@@ -67,6 +69,7 @@ def _validate_post_data(validated_data: dict) -> dict:
 # Post Creation
 # ---------------------------------------------------------------------------
 
+@transaction.atomic
 def create_event_post(actor, event_id: int, validated_data: dict) -> EventPosts:
     """
     Create a new post on an open event.
@@ -88,6 +91,7 @@ def create_event_post(actor, event_id: int, validated_data: dict) -> EventPosts:
 # Post Update
 # ---------------------------------------------------------------------------
 
+@transaction.atomic
 def update_event_post(actor, post_id: int, validated_data: dict) -> EventPosts:
     """
     Update editable post fields. The trigger enforces headcount floor,
@@ -113,6 +117,7 @@ def update_event_post(actor, post_id: int, validated_data: dict) -> EventPosts:
 # Post Closure
 # ---------------------------------------------------------------------------
 
+@transaction.atomic
 def close_event_post(actor, post_id: int) -> EventPosts:
     """
     Manually close a post. Only 'closed' is set manually; open/full are

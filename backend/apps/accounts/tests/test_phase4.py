@@ -119,6 +119,20 @@ class UploadTests(VerificationImageTestBase):
                 )
             self.assertEqual(ctx.exception.code, "invalid_image_type")
 
+    def test_upload_new_image_archives_previous_current_image(self):
+        """W27: Uploading a second image of the same type archives the previous one."""
+        with self.settings(VERIFICATION_MEDIA_ROOT=self.media_root):
+            first = verification_service.upload_verification_image(
+                self.user, "mock_selfie", _upload()
+            )
+            second = verification_service.upload_verification_image(
+                self.user, "mock_selfie", _upload()
+            )
+        first.refresh_from_db()
+        second.refresh_from_db()
+        self.assertFalse(first.is_current)
+        self.assertTrue(second.is_current)
+
     def test_upload_api_endpoint(self):
         client = APIClient()
         client.force_authenticate(user=self.user)
@@ -170,6 +184,30 @@ class VerificationStatusTests(VerificationImageTestBase):
 
     def test_recalculation_to_verified(self):
         self._approve_both()
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.verification_status, "verified")
+
+    def test_recalculation_intermediate_status_remains_pending(self):
+        """W32: Approving only a mock_selfie without an ID leaves status as 'pending'."""
+        with self.settings(VERIFICATION_MEDIA_ROOT=self.media_root):
+            selfie = verification_service.upload_verification_image(
+                self.user, "mock_selfie", _upload()
+            )
+        verification_service.review_verification_image(self.admin, selfie.id, "approved")
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.verification_status, "pending")
+
+    def test_recalculation_with_driver_license_becomes_verified(self):
+        """W32: Approving mock_selfie + driver_license achieves 'verified'."""
+        with self.settings(VERIFICATION_MEDIA_ROOT=self.media_root):
+            selfie = verification_service.upload_verification_image(
+                self.user, "mock_selfie", _upload()
+            )
+            dl = verification_service.upload_verification_image(
+                self.user, "driver_license", _upload()
+            )
+        verification_service.review_verification_image(self.admin, selfie.id, "approved")
+        verification_service.review_verification_image(self.admin, dl.id, "approved")
         self.user.refresh_from_db()
         self.assertEqual(self.user.verification_status, "verified")
 
@@ -253,6 +291,8 @@ class VerificationStatusTests(VerificationImageTestBase):
             resp = client.get(f"/api/v1/admin/verification-images/{image.id}/file/")
             self.assertEqual(resp.status_code, status.HTTP_200_OK)
             self.assertEqual(resp["content-type"], "image/jpeg")
+            if hasattr(resp, "file_to_stream") and hasattr(resp.file_to_stream, "close"):
+                resp.file_to_stream.close()
 
     def test_admin_pending_images_queue(self):
         client = APIClient()
@@ -327,6 +367,15 @@ class CoordinatorLifecycleTests(TestCase):
         coordinator_service.approve_coordinator(self.admin, self.verified_user.id)
         profile = coordinator_service.suspend_coordinator(self.admin, self.verified_user.id)
         self.assertEqual(profile.status, "suspended")
+
+    def test_coordinator_reactivation_suspended_to_approved(self):
+        """W38: A suspended coordinator can transition back to approved."""
+        coordinator_service.apply_for_coordinator(self.verified_user)
+        coordinator_service.approve_coordinator(self.admin, self.verified_user.id)
+        coordinator_service.suspend_coordinator(self.admin, self.verified_user.id)
+        reactivated = coordinator_service.approve_coordinator(self.admin, self.verified_user.id)
+        self.assertEqual(reactivated.status, "approved")
+        self.assertTrue(coordinator_service.is_approved_coordinator(self.verified_user))
 
     def test_coordinator_revocation(self):
         coordinator_service.apply_for_coordinator(self.verified_user)

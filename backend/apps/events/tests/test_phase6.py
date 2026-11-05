@@ -1,3 +1,4 @@
+import secrets
 from datetime import timedelta
 
 from django.test import TestCase
@@ -12,13 +13,9 @@ from common.exceptions import DomainError
 from common.utils import compute_phone_hash, encrypt_phone, normalize_phone
 from services import application_service, assignment_service, coordinator_service
 
-_phone_seq = 0
-
 
 def _phone():
-    global _phone_seq
-    _phone_seq += 1
-    return f"+959{_phone_seq:08d}"
+    return f"+959{secrets.randbelow(900000000) + 100000000}"
 
 
 def _make_user(name, is_admin=False, verified=False, **kwargs):

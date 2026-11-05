@@ -96,6 +96,7 @@ def _set_status(event, status):
 class PublicEventReadBase(TestCase):
     @classmethod
     def setUpTestData(cls):
+        Events.objects.exclude(title__in=["Yangon Tree Planting", "Flood Relief Distribution"]).filter(status__in=["published", "active"]).update(status="cancelled")
         cls.admin = _make_user("Admin", is_admin=True, verified=True)
         cls.coord = _make_approved_coordinator(cls.admin, "Coordinator 1")
         cls.other_user = _make_user("Regular Volunteer", verified=False)
@@ -168,6 +169,24 @@ class QueryServiceTests(PublicEventReadBase):
         qs = query_service.list_public_events({"charity_field": "environment"})
         self.assertEqual(qs.count(), 1)
         self.assertEqual(qs.first().id, self.published_event.id)
+
+    def test_filter_by_multi_charity_fields_comma_separated(self):
+        """Filtering by comma-separated charity_field matches events containing any of the fields."""
+        qs = query_service.list_public_events({"charity_field": "environment,disaster_relief"})
+        self.assertEqual(qs.count(), 2)
+
+    def test_list_active_charity_fields_service(self):
+        """list_active_charity_fields returns active taxonomy ordered by sort_order, code."""
+        fields = list(query_service.list_active_charity_fields())
+        self.assertGreater(len(fields), 0)
+        codes = [f.code for f in fields]
+        self.assertIn("environment", codes)
+
+    def test_get_event_posts_verified_visible_bypasses_check(self):
+        """get_event_posts with verified_visible=True returns posts directly."""
+        posts = query_service.get_event_posts(self.published_event.id, verified_visible=True)
+        self.assertEqual(len(posts), 1)
+        self.assertEqual(posts[0]["title"], "Sapling Planter")
 
     def test_filter_by_date_starts_after(self):
         """starts_after date filter functions correctly."""

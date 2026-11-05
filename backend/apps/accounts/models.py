@@ -4,6 +4,7 @@ from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.db.models import Q
+from django.db.models.expressions import RawSQL
 from django.utils import timezone
 from apps.accounts.managers import UserManager
 
@@ -32,7 +33,7 @@ class Users(AbstractBaseUser):
         REJECTED = 'rejected', 'Rejected'
 
     id = models.BigAutoField(primary_key=True)
-    uuid = models.UUIDField(unique=True, default=uuid.uuid4, editable=False)
+    uuid = models.UUIDField(unique=True, editable=False, db_default=RawSQL('uuidv7()', []))
     phone_hash = models.CharField(unique=True, max_length=128)
     phone_enc = models.TextField()
     password = models.TextField(blank=True, null=True)

@@ -130,7 +130,7 @@ class ResourceMaskedNotFound(DomainError):
 # VALIDATION ERRORS (400)
 # =============================================================================
 
-class ValidationError(DomainError):
+class ValidationError(DomainError, ValueError):
     """Input validation failed."""
     default_code = "validation_error"
     default_message = "The provided data is invalid."
@@ -228,7 +228,8 @@ def log_security_event(
         if hasattr(request, "user") and getattr(request.user, "is_authenticated", False):
             actor_id = getattr(request.user, "id", None)
 
-        ip_address = get_client_ip(request) if request else None
+        raw_ip = get_client_ip(request) if request else None
+        ip_address = raw_ip if raw_ip else None
 
         with connection.cursor() as cursor:
             cursor.execute(
@@ -300,19 +301,19 @@ _PG_ERROR_MAP: dict[str, tuple[type, int]] = {
     "otp_rate_limited": (OtpRateLimitError, 429),
 }
 
-_CONSTRAINT_ERROR_MAP: dict[str, tuple[type, int, str]] = {
-    "uq_event_application_active": (DuplicateError, 409, "You already have an active application for this event."),
-    "uq_assignment_active": (DuplicateError, 409, "This volunteer is already assigned to this event."),
-    "uq_assignment_application": (DuplicateError, 409, "This application already has an active assignment."),
-    "uq_assignment_group_leader": (DuplicateError, 409, "This group already has an assigned team leader."),
-    "uq_feedback_event_once": (DuplicateError, 409, "You have already submitted feedback for this shift."),
-    "uq_feedback_user_once": (DuplicateError, 409, "You have already submitted feedback for this person."),
-    "uq_onboarding_ack_user_event_ver": (DuplicateError, 409, "You have already acknowledged this version of the briefing."),
-    "uq_attendance_event_user": (DuplicateError, 409, "Attendance record already exists for this event."),
-    "uq_users_phone_hash": (DuplicateError, 409, "A user with this phone number already exists."),
-    "uq_availability_rule": (DuplicateError, 409, "This availability rule already exists."),
-    "uq_availability_exception": (DuplicateError, 409, "An exception for this date already exists."),
-    "ex_assignments_no_overlap": (ScheduleConflictError, 409, "You already have an overlapping shift during this time window."),
+_CONSTRAINT_ERROR_MAP: dict[str, tuple[type, int, str, str]] = {
+    "uq_event_application_active": (DuplicateError, 409, "duplicate_application", "You already have an active application for this event."),
+    "uq_assignment_active": (DuplicateError, 409, "duplicate_assignment", "This volunteer is already assigned to this event."),
+    "uq_assignment_application": (DuplicateError, 409, "duplicate_assignment", "This application already has an active assignment."),
+    "uq_assignment_group_leader": (DuplicateError, 409, "duplicate_group_leader", "This group already has an assigned team leader."),
+    "uq_feedback_event_once": (DuplicateError, 409, "duplicate_feedback", "You have already submitted feedback for this shift."),
+    "uq_feedback_user_once": (DuplicateError, 409, "duplicate_feedback", "You have already submitted feedback for this person."),
+    "uq_onboarding_ack_user_event_ver": (DuplicateError, 409, "already_acknowledged", "You have already acknowledged this version of the briefing."),
+    "uq_attendance_event_user": (DuplicateError, 409, "duplicate_attendance", "Attendance record already exists for this event."),
+    "uq_users_phone_hash": (DuplicateError, 409, "duplicate_user", "A user with this phone number already exists."),
+    "uq_availability_rule": (DuplicateError, 409, "duplicate_availability_rule", "This availability rule already exists."),
+    "uq_availability_exception": (DuplicateError, 409, "duplicate_availability_exception", "An exception for this date already exists."),
+    "ex_assignments_no_overlap": (ScheduleConflictError, 409, "schedule_conflict", "You already have an overlapping shift during this time window."),
 }
 
 
@@ -321,21 +322,22 @@ def translate_db_exception(exc: Exception) -> DomainError:
     Translate a PostgreSQL exception into a DomainError.
 
     Parses the error message for trigger-raised codes (format: "code: detail")
-    and constraint names from IntegrityError.
+    and constraint names from IntegrityError. Strips internal PL/pgSQL call stacks (CONTEXT:).
     """
     error_msg = str(exc)
+    first_line = error_msg.split("\n")[0].strip()
 
     # Check for trigger-raised errors (format: "code_prefix: detail message")
     for prefix, (exc_class, status_code) in _PG_ERROR_MAP.items():
-        if error_msg.startswith(f"{prefix}:") or error_msg.startswith(f"{prefix} "):
-            detail = error_msg[len(prefix):].lstrip(": ").strip()
+        if first_line.startswith(f"{prefix}:") or first_line.startswith(f"{prefix} "):
+            detail = first_line[len(prefix):].lstrip(": ").strip()
             return exc_class(message=detail or exc_class.default_message, code=prefix, status_code=status_code)
 
     # Check for constraint violations in IntegrityError
     if isinstance(exc, IntegrityError):
-        for constraint_name, (exc_class, status_code, message) in _CONSTRAINT_ERROR_MAP.items():
+        for constraint_name, (exc_class, status_code, domain_code, message) in _CONSTRAINT_ERROR_MAP.items():
             if constraint_name in error_msg:
-                return exc_class(message=message, code=constraint_name, status_code=status_code)
+                return exc_class(message=message, code=domain_code, status_code=status_code)
 
         logger.warning("Unhandled IntegrityError: %s", error_msg)
         return ConflictError(

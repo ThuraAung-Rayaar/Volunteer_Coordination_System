@@ -157,6 +157,9 @@ class HandoverSerializer(serializers.Serializer):
     reason = serializers.CharField(required=False, allow_blank=True, default="")
 
 
+CoordinatorHandoverSerializer = HandoverSerializer
+
+
 class RetakeSerializer(serializers.Serializer):
     reason = serializers.CharField(required=False, allow_blank=True, default="Owner retook coordination")
 
@@ -182,9 +185,44 @@ class AutoAssignResultSerializer(serializers.Serializer):
     remaining_unassigned = serializers.IntegerField(read_only=True)
 
 
+class CoordinatorApplicationListSerializer(serializers.Serializer):
+    id = serializers.IntegerField(read_only=True)
+    user_id = serializers.IntegerField(read_only=True)
+    display_name = serializers.CharField(read_only=True)
+    post_id = serializers.IntegerField(read_only=True, allow_null=True)
+    post_title = serializers.CharField(read_only=True, allow_null=True)
+    source = serializers.CharField(read_only=True)
+    status = serializers.CharField(read_only=True)
+    applied_at = serializers.DateTimeField(read_only=True)
+    decided_at = serializers.DateTimeField(read_only=True, allow_null=True)
+    decided_by_id = serializers.IntegerField(read_only=True, allow_null=True)
+    skills = serializers.ListField(child=serializers.CharField(), required=False)
+    physical_ok = serializers.BooleanField(required=False)
+    can_lift_heavy = serializers.BooleanField(required=False)
+    has_leader_experience = serializers.BooleanField(required=False)
+    new_to_volunteer = serializers.BooleanField(required=False)
+
+
+class CoordinatorAssignmentListSerializer(serializers.Serializer):
+    id = serializers.IntegerField(read_only=True)
+    user_id = serializers.IntegerField(read_only=True)
+    display_name = serializers.CharField(read_only=True)
+    post_id = serializers.IntegerField(read_only=True, allow_null=True)
+    post_title = serializers.CharField(read_only=True, allow_null=True)
+    group_code = serializers.CharField(read_only=True, allow_null=True)
+    is_group_leader = serializers.BooleanField(read_only=True)
+    status = serializers.CharField(read_only=True)
+    assigned_by = serializers.CharField(read_only=True)
+    schedule_start = serializers.DateTimeField(read_only=True)
+    schedule_end = serializers.DateTimeField(read_only=True)
+    confirmed_at = serializers.DateTimeField(read_only=True, allow_null=True)
+
+
 __all__ = [
     "AutoAssignResultSerializer",
     "CancelEventSerializer",
+    "CoordinatorApplicationListSerializer",
+    "CoordinatorAssignmentListSerializer",
     "EventCreateSerializer",
     "EventListSerializer",
     "EventPostCreateSerializer",
@@ -193,6 +231,7 @@ __all__ = [
     "EventSummarySerializer",
     "EventUpdateSerializer",
     "HandoverSerializer",
+    "CoordinatorHandoverSerializer",
     "ManualAssignSerializer",
     "RetakeSerializer",
 ]

@@ -16,7 +16,7 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-from django.db import connection
+from django.db import connection, transaction
 from django.db.models import Q
 
 from apps.events.models import EventCharityFields, Events, CharityFields
@@ -74,12 +74,13 @@ def _is_approved_coordinator(user_id: int) -> bool:
 
 def _replace_charity_fields(event: Events, charity_codes: list[str]) -> None:
     """Atomically replace an event's charity field associations."""
-    if charity_codes:
+    unique_codes = sorted(set(charity_codes or []))
+    if unique_codes:
         valid = set(
-            CharityFields.objects.filter(active=True, code__in=charity_codes)
+            CharityFields.objects.filter(active=True, code__in=unique_codes)
             .values_list("code", flat=True)
         )
-        invalid = set(charity_codes) - valid
+        invalid = set(unique_codes) - valid
         if invalid:
             raise DomainError(
                 code="invalid_charity_field",
@@ -87,7 +88,7 @@ def _replace_charity_fields(event: Events, charity_codes: list[str]) -> None:
                 status_code=400,
             )
     EventCharityFields.objects.filter(event=event).delete()
-    for code in (charity_codes or []):
+    for code in unique_codes:
         EventCharityFields.objects.create(event=event, field_code_id=code)
 
 
@@ -95,6 +96,7 @@ def _replace_charity_fields(event: Events, charity_codes: list[str]) -> None:
 # Event Creation
 # ---------------------------------------------------------------------------
 
+@transaction.atomic
 def create_event(
     coordinator_user,
     validated_data: dict,
@@ -134,6 +136,7 @@ def create_event(
 # Event Editing
 # ---------------------------------------------------------------------------
 
+@transaction.atomic
 def update_event(
     actor,
     event_id: int,
@@ -172,6 +175,7 @@ def update_event(
 # Event Lifecycle Transitions
 # ---------------------------------------------------------------------------
 
+@transaction.atomic
 def transition_event_status(
     actor,
     event_id: int,
@@ -234,6 +238,7 @@ def cancel_event(actor, event_id: int, reason: Optional[str] = None) -> Events:
 # Coordinator Handover & Owner Retake
 # ---------------------------------------------------------------------------
 
+@transaction.atomic
 def handover_event_coordinator(
     actor,
     event_id: int,
@@ -271,6 +276,7 @@ def handover_event_coordinator(
     return event
 
 
+@transaction.atomic
 def retake_event_coordinator(
     owner_user,
     event_id: int,
@@ -310,6 +316,10 @@ def retake_event_coordinator(
     event.refresh_from_db()
     logger.info("Event coordination retaken by owner", extra={"event_id": event_id, "owner_id": owner_user.id})
     return event
+
+
+handover_event = handover_event_coordinator
+retake_event = retake_event_coordinator
 
 
 # ---------------------------------------------------------------------------

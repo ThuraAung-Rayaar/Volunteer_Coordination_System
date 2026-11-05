@@ -1,8 +1,15 @@
 from rest_framework import serializers
 
 from apps.accounts.models import UserVerificationImages
-from apps.events.models import VEventSummary, VPublicEvents
+from apps.events.models import CharityFields, VEventSummary, VPublicEvents
 from common.permissions import AllowListSerializerMixin
+
+
+class CharityFieldSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CharityFields
+        fields = ["code", "label", "sort_order"]
+        read_only_fields = fields
 
 
 class PublicEventSerializer(serializers.ModelSerializer):
@@ -53,6 +60,47 @@ class PublicEventPostSerializer(serializers.Serializer):
     required_headcount = serializers.IntegerField(read_only=True)
     assigned_count = serializers.IntegerField(read_only=True)
     remaining = serializers.IntegerField(read_only=True)
+
+
+class PublicEventDetailSerializer(serializers.Serializer):
+    id = serializers.IntegerField(read_only=True)
+    title = serializers.CharField(read_only=True)
+    description = serializers.CharField(read_only=True, allow_null=True)
+    purpose_type = serializers.CharField(read_only=True)
+    location_name = serializers.CharField(read_only=True, allow_null=True)
+    landmark_text = serializers.CharField(read_only=True, allow_null=True)
+    latitude = serializers.DecimalField(max_digits=9, decimal_places=6, read_only=True, allow_null=True)
+    longitude = serializers.DecimalField(max_digits=9, decimal_places=6, read_only=True, allow_null=True)
+    geo_radius_m = serializers.IntegerField(read_only=True, allow_null=True)
+    geo_checkin_enabled = serializers.BooleanField(read_only=True)
+    map_provider = serializers.CharField(read_only=True)
+    start_at = serializers.DateTimeField(read_only=True)
+    end_at = serializers.DateTimeField(read_only=True)
+    application_deadline = serializers.DateTimeField(read_only=True, allow_null=True)
+    status = serializers.CharField(read_only=True)
+    acceptance_mode = serializers.CharField(read_only=True)
+    max_participants = serializers.IntegerField(read_only=True, allow_null=True)
+    meals_provided = serializers.BooleanField(read_only=True)
+    lodging_provided = serializers.BooleanField(read_only=True)
+    travel_support_provided = serializers.BooleanField(read_only=True)
+    compensation_kind = serializers.CharField(read_only=True)
+    coordinator_name = serializers.CharField(read_only=True, allow_null=True)
+    charity_fields = serializers.ListField(child=serializers.CharField(), read_only=True)
+    spots_remaining = serializers.IntegerField(read_only=True)
+    posts = PublicEventPostSerializer(many=True, read_only=True, required=False)
+
+    onboarding_text = serializers.CharField(read_only=True, allow_null=True, required=False)
+    onboarding_version = serializers.IntegerField(read_only=True, required=False)
+    compensation_note = serializers.CharField(read_only=True, allow_null=True, required=False)
+
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        can_access_t2 = self.context.get("can_access_t2", False)
+        if not can_access_t2:
+            ret.pop("onboarding_text", None)
+            ret.pop("onboarding_version", None)
+            ret.pop("compensation_note", None)
+        return ret
 
 
 class EventSummarySerializer(serializers.ModelSerializer):
@@ -184,6 +232,47 @@ class AvailabilityCheckSerializer(serializers.Serializer):
     end_at = serializers.DateTimeField()
 
 
+class UserPublicCardSerializer(serializers.Serializer):
+    """T1 Minimal Public Card (W24)."""
+    uuid = serializers.UUIDField(read_only=True)
+    display_name = serializers.CharField(read_only=True)
+
+
+class UserT2CoordinatorCardSerializer(serializers.Serializer):
+    """T2 Event-Scoped Volunteer Card for coordinators (W24)."""
+    id = serializers.IntegerField(read_only=True)
+    uuid = serializers.UUIDField(read_only=True)
+    display_name = serializers.CharField(read_only=True)
+    skills = serializers.ListField(child=serializers.CharField(), read_only=True)
+    physical_ok = serializers.BooleanField(read_only=True)
+    good_eyesight = serializers.BooleanField(read_only=True)
+    needs_glasses = serializers.BooleanField(read_only=True)
+    can_lift_heavy = serializers.BooleanField(read_only=True)
+    can_work_outdoor = serializers.BooleanField(read_only=True)
+    has_leader_experience = serializers.BooleanField(read_only=True)
+    new_to_volunteer = serializers.BooleanField(read_only=True)
+    preferred_language = serializers.CharField(read_only=True)
+    home_area = serializers.CharField(read_only=True, allow_null=True)
+    needs_meal_support = serializers.BooleanField(read_only=True)
+    needs_travel_support = serializers.BooleanField(read_only=True)
+    accepts_unpaid = serializers.BooleanField(read_only=True)
+    verification_status = serializers.CharField(read_only=True)
+    assignment_status = serializers.CharField(read_only=True, allow_null=True)
+    event_id = serializers.IntegerField(read_only=True, allow_null=True)
+
+
+class AvailabilitySerializer(serializers.Serializer):
+    """Composite serializer for rules and exceptions."""
+    rules = AvailabilityRuleSerializer(many=True, read_only=True)
+    exceptions = AvailabilityExceptionSerializer(many=True, read_only=True)
+
+
+# Aliases for specification naming compatibility
+ProfileSerializer = UserProfileSerializer
+UserByUuidSerializer = UserPublicCardSerializer
+
+
+
 # ---------------------------------------------------------------------------
 # Phase 4 Identity Verification & Coordinator Serializers
 # ---------------------------------------------------------------------------
@@ -280,4 +369,21 @@ class AssignmentCancelSerializer(serializers.Serializer):
     reason = serializers.CharField(required=False, allow_blank=True, default="")
 
 
+class VolunteerAssignmentListSerializer(serializers.Serializer):
+    id = serializers.IntegerField(read_only=True)
+    event_id = serializers.IntegerField(read_only=True)
+    event_title = serializers.CharField(read_only=True)
+    event_status = serializers.CharField(read_only=True)
+    post_id = serializers.IntegerField(read_only=True, allow_null=True)
+    post_title = serializers.CharField(read_only=True, allow_null=True)
+    group_code = serializers.CharField(read_only=True, allow_null=True)
+    is_group_leader = serializers.BooleanField(read_only=True)
+    status = serializers.CharField(read_only=True)
+    schedule_start = serializers.DateTimeField(read_only=True)
+    schedule_end = serializers.DateTimeField(read_only=True)
+    confirmed_at = serializers.DateTimeField(read_only=True, allow_null=True)
+
+
 ApplicationCancelSerializer = AssignmentCancelSerializer
+VolunteerApplicationListSerializer = ApplicationStatusSerializer
+

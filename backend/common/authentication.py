@@ -36,9 +36,15 @@ class BlockedAwareTokenAuthentication(TokenAuthentication):
     def authenticate_credentials(self, key):
         from django.db import connection
 
-        user, token = super().authenticate_credentials(key)
+        model = self.get_model()
+        try:
+            token = model.objects.select_related("user").get(key=key)
+        except model.DoesNotExist:
+            raise AuthenticationFailed("Invalid token.")
 
-        # Lazy block expiry: if blocked_until has passed, release the block
+        user = token.user
+
+        # Lazy block expiry: if blocked_until has passed, release the block in PostgreSQL
         if getattr(user, "account_status", "") == "blocked" and getattr(user, "blocked_until", None) is not None:
             if user.blocked_until <= timezone.now():
                 with connection.cursor() as cursor:

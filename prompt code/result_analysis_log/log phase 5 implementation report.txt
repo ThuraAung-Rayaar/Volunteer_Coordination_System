@@ -1,0 +1,143 @@
+Ran check prompt log directory
+Analyzed log phase5.md:L1-100
+Analyzed log phase5.md:L101-151
+Analyzed ref_phase5.md:L1-80
+Ran find Domain 6 and 7 in spec
+Analyzed event_service.py:L1-100
+Analyzed event_service.py:L101-200
+Analyzed event_service.py:L201-350
+Analyzed event_post_service.py:L1-100
+Analyzed event_post_service.py:L101-180
+Analyzed views.py:L50-160
+Analyzed views.py:L161-210
+Analyzed test_phase5.py:L1-100
+Ran run test_phase5
+Ran find change_event_coordinator definition
+Ran check event_coordinator_history triggers
+Ran check permissions helpers
+Analyzed permissions.py:L135-160
+Ran check exception handler in common
+Ran check frozen_event in exceptions.py
+Ran check frozen_event in exceptions.py
+Ran check frozen_event in SQL
+Ran find trg_events_before_update in SQL
+
+Error: API error (attempt 1): request failed: stream idle timeout (5m0s): context deadline exceeded (Error ID: 63057a8c-56bd-46ed-88f8-04472e88f515-1188)
+
+Analyzed updated_volunteer_coordination_system_Database.sql:L2110-2145
+Analyzed test_phase5.py:L100-250
+Analyzed test_phase5.py:L251-360
+Analyzed serializers.py:L1-100
+Analyzed serializers.py:L101-150
+Created phase5_implementation_review.md
+
+# Phase 5 Implementation Review: Event Lifecycle, Posts, Handover, Owner-as-Monitor & Retake
+
+The senior code review for **Phase 5** (`Domain 6`: Event Lifecycle, Handover, Owner-as-Monitor & Retake; `Domain 7`: Event Posts / Role Definitions — Business Rules `W41`–`W63`) has been completed.
+
+The complete review report is saved to [`phase5_implementation_review.md`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/prompt%20code/prompt_result_analysis/phase5_implementation_review.md).
+
+---
+
+### 1. Overall Assessment: CONDITIONAL APPROVAL / HIGH COMPLIANCE
+
+The Phase 5 implementation demonstrates exceptional architectural rigor and strict fidelity to the database-first design:
+- **PostgreSQL-Authoritative State Machine**: Lifecycle transitions (`draft -> published -> active -> completed`, cancellation from any non-terminal state) and publish gates (`publish_requires_post`, `publish_requires_future_start`) are enforced authoritatively by trigger `trg_01_events_before_update`.
+- **Owner-as-Monitor Security Pattern (`W50`–`W53`)**: Implemented cleanly in [`get_event_for_manager_or_404`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/common/permissions.py#L118-L159). When coordination is delegated (`owner_id != current_coordinator_id`), the owner is locked into read-only monitor mode ([`OwnerMonitorReadOnlyError`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/common/exceptions.py), HTTP 403 `owner_monitor_readonly`), with only one permitted write action: calling Retake ([`retake_event_coordinator`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/services/event_service.py#L274)).
+- **Database Trigger-Driven Coordinator History**: Handover operations delegate strictly to SQL function `change_event_coordinator()`, which records immutable audit history in `event_coordinator_history` via `trg_50_events_after_update`.
+- **Live Capacity via SQL View (`W62`)**: Role post capacity and remaining seats are read directly from PostgreSQL view `v_event_post_capacity`. Python code performs zero manual calculations of headcounts or filled places.
+- **Onboarding Auto-Versioning (`W124`)**: Updating `onboarding_text` triggers an automatic increment of `onboarding_version` via database triggers.
+- **Test Suite Status**: All 28 existing tests in [`backend/apps/events/tests/test_phase5.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/apps/events/tests/test_phase5.py) pass cleanly.
+
+---
+
+### 2. Findings by Severity
+
+```
+CRITICAL : 0
+HIGH     : 0
+MEDIUM   : 2
+LOW      : 2
+```
+
+#### 🟡 MEDIUM Findings
+1. **Finding 2.1 — Missing Transaction Atomicity Boundaries on Mutating Event Services**:
+   - In [`event_service.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/services/event_service.py) (`create_event`, `update_event`, `transition_event_status`, `handover_event_coordinator`, `retake_event_coordinator`) and [`event_post_service.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/services/event_post_service.py) (`create_event_post`, `update_event_post`, `close_event_post`), operations are not wrapped with `@transaction.atomic`. If secondary operations (like charity field replacement or downstream trigger cascades) fail, partial state could persist.
+2. **Finding 2.2 — Missing Automated Test Coverage for Event Completion & Cancellation Cascades (`W45`, `W46`)**:
+   - While status transitions are tested, `test_phase5.py` does not assert that `trg_50_events_after_update` properly cascades to active assignments, attendance records, and applications when an event transitions to `completed` or `cancelled`.
+
+#### 🟢 LOW Findings
+3. **Finding 2.3 — Deduplication of `charity_codes` in `_replace_charity_fields`**:
+   - Supplying duplicate charity codes (e.g. `["teaching", "teaching"]`) causes a unique constraint violation on `uq_event_charity_field`. Codes should be deduplicated via `set()` before insertion.
+4. **Finding 2.4 — Missing Automated Test for Past-Date Publish Gate (`publish_requires_future_start`)**:
+   - `publish_requires_post` is tested, but attempting to publish an event with `start_at <= now()` lacks an explicit test.
+
+---
+
+### 3. Exact Affected Files
+
+- [`backend/services/event_service.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/services/event_service.py)
+- [`backend/services/event_post_service.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/services/event_post_service.py)
+- [`backend/apps/events/tests/test_phase5.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/apps/events/tests/test_phase5.py)
+
+---
+
+### 4. Recommended Corrections
+
+```python
+# 1. In backend/services/event_service.py & event_post_service.py:
+from django.db import transaction
+
+@transaction.atomic
+def create_event(coordinator_user, validated_data: dict, charity_codes: Optional[list[str]] = None) -> Events:
+    ...
+
+@transaction.atomic
+def update_event(actor, event_id: int, validated_data: dict, charity_codes: Optional[list[str]] = None) -> Events:
+    ...
+
+# 2. In _replace_charity_fields:
+def _replace_charity_fields(event: Events, charity_codes: list[str]) -> None:
+    unique_codes = sorted(set(charity_codes or []))
+    ...
+```
+
+---
+
+### 5. Missing Tests That Should Be Added
+
+1. `test_publish_with_past_start_date_fails`: Verify `publish_requires_future_start` trigger rejection when publishing an event in the past.
+2. `test_create_event_with_duplicate_charity_codes`: Verify duplicate codes in charity array are safely deduplicated.
+3. `test_complete_event_cascades_assignments`: Verify trigger `trg_50_events_after_update` completion cascades.
+
+---
+
+### 6. Acceptance Criteria Satisfaction
+
+| Rule ID | Requirement Description | Operational Mechanism | Status |
+| :--- | :--- | :--- | :---: |
+| **`W41`** | Coordinator Event Creation | `create_event()`, `trg_01_events_before_insert` sets `draft`, `version=1` | **SATISFIED** |
+| **`W42`** | Manager Event Editing | `update_event()`, restricted to write managers | **SATISFIED** |
+| **`W43`** | Event Publish Gate | `publish_event()`, requires $\ge 1$ post and future `start_at` | **SATISFIED** |
+| **`W44`** | Event Activation | `activate_event()`, transitions `published -> active` | **SATISFIED** |
+| **`W45`** | Event Completion Cascade | `complete_event()`, cascades assignments & attendance | **SATISFIED** |
+| **`W46`** | Event Cancellation Cascade | `cancel_event()`, cascades cancellations | **SATISFIED** |
+| **`W50`** | Coordinator Handover | `handover_event_coordinator()` delegates to SQL `change_event_coordinator` | **SATISFIED** |
+| **`W51`** | Owner Retake Authority | `retake_event_coordinator()`, owner reclaims authority | **SATISFIED** |
+| **`W52`** | Owner-as-Monitor State | `get_event_for_manager_or_404(require_write=True)` raises `OwnerMonitorReadOnlyError` | **SATISFIED** |
+| **`W53`** | Handover Audit History | `event_coordinator_history` logs initial coordinator and each handover | **SATISFIED** |
+| **`W54`** | Owner Immutability | `trg_01_events_before_update` enforces `owner_id` is immutable | **SATISFIED** |
+| **`W55`** | Frozen Event Modification Block | Modifying completed/cancelled events raises `event_frozen` | **SATISFIED** |
+| **`W57`** | Publish Future Start Date Guard | `publish_requires_future_start` trigger block | **SATISFIED** |
+| **`W58`** | Publish Post Existence Guard | `publish_requires_post` trigger block | **SATISFIED** |
+| **`W59`** | Event Role Post Creation | `create_event_post()`, initial status `'open'` | **SATISFIED** |
+| **`W60`** | Event Role Post Modification | `update_event_post()`, respects headcount floor | **SATISFIED** |
+| **`W61`** | Event Role Post Closure | `close_event_post()`, transitions status to `'closed'` | **SATISFIED** |
+| **`W62`** | Live Post Capacity Reading | `get_event_posts_with_capacity()` reads `v_event_post_capacity` | **SATISFIED** |
+| **`W63`** | Post Event Immutability | Post cannot change `event_id` (trigger-enforced) | **SATISFIED** |
+| **`W124`**| Onboarding Text Version Bump | Changing `onboarding_text` auto-bumps `onboarding_version` | **SATISFIED** |
+
+---
+
+> [!IMPORTANT]
+> **Protocol Confirmation**: In accordance with the review protocol, **no files have been modified yet**. Please confirm if you approve these recommended corrections and supplementary test additions, or provide your next prompt (e.g. Phase 5 Testing Prompt).

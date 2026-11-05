@@ -11,18 +11,29 @@ Tests cover:
 7. BlockedAwareTokenAuthentication
 """
 
+import io
+import os
+import re
 import secrets
+import shutil
+import time
+import uuid
 from datetime import timedelta
+from pathlib import Path
+from PIL import Image
+from django.conf import settings
 from django.test import TestCase, TransactionTestCase, RequestFactory
 from django.db import connection, IntegrityError, transaction
 from django.contrib.auth import get_user_model
 from django.utils import timezone
+from rest_framework import serializers
 from rest_framework.test import APIRequestFactory
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.authtoken.models import Token
 
 from common.db_context import (
     set_db_session_context,
+    get_db_session_context,
     get_client_ip,
     clear_db_session_context,
     set_system_actor_context,
@@ -37,6 +48,7 @@ from common.transactions import (
 )
 from common.exceptions import (
     DomainError,
+    ValidationError,
     PermissionDeniedError,
     ResourceMaskedNotFound,
     OwnerMonitorReadOnlyError,
@@ -45,6 +57,7 @@ from common.exceptions import (
     DuplicateError,
     translate_db_exception,
     custom_exception_handler,
+    log_security_event,
 )
 from common.permissions import (
     ensure_active_user,
@@ -57,6 +70,7 @@ from common.permissions import (
     IsActiveUser,
     IsAdminUser,
     IsApprovedCoordinator,
+    AllowListSerializerMixin,
 )
 from common.privacy import (
     PrivacyTier,
@@ -71,6 +85,7 @@ from common.privacy import (
 from common.security import (
     normalize_phone,
     compute_phone_hash,
+    hash_phone,
     encrypt_phone,
     decrypt_phone,
     compute_otp_hash,
@@ -79,7 +94,12 @@ from common.security import (
     hash_qr_token,
     redact_sensitive_data,
 )
-from common.utils import normalize_tags, truncate_string, safe_int
+from common.utils import (
+    normalize_tags,
+    truncate_string,
+    safe_int,
+    sanitize_and_save_verification_jpeg,
+)
 from common.authentication import BlockedAwareTokenAuthentication
 
 User = get_user_model()
@@ -575,6 +595,32 @@ class TestPrivacy(TestCase):
         """T4 data requires admin status."""
         self.assertFalse(can_access_t4_data(self.active_user))
 
+    def test_t2_volunteer_card_field_masking(self):
+        """T2 volunteer card extracts only event-scoped semi-private fields."""
+        card = get_t2_volunteer_card(self.active_user)
+        self.assertIn("skills", card)
+        self.assertIn("display_name", card)
+        self.assertIn("preferred_language", card)
+        self.assertNotIn("phone_hash", card)
+        self.assertNotIn("phone_enc", card)
+        self.assertNotIn("password", card)
+        self.assertNotIn("blood_type", card)
+
+    def test_in_memory_tier_filtering_has_zero_db_queries(self):
+        """Evaluating in-memory privacy tier filtering over list collections performs 0 SQL queries (avoids N+1)."""
+        volunteers = [
+            {"id": i, "display_name": f"Vol {i}", "phone_hash": "secret", "skills": ["aid"]}
+            for i in range(50)
+        ]
+        with self.assertNumQueries(0):
+            filtered = [
+                filter_fields_for_tier(v, {"id", "display_name", "skills"})
+                for v in volunteers
+            ]
+        self.assertEqual(len(filtered), 50)
+        for v in filtered:
+            self.assertNotIn("phone_hash", v)
+
 
 # =============================================================================
 # SECURITY TESTS
@@ -723,3 +769,406 @@ class TestAuthentication(TestCase):
         with transaction.atomic():
             with self.assertRaises(AuthenticationFailed):
                 self.auth.authenticate(request)
+
+
+# =============================================================================
+# IMAGE SANITIZATION TESTS (BR-SEC-05)
+# =============================================================================
+
+class TestImageSanitization(TestCase):
+    """Test JPEG verification document intake and sanitization."""
+
+    def setUp(self):
+        self.user_uuid = str(uuid.uuid4())
+        self.sample_root_jpg = Path(settings.BASE_DIR).parent / "JPEG_example_flower.jpg"
+        if not self.sample_root_jpg.exists():
+            self.sample_root_jpg = Path("JPEG_example_flower.jpg")
+
+    def tearDown(self):
+        # Clean up any created directories under VERIFICATION_MEDIA_ROOT
+        target_dir = Path(settings.VERIFICATION_MEDIA_ROOT) / self.user_uuid
+        if target_dir.exists():
+            shutil.rmtree(target_dir, ignore_errors=True)
+
+    def test_sanitize_valid_root_jpeg(self):
+        """Valid JPEG from project root is sanitized, stripped of EXIF, and saved with SHA-256."""
+        self.assertTrue(self.sample_root_jpg.exists(), f"Sample image not found at {self.sample_root_jpg}")
+
+        with open(self.sample_root_jpg, "rb") as f:
+            rel_path, sha256_hex = sanitize_and_save_verification_jpeg(
+                user_uuid=self.user_uuid,
+                image_type="mock_selfie",
+                uploaded_file=f,
+            )
+
+        self.assertTrue(rel_path.startswith(f"{self.user_uuid}/mock_selfie_"))
+        self.assertTrue(rel_path.endswith(".jpg"))
+        self.assertEqual(len(sha256_hex), 64)
+        self.assertRegex(sha256_hex, r"^[0-9a-f]{64}$")
+
+        saved_path = Path(settings.VERIFICATION_MEDIA_ROOT) / rel_path
+        self.assertTrue(saved_path.exists())
+
+        # Verify saved file is a valid JPEG
+        with Image.open(saved_path) as saved_img:
+            self.assertEqual(saved_img.format, "JPEG")
+            self.assertEqual(saved_img.mode, "RGB")
+            # Verify EXIF is stripped
+            exif_data = saved_img.getexif()
+            self.assertEqual(len(exif_data), 0)
+
+    def test_sanitize_image_dimension_bounds(self):
+        """Images below 200px or above 6000px are rejected."""
+        # Test image too small (100x100)
+        small_buf = io.BytesIO()
+        small_img = Image.new("RGB", (100, 100), color="blue")
+        small_img.save(small_buf, format="JPEG")
+        small_buf.seek(0)
+
+        with self.assertRaises(ValidationError) as ctx:
+            sanitize_and_save_verification_jpeg(self.user_uuid, "mock_selfie", small_buf)
+        self.assertEqual(ctx.exception.code, "image_too_small")
+
+        # Test image too large (6001x300)
+        large_buf = io.BytesIO()
+        large_img = Image.new("RGB", (6001, 300), color="green")
+        large_img.save(large_buf, format="JPEG")
+        large_buf.seek(0)
+
+        with self.assertRaises(ValidationError) as ctx:
+            sanitize_and_save_verification_jpeg(self.user_uuid, "mock_selfie", large_buf)
+        self.assertEqual(ctx.exception.code, "image_too_large")
+
+        # Test exact lower boundary (200x200) passes
+        boundary_buf = io.BytesIO()
+        boundary_img = Image.new("RGB", (200, 200), color="red")
+        boundary_img.save(boundary_buf, format="JPEG")
+        boundary_buf.seek(0)
+
+        rel_path, sha_hex = sanitize_and_save_verification_jpeg(self.user_uuid, "mock_selfie", boundary_buf)
+        self.assertTrue(rel_path.endswith(".jpg"))
+
+    def test_sanitize_path_traversal_protection(self):
+        """Path traversal patterns in user_uuid are strictly rejected."""
+        buf = io.BytesIO()
+        img = Image.new("RGB", (300, 300), color="white")
+        img.save(buf, format="JPEG")
+        buf.seek(0)
+
+        malicious_uuids = [
+            "../../etc/passwd",
+            "../user_data",
+            "not-a-valid-uuid",
+            "",
+            "12345",
+        ]
+        for bad_uuid in malicious_uuids:
+            buf.seek(0)
+            with self.assertRaises(ValidationError) as ctx:
+                sanitize_and_save_verification_jpeg(bad_uuid, "mock_selfie", buf)
+            self.assertEqual(ctx.exception.code, "invalid_uuid")
+
+    def test_sanitize_invalid_file_types(self):
+        """Zero-byte files, non-images, and corrupted binaries are rejected."""
+        # Zero byte
+        zero_buf = io.BytesIO(b"")
+        with self.assertRaises(ValidationError) as ctx:
+            sanitize_and_save_verification_jpeg(self.user_uuid, "mock_selfie", zero_buf)
+        self.assertIn(ctx.exception.code, ["empty_file", "invalid_image"])
+
+        # Plain text
+        text_buf = io.BytesIO(b"This is not a JPEG image file.")
+        with self.assertRaises(ValidationError) as ctx:
+            sanitize_and_save_verification_jpeg(self.user_uuid, "mock_selfie", text_buf)
+        self.assertEqual(ctx.exception.code, "invalid_image")
+
+        # Corrupted binary header
+        corrupt_buf = io.BytesIO(b"\xff\xd8\xff\x00\x11\x22\x33\x44")
+        with self.assertRaises(ValidationError) as ctx:
+            sanitize_and_save_verification_jpeg(self.user_uuid, "mock_selfie", corrupt_buf)
+        self.assertEqual(ctx.exception.code, "invalid_image")
+
+    def test_sanitize_invalid_image_type(self):
+        """Disallowed image types are rejected."""
+        buf = io.BytesIO()
+        img = Image.new("RGB", (300, 300), color="yellow")
+        img.save(buf, format="JPEG")
+        buf.seek(0)
+
+        with self.assertRaises(ValidationError) as ctx:
+            sanitize_and_save_verification_jpeg(self.user_uuid, "malicious_type", buf)
+        self.assertEqual(ctx.exception.code, "invalid_image_type")
+
+
+# =============================================================================
+# SERIALIZER ALLOWLIST TESTS (BR-SEC-04)
+# =============================================================================
+
+class TestAllowListSerializer(TestCase):
+    """Test AllowListSerializerMixin parameter filtering."""
+
+    class ExampleSerializer(AllowListSerializerMixin, serializers.Serializer):
+        id = serializers.IntegerField(read_only=True)
+        display_name = serializers.CharField(max_length=50)
+        skills = serializers.ListField(child=serializers.CharField(), required=False)
+
+    def test_allow_list_valid_payload(self):
+        """Declared writable fields pass validation."""
+        serializer = self.ExampleSerializer(data={"display_name": "Volunteer A", "skills": ["first_aid"]})
+        self.assertTrue(serializer.is_valid())
+        self.assertEqual(serializer.validated_data["display_name"], "Volunteer A")
+
+    def test_allow_list_undeclared_fields_rejected(self):
+        """Undeclared parameters are rejected with HTTP 400."""
+        serializer = self.ExampleSerializer(data={
+            "display_name": "Volunteer A",
+            "is_admin": True,
+            "account_status": "active",
+        })
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("is_admin", serializer.errors)
+        self.assertIn("account_status", serializer.errors)
+
+    def test_allow_list_readonly_fields_rejected_in_request_body(self):
+        """Read-only fields submitted in incoming data are rejected."""
+        serializer = self.ExampleSerializer(data={"id": 42, "display_name": "Volunteer A"})
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("id", serializer.errors)
+        self.assertIn("Read-only field cannot be modified.", str(serializer.errors["id"]))
+
+
+# =============================================================================
+# LAZY BLOCK EXPIRY TESTS (BR-SEC-02)
+# =============================================================================
+
+class TestLazyBlockExpiry(TransactionTestCase):
+    """Test BlockedAwareTokenAuthentication lazy block release."""
+
+    def setUp(self):
+        self.auth = BlockedAwareTokenAuthentication()
+
+    def test_lazy_block_release_on_expired_blocked_user(self):
+        """User whose blocked_until has passed is automatically unblocked upon token auth."""
+        user = User.objects.create(
+            phone_hash=secrets.token_hex(32),
+            phone_enc="enc_lazy",
+            display_name="Lazy Expired User",
+            account_status="blocked",
+            blocked_until=timezone.now() - timedelta(minutes=10),
+        )
+        token = Token.objects.create(user=user)
+
+        authenticated_user, auth_token = self.auth.authenticate_credentials(token.key)
+        self.assertEqual(authenticated_user.id, user.id)
+        self.assertEqual(authenticated_user.account_status, "active")
+        self.assertTrue(authenticated_user.is_active)
+        self.assertIsNone(authenticated_user.blocked_until)
+
+        # Cleanup
+        user.delete()
+
+    def test_unexpired_blocked_user_remains_blocked(self):
+        """User whose blocked_until is in the future remains blocked and is rejected."""
+        user = User.objects.create(
+            phone_hash=secrets.token_hex(32),
+            phone_enc="enc_future",
+            display_name="Future Blocked User",
+            account_status="blocked",
+            blocked_until=timezone.now() + timedelta(hours=2),
+        )
+        token = Token.objects.create(user=user)
+
+        with self.assertRaises(AuthenticationFailed):
+            self.auth.authenticate_credentials(token.key)
+
+        user.refresh_from_db()
+        self.assertEqual(user.account_status, "blocked")
+        user.delete()
+
+
+# =============================================================================
+# SECURITY AUDIT LOGGING INTEGRATION (BR-SEC-01)
+# =============================================================================
+
+class TestSecurityAuditLogging(TransactionTestCase):
+    """Test log_security_event with database integration."""
+
+    def test_log_security_event_empty_ip_coerced_to_null(self):
+        """Empty client IP string is coerced to SQL NULL without INET syntax error."""
+        factory = RequestFactory()
+        request = factory.get("/", REMOTE_ADDR="")
+
+        action_name = f"security.test.empty_ip_{secrets.token_hex(4)}"
+        log_security_event(request, action=action_name, entity_type="test_probe", details={"attempt": 1})
+
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT action, entity_type, ip_address, after_data FROM audit_logs WHERE action = %s",
+                [action_name],
+            )
+            row = cursor.fetchone()
+            self.assertIsNotNone(row)
+            self.assertEqual(row[0], action_name)
+            self.assertEqual(row[1], "test_probe")
+            self.assertIsNone(row[2])  # Coerced to NULL in PostgreSQL INET column
+
+    def test_log_security_event_none_request(self):
+        """None request is handled safely without exception."""
+        action_name = f"security.test.no_req_{secrets.token_hex(4)}"
+        log_security_event(None, action=action_name, entity_type="background_job")
+
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT action, ip_address FROM audit_logs WHERE action = %s", [action_name])
+            row = cursor.fetchone()
+            self.assertIsNotNone(row)
+            self.assertIsNone(row[1])
+
+    def test_log_security_event_valid_ip(self):
+        """Valid IP string is stored correctly in INET column."""
+        factory = RequestFactory()
+        request = factory.get("/", REMOTE_ADDR="198.51.100.42")
+
+        action_name = f"security.test.valid_ip_{secrets.token_hex(4)}"
+        log_security_event(request, action=action_name, entity_type="valid_probe")
+
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT host(ip_address) FROM audit_logs WHERE action = %s", [action_name])
+            row = cursor.fetchone()
+            self.assertIsNotNone(row)
+            self.assertEqual(row[0], "198.51.100.42")
+
+
+# =============================================================================
+# NATIVE UUIDV7 DATABASE GENERATION (BR-DATA-01)
+# =============================================================================
+
+class TestNativeUuidv7DatabaseGeneration(TransactionTestCase):
+    """Test PostgreSQL native uuidv7 generation on user creation."""
+
+    def test_orm_creates_native_uuidv7(self):
+        """Django ORM relies on PostgreSQL DEFAULT uuidv7() for primary UUID generation."""
+        user = User.objects.create(
+            phone_hash=secrets.token_hex(32),
+            phone_enc="enc_uuidv7",
+            display_name="UUIDv7 Test User",
+        )
+        user.refresh_from_db()
+        user_uuid = uuid.UUID(str(user.uuid))
+        self.assertEqual(user_uuid.version, 7, f"Expected UUIDv7 but got version {user_uuid.version}")
+        user.delete()
+
+    def test_uuidv7_chronological_ordering(self):
+        """Sequentially created UUIDv7s maintain millisecond-precision chronological sort order."""
+        u1 = User.objects.create(phone_hash=secrets.token_hex(32), phone_enc="enc_1", display_name="User 1")
+        time.sleep(0.005)
+        u2 = User.objects.create(phone_hash=secrets.token_hex(32), phone_enc="enc_2", display_name="User 2")
+        time.sleep(0.005)
+        u3 = User.objects.create(phone_hash=secrets.token_hex(32), phone_enc="enc_3", display_name="User 3")
+
+        u1.refresh_from_db()
+        u2.refresh_from_db()
+        u3.refresh_from_db()
+
+        self.assertLess(str(u1.uuid), str(u2.uuid))
+        self.assertLess(str(u2.uuid), str(u3.uuid))
+
+        u1.delete()
+        u2.delete()
+        u3.delete()
+
+
+# =============================================================================
+# DATABASE ERROR TRANSLATION CLEANLINESS (BR-SEC-07)
+# =============================================================================
+
+class TestDatabaseErrorTranslationCleanliness(TestCase):
+    """Test suppression of internal PL/pgSQL traces and canonical domain code mapping."""
+
+    def test_trigger_exception_strips_internal_call_stacks(self):
+        """Trigger errors with CONTEXT: PL/pgSQL traces are sanitized."""
+        raw_msg = (
+            "capacity_full: No places remaining for this role.\n"
+            "CONTEXT: PL/pgSQL function trg_check_capacity line 14 at RAISE\n"
+            "SQL statement: SELECT trg_check_capacity()"
+        )
+        domain_err = translate_db_exception(Exception(raw_msg))
+        self.assertEqual(domain_err.code, "capacity_full")
+        self.assertEqual(domain_err.message, "No places remaining for this role.")
+        self.assertNotIn("CONTEXT:", domain_err.message)
+        self.assertNotIn("PL/pgSQL", domain_err.message)
+
+    def test_constraint_mapping_canonical_codes(self):
+        """Database constraint violations map to canonical domain codes."""
+        test_cases = [
+            ("uq_event_application_active", "duplicate_application", 409),
+            ("ex_assignments_no_overlap", "schedule_conflict", 409),
+            ("uq_assignment_active", "duplicate_assignment", 409),
+            ("uq_assignment_group_leader", "duplicate_group_leader", 409),
+            ("uq_feedback_event_once", "duplicate_feedback", 409),
+            ("uq_onboarding_ack_user_event_ver", "already_acknowledged", 409),
+        ]
+        for constraint_name, expected_code, expected_status in test_cases:
+            integrity_err = IntegrityError(f'violates unique/exclusion constraint "{constraint_name}"')
+            err = translate_db_exception(integrity_err)
+            self.assertEqual(err.code, expected_code, f"Failed mapping for {constraint_name}")
+            self.assertEqual(err.status_code, expected_status)
+
+
+# =============================================================================
+# COMBINED SESSION CONTEXT & IDEMPOTENCY (BR-SEC-01)
+# =============================================================================
+
+class TestCombinedSessionContextAndIdempotency(TransactionTestCase):
+    """Test single round-trip context setting, get_db_session_context, and idempotency."""
+
+    def test_combined_session_context_setting_and_reading(self):
+        """set_db_session_context sets both variables and get_db_session_context reads them."""
+        with transaction.atomic():
+            set_db_session_context(user_id=8888, ip_address="192.0.2.100")
+            uid, ip = get_db_session_context()
+            self.assertEqual(uid, 8888)
+            self.assertEqual(ip, "192.0.2.100")
+
+    def test_idempotent_session_context_repeated_calls(self):
+        """Repeated sequential context updates within the same transaction execute cleanly."""
+        with transaction.atomic():
+            set_db_session_context(user_id=101, ip_address="10.0.0.1")
+            uid1, ip1 = get_db_session_context()
+            self.assertEqual(uid1, 101)
+
+            set_db_session_context(user_id=101, ip_address="10.0.0.1")
+            uid2, ip2 = get_db_session_context()
+            self.assertEqual(uid2, 101)
+
+            set_db_session_context(user_id=202, ip_address="10.0.0.2")
+            uid3, ip3 = get_db_session_context()
+            self.assertEqual(uid3, 202)
+            self.assertEqual(ip3, "10.0.0.2")
+
+    def test_idempotent_tag_normalization(self):
+        """Repeated normalization on already normalized tags returns identical output."""
+        raw = ["  First Aid  ", "DISASTER relief", "first aid", ""]
+        step1 = normalize_tags(raw)
+        step2 = normalize_tags(step1)
+        self.assertEqual(step1, ["first aid", "disaster relief"])
+        self.assertEqual(step1, step2)
+
+    def test_phone_hashing_and_encryption_roundtrip(self):
+        """Deterministic hashing via hash_phone alias and Fernet roundtrip."""
+        phone = "+95 9 123 456 789"
+        h1 = hash_phone(phone)
+        h2 = compute_phone_hash(phone)
+        self.assertEqual(h1, h2)
+        self.assertEqual(len(h1), 64)
+
+        encrypted = encrypt_phone(phone)
+        decrypted = decrypt_phone(encrypted)
+        self.assertEqual(decrypted, "+959123456789")
+
+    def test_input_normalization_raises_domain_error(self):
+        """Input normalizers raise DomainError (HTTP 400 Bad Request compatible)."""
+        with self.assertRaises(DomainError):
+            normalize_phone("invalid_phone_number")
+
+        with self.assertRaises(DomainError):
+            normalize_tags([f"tag_{i}" for i in range(35)])

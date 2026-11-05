@@ -194,3 +194,9 @@ def check_schedule_conflict(
         row = cursor.fetchone()
         return bool(row[0]) if row else False
 
+
+# Aliases for specification naming compatibility
+set_user_availability = set_weekly_availability_rules
+check_user_availability_window = check_user_availability
+
+

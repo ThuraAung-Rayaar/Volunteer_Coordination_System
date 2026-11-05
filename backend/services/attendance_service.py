@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import logging
 
-from django.db import IntegrityError, InternalError, ProgrammingError, connection
+from django.db import IntegrityError, InternalError, ProgrammingError, connection, transaction
 from django.utils import timezone
 
 from apps.attendance.models import (
@@ -22,6 +22,7 @@ from apps.attendance.models import (
     VGeoAttemptsReview,
     VPendingConfirmations,
 )
+from common.db_context import get_db_session_context, set_db_session_context
 from common.exceptions import DomainError, ResourceMaskedNotFound, translate_db_exception
 from common.permissions import get_event_for_manager_or_404
 
@@ -82,6 +83,7 @@ def get_geo_attempts_review(actor, event_id: int) -> list[dict]:
 # Manual Check-In / Check-Out
 # ---------------------------------------------------------------------------
 
+@transaction.atomic
 def manual_check_in(actor, event_id: int, volunteer_user_id: int, note: str = "") -> Attendance:
     """
     Coordinator checks in a volunteer in person.
@@ -104,6 +106,8 @@ def manual_check_in(actor, event_id: int, volunteer_user_id: int, note: str = ""
     if att.status in ("checked_in", "completed"):
         return att  # idempotent
 
+    prev_user_id, prev_ip = get_db_session_context()
+    set_db_session_context(actor.id)
     att.status = "checked_in"
     att.method = "coordinator_manual"
     att.recorded_by_user = actor
@@ -115,6 +119,8 @@ def manual_check_in(actor, event_id: int, volunteer_user_id: int, note: str = ""
         att.refresh_from_db()
     except (ProgrammingError, IntegrityError, InternalError) as exc:
         raise translate_db_exception(exc) from exc
+    else:
+        set_db_session_context(prev_user_id, prev_ip)
 
     logger.info(
         "Manual check-in",
@@ -123,6 +129,7 @@ def manual_check_in(actor, event_id: int, volunteer_user_id: int, note: str = ""
     return att
 
 
+@transaction.atomic
 def check_out(actor, attendance_id: int) -> Attendance:
     """Record checkout for a checked-in attendance row (self or manager)."""
     att = Attendance.objects.filter(id=attendance_id).first()
@@ -139,12 +146,16 @@ def check_out(actor, attendance_id: int) -> Attendance:
             status_code=400,
         )
 
+    prev_user_id, prev_ip = get_db_session_context()
+    set_db_session_context(actor.id)
     att.checkout_at = timezone.now()
     try:
         att.save(update_fields=["checkout_at"])
         att.refresh_from_db()
     except (ProgrammingError, IntegrityError, InternalError) as exc:
         raise translate_db_exception(exc) from exc
+    else:
+        set_db_session_context(prev_user_id, prev_ip)
     return att
 
 
@@ -152,6 +163,7 @@ def check_out(actor, attendance_id: int) -> Attendance:
 # Geo Confirmation / Rejection (delegate to SQL)
 # ---------------------------------------------------------------------------
 
+@transaction.atomic
 def confirm_attendance(actor, attendance_id: int, note: str | None = None) -> None:
     """Confirm a pending geo check-in via the SQL confirm_attendance()."""
     att = Attendance.objects.filter(id=attendance_id).first()
@@ -160,18 +172,22 @@ def confirm_attendance(actor, attendance_id: int, note: str | None = None) -> No
 
     get_event_for_manager_or_404(actor, att.event_id, require_write=True)
 
+    prev_user_id, prev_ip = get_db_session_context()
+    set_db_session_context(actor.id)
     try:
         with connection.cursor() as cursor:
-            cursor.execute("SELECT set_config('app.user_id', %s, true)", [str(actor.id)])
             cursor.execute(
                 "SELECT confirm_attendance(%s, %s, %s)",
                 [attendance_id, actor.id, note],
             )
     except (ProgrammingError, IntegrityError, InternalError) as exc:
         raise translate_db_exception(exc) from exc
+    else:
+        set_db_session_context(prev_user_id, prev_ip)
     logger.info("Attendance confirmed", extra={"attendance_id": attendance_id, "actor_id": actor.id})
 
 
+@transaction.atomic
 def reject_attendance(actor, attendance_id: int, reason: str) -> None:
     """Reject a pending geo check-in via the SQL reject_attendance()."""
     att = Attendance.objects.filter(id=attendance_id).first()
@@ -180,13 +196,44 @@ def reject_attendance(actor, attendance_id: int, reason: str) -> None:
 
     get_event_for_manager_or_404(actor, att.event_id, require_write=True)
 
+    prev_user_id, prev_ip = get_db_session_context()
+    set_db_session_context(actor.id)
     try:
         with connection.cursor() as cursor:
-            cursor.execute("SELECT set_config('app.user_id', %s, true)", [str(actor.id)])
             cursor.execute(
                 "SELECT reject_attendance(%s, %s, %s)",
                 [attendance_id, actor.id, reason],
             )
     except (ProgrammingError, IntegrityError, InternalError) as exc:
         raise translate_db_exception(exc) from exc
+    else:
+        set_db_session_context(prev_user_id, prev_ip)
     logger.info("Attendance rejected", extra={"attendance_id": attendance_id, "actor_id": actor.id})
+
+
+# ---------------------------------------------------------------------------
+# Privacy-Preserving Self-Service History (BR-PRIV-T4) & Aliases
+# ---------------------------------------------------------------------------
+
+def get_user_attendance_history(user) -> list[dict]:
+    """
+    Return sanitized attendance history for a volunteer.
+    Strictly omits raw coordinates, accuracy, and device telemetry (BR-PRIV-T4).
+    """
+    rows = Attendance.objects.filter(user=user).order_by("-checkin_at", "-id")
+    return [
+        {
+            "id": att.id,
+            "event_id": att.event_id,
+            "status": att.status,
+            "method": att.method,
+            "checkin_at": att.checkin_at,
+            "checkout_at": att.checkout_at,
+            "confirmation_status": att.confirmation_status,
+            "walk_in_flag": att.walk_in_flag,
+        }
+        for att in rows
+    ]
+
+
+get_event_attendance_roster = get_event_attendance_board

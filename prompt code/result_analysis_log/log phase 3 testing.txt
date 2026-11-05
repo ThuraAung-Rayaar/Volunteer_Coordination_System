@@ -1,0 +1,170 @@
+Error: API error (attempt 1): request failed: Post "https://daily-cloudcode-pa.googleapis.com/v1internal:streamGenerateContent?alt=sse": read tcp 10.228.216.63:63115->172.217.115.4:443: wsarecv: An existing connection was forcibly closed by the remote host. (Error ID: 63057a8c-56bd-46ed-88f8-04472e88f515-667)
+
+Error: API error (attempt 2): request failed: Post "https://daily-cloudcode-pa.googleapis.com/v1internal:streamGenerateContent?alt=sse": write tcp 10.228.216.63:54964->172.217.117.4:443: wsasend: An existing connection was forcibly closed by the remote host. (Error ID: 63057a8c-56bd-46ed-88f8-04472e88f515-668)
+
+Analyzed phase2_test_analysis.md:L1-100
+Analyzed serializers.py:L1-100
+
+Error: API error (attempt 1): request failed: Post "https://daily-cloudcode-pa.googleapis.com/v1internal:streamGenerateContent?alt=sse": read tcp 10.228.216.63:50960->172.217.115.4:443: wsarecv: An existing connection was forcibly closed by the remote host. (Error ID: 63057a8c-56bd-46ed-88f8-04472e88f515-673)
+
+Error: API error (attempt 2): request failed: Post "https://daily-cloudcode-pa.googleapis.com/v1internal:streamGenerateContent?alt=sse": write tcp 10.228.216.63:59855->172.217.117.4:443: wsasend: An existing connection was forcibly closed by the remote host. (Error ID: 63057a8c-56bd-46ed-88f8-04472e88f515-674)
+
+Analyzed serializers.py:L101-200
+Analyzed serializers.py:L201-260
+Analyzed profile_service.py:L230-254
+Edited profile_service.py
+Edited profile_service.py
+Analyzed auth_service.py:L230-250
+Edited auth_service.py
+Analyzed availability_service.py:L180-196
+Edited availability_service.py
+Analyzed otp_service.py:L1-12
+Editing otp_service.py
+Analyzed otp_service.py:L1-12
+Edited otp_service.py
+Analyzed serializers.py:L225-240
+Edited serializers.py
+Analyzed views.py:L184-235
+Analyzed views.py:L20-45
+Edited views.py
+Edited views.py
+Analyzed urls.py:L1-60
+Edited urls.py
+Edited urls.py
+Ran check django configuration
+Ran run test_phase3.py
+Analyzed urls.py:L1-9
+Edited urls.py
+Analyzed views.py:L70-80
+Edited views.py
+Ran list tests in accounts
+Created test_unit_auth_profile.py
+Created test_services_phase3.py
+Created test_db_triggers_constraints.py
+Created test_bff_endpoints_phase3.py
+Ran run apps.accounts tests · Exited with code 1
+Ran find CoordinatorProfiles in models
+Ran search coordinator in models
+Ran list classes in accounts/models.py
+Ran find coordinator in apps
+Analyzed utils.py:L40-80
+Analyzed utils.py:L81-140
+Ran check normalize_phone definition
+Ran search def normalize_phone in backend
+Analyzed security.py:L34-65
+Analyzed security.py:L66-75
+Edited test_unit_auth_profile.py
+Edited test_unit_auth_profile.py
+Edited test_services_phase3.py
+Edited test_bff_endpoints_phase3.py
+Ran re-run apps.accounts tests · Exited with code 1
+Ran search approved_by in tests
+Ran search CoordinatorProfiles in tests
+Ran search CoordinatorProfiles in backend/apps
+Ran inspect trg_coordinator_guard in SQL
+Ran check Events creation in test_phase2_api
+Analyzed test_phase2_api.py:L30-65
+Analyzed test_services_phase3.py:L135-165
+Edited test_services_phase3.py
+Analyzed test_bff_endpoints_phase3.py:L150-185
+Edited test_bff_endpoints_phase3.py
+Ran run apps.accounts tests · Exited with code 1
+Edited test_services_phase3.py
+Edited test_bff_endpoints_phase3.py
+Ran run apps.accounts tests · Exited with code 1
+Analyzed permissions.py:L170-250
+Analyzed permissions.py:L130-169
+Analyzed permissions.py:L110-135
+Ran find _is_event_manager in permissions.py
+Analyzed models.py:L1-45
+Analyzed permissions.py:L370-385
+Ran check is_active in accounts/models.py
+Ran inspect trg_applications_before_insert
+Analyzed updated_volunteer_coordination_system_Database.sql:L2325-2365
+Edited test_services_phase3.py
+Edited test_bff_endpoints_phase3.py
+Ran run apps.accounts tests
+Ran run full backend test suite
+Checked task Run full backend test suite
+Checked task Run full backend test suite
+Ran run apps.accounts tests with local settings
+Created phase3_test_analysis.md
+Ran check git status
+
+# Phase 3 Test Coverage & Verification Analysis
+
+The comprehensive test coverage review, gap remediation, and test suite execution for **Phase 3** (`Domains 1, 2, and 3`: OTP Auth, Profile Management, Availability Rules & Public UUID Lookup) have been completed and saved to the analysis directory:
+
+📄 **Report Artifact:** [`prompt code/prompt_result_analysis/phase3_test_analysis.md`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/prompt%20code/prompt_result_analysis/phase3_test_analysis.md)
+
+---
+
+### 1. Key Implementation Enhancements
+
+1. **Public UUID Lookup & Badge Scan (`W24`)**:
+   - Implemented [`lookup_user_by_uuid`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/services/profile_service.py) with dual-tier privacy routing:
+     - Returns **T1 Minimal Public Card** (`{uuid, display_name}`) for regular authenticated queries.
+     - Returns **T2 Elevated Volunteer Card** (`{id, uuid, display_name, skills, physical_ok, verification_status, assignment_status, event_id}`) when `?event_id=` is queried by an authorized coordinator/manager for an accepted volunteer.
+     - Masks non-existent or inactive/blocked users with HTTP 404 ([`ResourceMaskedNotFound`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/common/exceptions.py)).
+   - Implemented [`UserByUuidView`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/bff/volunteer/views.py) and mounted route `path("users/by-uuid/<uuid:uuid>/", UserByUuidView.as_view(), name="user-by-uuid")` in [`backend/bff/volunteer/urls.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/bff/volunteer/urls.py).
+2. **Availability Schedule Replacement & Window Check (`W18`–`W22`)**:
+   - Added `put()` to [`MeAvailabilityView`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/bff/volunteer/views.py) supporting atomic weekly rules replacement via `PUT /api/v1/availability/` (and `/me/availability/`).
+   - Mounted `events/check-availability/` in [`backend/bff/volunteer/urls.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/bff/volunteer/urls.py).
+3. **Authoritative OTP Delegation**:
+   - Cleaned up [`backend/services/otp_service.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/services/otp_service.py) to delegate directly to [`backend/services/auth_service.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/services/auth_service.py).
+
+---
+
+### 2. Test Suite Organization
+
+The test suite in [`backend/apps/accounts/tests/`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/apps/accounts/tests/) was structured into four distinct test layers:
+
+* **Unit Tests ([`test_unit_auth_profile.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/apps/accounts/tests/test_unit_auth_profile.py) — 10 tests)**:
+  Serializer validation (`OtpRequestSerializer`, `OtpVerifySerializer`, `ProfileUpdateSerializer`, `AvailabilityRuleSerializer`, `UserPublicCardSerializer`), allow-list rejection of forbidden keys (`is_admin`, `role`, `points_balance`), HMAC-SHA256 phone hashing, Fernet phone encryption/decryption, and tag normalization formula (`tags_are_normalized`).
+* **Service Integration Tests ([`test_services_phase3.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/apps/accounts/tests/test_services_phase3.py) — 10 tests)**:
+  Direct execution of `auth_service.py` against PostgreSQL stored procedures, `profile_service.py` with `lookup_user_by_uuid` (T1 vs T2), and `availability_service.py` conflict checks via `is_user_available` and `user_has_schedule_conflict`.
+* **Database Integration Tests ([`test_db_triggers_constraints.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/apps/accounts/tests/test_db_triggers_constraints.py) — 4 tests)**:
+  PostgreSQL trigger `trg_01_otp_rate_limit` (5 requests/hour threshold, 6th raises 429), database constraint `ck_users_emergency_contact_pairing` (IntegrityError on unpaired contact), and stored procedure `release_expired_blocks()`.
+* **API Endpoint Tests ([`test_bff_endpoints_phase3.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/apps/accounts/tests/test_bff_endpoints_phase3.py) — 17 tests)**:
+  Endpoints for `/api/v1/auth/request-otp/`, `/api/v1/auth/verify-otp/`, `/api/v1/auth/logout/`, `/api/v1/profile/`, `/api/v1/availability/`, and `/api/v1/users/by-uuid/{uuid}/` (T1 public, T2 coordinator, 404 masked, 401 unauthenticated, and atomic rollback on invalid rules batch).
+* **Existing Phase 3 & 4 Suites ([`test_phase3.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/apps/accounts/tests/test_phase3.py) & [`test_phase4.py`](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer%20HR%20Management/python%20stack/backend/apps/accounts/tests/test_phase4.py) — 68 tests)**:
+  Full regression coverage preserved without deletions.
+
+---
+
+### 3. Execution & Reporting Metrics
+
+**Test Command Executed:**
+```bash
+python manage.py test apps.accounts --settings=config.settings.local --keepdb
+```
+
+```text
+Using existing test database for alias 'default'...
+Found 109 test(s).
+System check identified no issues (0 silenced).
+.............................................................................................................
+----------------------------------------------------------------------
+Ran 109 tests in 2.678s
+
+OK
+Preserving test database for alias 'default'...
+```
+
+**Full Backend Regression Check:**
+```bash
+python manage.py test --settings=config.settings.local --keepdb
+```
+```text
+Ran 369 tests in 15.571s
+
+OK
+Preserving test database for alias 'default'...
+```
+
+* **Passed:** **109 tests** in `apps.accounts` (**369 tests** across entire backend).
+* **Failed:** **0**
+* **Errors:** **0**
+* **Skipped:** **0**
+* **Not Executed:** **0**
+* **Pass Rate:** **100.0%**

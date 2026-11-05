@@ -185,6 +185,47 @@ def get_t2_volunteer_card(user) -> dict[str, Any]:
     }
 
 
+def can_access_event_t2(user, event) -> bool:
+    """
+    Check if a user can access T2 event-level semi-private data:
+    - onboarding_text
+    - onboarding_version
+    - compensation_note
+
+    Access is granted if user is authenticated and:
+    - Is an active admin, OR
+    - Is an event manager (owner or current coordinator), OR
+    - Holds an 'accepted' application for this event, OR
+    - Holds an active (non-cancelled) assignment for this event.
+    """
+    if not user or not getattr(user, "is_authenticated", False) or not getattr(user, "is_active", False):
+        return False
+
+    if getattr(user, "is_admin", False):
+        return True
+
+    from common.permissions import _is_event_manager
+    if _is_event_manager(user, event):
+        return True
+
+    from apps.events.models import EventApplications
+    from apps.coordination.models import Assignments
+
+    has_accepted_app = EventApplications.objects.filter(
+        event_id=event.id,
+        user_id=user.id,
+        status="accepted",
+    ).exists()
+    if has_accepted_app:
+        return True
+
+    has_active_assignment = Assignments.objects.filter(
+        event_id=event.id,
+        user_id=user.id,
+    ).exclude(status="cancelled").exists()
+    return has_active_assignment
+
+
 def can_access_t3_data(requestor, target_user, event=None) -> bool:
     """
     Check if requestor can access T3 strictly private data for target_user.

@@ -1,11 +1,14 @@
 from django.http import FileResponse
 from django.shortcuts import render
-from rest_framework import status
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema
+from rest_framework import serializers, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.models import UserVerificationImages
+from apps.audit.models import Feedback
 from common.exceptions import DomainError, ResourceMaskedNotFound, log_security_event
 from common.permissions import ensure_admin
 from services import (
@@ -19,10 +22,20 @@ from services import (
 )
 
 from .serializers import (
+    AdminActionSuccessSerializer,
+    AdminAuditLogSerializer,
+    AdminCoordinatorHistorySerializer,
+    AdminCoordinatorProfileSerializer,
+    AdminDashboardMetricsSerializer,
+    AdminFeedbackSerializer,
+    AdminGeoAttemptSerializer,
+    AdminMaintenanceResponseSerializer,
+    AdminModerationSummarySerializer,
     AdminVerificationImageSerializer,
     BlockUserSerializer,
     FeedbackSubmitSerializer,
     HideFeedbackSerializer,
+    ModerationActionResponseSerializer,
     ModerationActionSerializer,
     ReviewImageSerializer,
 )
@@ -49,12 +62,20 @@ def coordinator_board_view(request):
 # ---------------------------------------------------------------------------
 
 class AdminPendingVerificationImagesView(APIView):
-    """GET /api/v1/admin/verification-images/ — pending review queue."""
+    """GET /api/v1/admin/verification-images/ — pending review queue with optional filters."""
     permission_classes = [IsAuthenticated]
+    serializer_class = AdminVerificationImageSerializer
 
+    @extend_schema(responses={200: AdminVerificationImageSerializer(many=True)})
     def get(self, request):
         ensure_admin(request)
-        rows = verification_service.get_pending_images_for_admin(request.user)
+        status_filter = request.query_params.get("status", "pending")
+        image_type_filter = request.query_params.get("image_type")
+        rows = verification_service.get_pending_images_for_admin(
+            request.user,
+            status=status_filter,
+            image_type=image_type_filter,
+        )
         return Response({"results": rows})
 
 
@@ -62,6 +83,7 @@ class AdminVerificationImageFileView(APIView):
     """GET /api/v1/admin/verification-images/{id}/file/ — private stream."""
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(responses={200: OpenApiTypes.BINARY})
     def get(self, request, image_id):
         ensure_admin(request)  # raises masked 404 for non-admins
         image = UserVerificationImages.objects.filter(id=image_id).first()
@@ -74,13 +96,19 @@ class AdminVerificationImageFileView(APIView):
             entity_id=image.id,
         )
         path = verification_service.resolve_private_image_path(image)
-        return FileResponse(open(path, "rb"), content_type="image/jpeg")
+        file_obj = open(path, "rb")
+        return FileResponse(file_obj, content_type="image/jpeg")
 
 
 class AdminReviewVerificationImageView(APIView):
     """POST /api/v1/admin/verification-images/{id}/review/."""
     permission_classes = [IsAuthenticated]
+    serializer_class = ReviewImageSerializer
 
+    @extend_schema(
+        request=ReviewImageSerializer,
+        responses={200: AdminVerificationImageSerializer},
+    )
     def post(self, request, image_id):
         ensure_admin(request)
         serializer = ReviewImageSerializer(data=request.data)
@@ -99,7 +127,9 @@ class AdminReviewVerificationImageView(APIView):
 class AdminPendingCoordinatorsView(APIView):
     """GET /api/v1/admin/coordinators/ — pending coordinator applications."""
     permission_classes = [IsAuthenticated]
+    serializer_class = AdminCoordinatorProfileSerializer
 
+    @extend_schema(responses={200: AdminCoordinatorProfileSerializer(many=True)})
     def get(self, request):
         ensure_admin(request)
         rows = coordinator_service.get_pending_coordinator_applications(request.user)
@@ -113,6 +143,10 @@ class AdminCoordinatorDecisionView(APIView):
     """
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        request=None,
+        responses={200: AdminActionSuccessSerializer},
+    )
     def post(self, request, user_id, action):
         ensure_admin(request)
         notes = request.data.get("notes", "")
@@ -136,6 +170,12 @@ class AdminCoordinatorDecisionView(APIView):
         })
 
 
+# --- View Aliases for Alternative View Naming Conventions -------------------
+AdminVerificationImageListView = AdminPendingVerificationImagesView
+AdminVerificationImageReviewView = AdminReviewVerificationImageView
+AdminCoordinatorListView = AdminPendingCoordinatorsView
+
+
 # ---------------------------------------------------------------------------
 # Administrative API Views (Phase 8: Governance, Moderation, Audit, Dashboards)
 # ---------------------------------------------------------------------------
@@ -143,7 +183,9 @@ class AdminCoordinatorDecisionView(APIView):
 class AdminDashboardView(APIView):
     """GET /api/v1/admin/dashboard/ — A01."""
     permission_classes = [IsAuthenticated]
+    serializer_class = AdminDashboardMetricsSerializer
 
+    @extend_schema(responses={200: AdminDashboardMetricsSerializer})
     def get(self, request):
         ensure_admin(request)
         return Response(query_service.get_admin_dashboard())
@@ -152,7 +194,12 @@ class AdminDashboardView(APIView):
 class AdminModerationView(APIView):
     """POST /api/v1/admin/moderation/ — generic insert-to-apply moderation."""
     permission_classes = [IsAuthenticated]
+    serializer_class = ModerationActionSerializer
 
+    @extend_schema(
+        request=ModerationActionSerializer,
+        responses={201: ModerationActionResponseSerializer},
+    )
     def post(self, request):
         ensure_admin(request)
         serializer = ModerationActionSerializer(data=request.data)
@@ -174,7 +221,12 @@ class AdminUserActionView(APIView):
     """POST /api/v1/admin/users/{id}/{action}/ where action is
     warn|block|unblock|close|reinstate."""
     permission_classes = [IsAuthenticated]
+    serializer_class = BlockUserSerializer
 
+    @extend_schema(
+        request=BlockUserSerializer,
+        responses={200: AdminActionSuccessSerializer},
+    )
     def post(self, request, user_id, action):
         ensure_admin(request)
         action_map = {
@@ -201,7 +253,12 @@ class AdminUserActionView(APIView):
 class AdminEventActionView(APIView):
     """POST /api/v1/admin/events/{id}/{action}/ where action is cancel|delete|restore."""
     permission_classes = [IsAuthenticated]
+    serializer_class = BlockUserSerializer
 
+    @extend_schema(
+        request=BlockUserSerializer,
+        responses={200: AdminActionSuccessSerializer},
+    )
     def post(self, request, event_id, action):
         ensure_admin(request)
         action_map = {"cancel": "event_cancel", "delete": "event_delete", "restore": "event_restore"}
@@ -221,7 +278,12 @@ class AdminEventActionView(APIView):
 class AdminHideFeedbackView(APIView):
     """POST /api/v1/admin/feedback/{id}/hide/"""
     permission_classes = [IsAuthenticated]
+    serializer_class = HideFeedbackSerializer
 
+    @extend_schema(
+        request=HideFeedbackSerializer,
+        responses={200: AdminActionSuccessSerializer},
+    )
     def post(self, request, feedback_id):
         ensure_admin(request)
         serializer = HideFeedbackSerializer(data=request.data)
@@ -235,10 +297,45 @@ class AdminHideFeedbackView(APIView):
         return Response({"feedback_id": feedback_id, "status": "hidden"})
 
 
+class AdminFeedbackListView(APIView):
+    """GET /api/v1/admin/feedback/ — list feedback for moderation review."""
+    permission_classes = [IsAuthenticated]
+    serializer_class = AdminFeedbackSerializer
+
+    @extend_schema(responses={200: AdminFeedbackSerializer(many=True)})
+    def get(self, request):
+        ensure_admin(request)
+        event_id = request.query_params.get("event_id")
+        status_filter = request.query_params.get("status")
+        qs = Feedback.objects.all().order_by("-created_at")
+        if event_id:
+            qs = qs.filter(event_id=int(event_id))
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        rows = [
+            {
+                "id": fb.id,
+                "event_id": fb.event_id,
+                "rater_user_id": fb.rater_user_id,
+                "target_user_id": fb.target_user_id,
+                "direction": fb.direction,
+                "score": fb.score,
+                "tags": list(fb.tags or []),
+                "comment": fb.comment,
+                "status": fb.status,
+                "created_at": fb.created_at,
+            }
+            for fb in qs[:100]
+        ]
+        return Response({"results": rows})
+
+
 class AdminAuditLogsView(APIView):
     """GET /api/v1/admin/audit/ — Super Admin only (A05)."""
     permission_classes = [IsAuthenticated]
+    serializer_class = AdminAuditLogSerializer
 
+    @extend_schema(responses={200: AdminAuditLogSerializer(many=True)})
     def get(self, request):
         records = audit_service.get_audit_records(
             request.user,
@@ -252,7 +349,9 @@ class AdminAuditLogsView(APIView):
 class AdminCoordinatorHistoryView(APIView):
     """GET /api/v1/admin/coordinator-history/"""
     permission_classes = [IsAuthenticated]
+    serializer_class = AdminCoordinatorHistorySerializer
 
+    @extend_schema(responses={200: AdminCoordinatorHistorySerializer(many=True)})
     def get(self, request):
         event_id = request.query_params.get("event_id")
         rows = audit_service.get_event_coordinator_history(
@@ -264,7 +363,9 @@ class AdminCoordinatorHistoryView(APIView):
 class AdminModerationSummaryView(APIView):
     """GET /api/v1/admin/users/{id}/moderation-summary/"""
     permission_classes = [IsAuthenticated]
+    serializer_class = AdminModerationSummarySerializer
 
+    @extend_schema(responses={200: AdminModerationSummarySerializer})
     def get(self, request, user_id):
         ensure_admin(request)
         summary = query_service.get_user_moderation_summary(user_id)
@@ -276,7 +377,9 @@ class AdminModerationSummaryView(APIView):
 class AdminGeoMonitoringView(APIView):
     """GET /api/v1/admin/geo-monitoring/ — geo attempt telemetry for fraud review."""
     permission_classes = [IsAuthenticated]
+    serializer_class = AdminGeoAttemptSerializer
 
+    @extend_schema(responses={200: AdminGeoAttemptSerializer(many=True)})
     def get(self, request):
         ensure_admin(request)
         from apps.attendance.models import VGeoAttemptsReview
@@ -287,9 +390,22 @@ class AdminGeoMonitoringView(APIView):
 class AdminRunMaintenanceView(APIView):
     """POST /api/v1/admin/maintenance/run/ — Super Admin only (A12)."""
     permission_classes = [IsAuthenticated]
+    serializer_class = AdminMaintenanceResponseSerializer
 
+    @extend_schema(
+        request=None,
+        responses={200: AdminMaintenanceResponseSerializer},
+    )
     def post(self, request):
         ensure_admin(request, require_superuser=True)
         summary = maintenance_service.run_all_maintenance()
         return Response(summary)
 
+
+# Phase 8 Specification View Aliases
+AdminModerationActionListView = AdminModerationView
+AdminModerationActionCreateView = AdminModerationView
+AdminFeedbackHideView = AdminHideFeedbackView
+AdminAuditLogListView = AdminAuditLogsView
+AdminGeoAttemptListView = AdminGeoMonitoringView
+AdminDashboardMetricsView = AdminDashboardView

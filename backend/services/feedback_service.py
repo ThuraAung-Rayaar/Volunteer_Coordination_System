@@ -14,9 +14,10 @@ from __future__ import annotations
 
 import logging
 
-from django.db import IntegrityError, InternalError, ProgrammingError, connection
+from django.db import IntegrityError, InternalError, ProgrammingError, connection, transaction
 from apps.audit.models import Feedback
 from apps.events.models import Events
+from common.db_context import get_db_session_context, set_db_session_context
 from common.exceptions import DomainError, ResourceMaskedNotFound, translate_db_exception
 from common.permissions import get_event_for_manager_or_404, get_visible_event_or_404
 from common.utils import normalize_tags
@@ -26,6 +27,7 @@ logger = logging.getLogger(__name__)
 VALID_DIRECTIONS = ("coordinator_to_volunteer", "volunteer_to_event", "volunteer_to_coordinator")
 
 
+@transaction.atomic
 def submit_event_feedback(
     rater,
     event_id: int,
@@ -67,9 +69,8 @@ def submit_event_feedback(
 
     clean_tags = normalize_tags(tags)
 
-    with connection.cursor() as cursor:
-        cursor.execute("SELECT set_config('app.user_id', %s, true)", [str(rater.id)])
-
+    prev_user_id, prev_ip = get_db_session_context()
+    set_db_session_context(rater.id)
     try:
         feedback = Feedback.objects.create(
             event_id=event_id,
@@ -82,6 +83,8 @@ def submit_event_feedback(
         )
     except (ProgrammingError, IntegrityError, InternalError) as exc:
         raise translate_db_exception(exc) from exc
+    finally:
+        set_db_session_context(prev_user_id, prev_ip)
 
     logger.info(
         "Feedback submitted",
@@ -160,3 +163,10 @@ def hide_feedback_via_moderation(admin_user, feedback_id: int, reason: str) -> N
     moderation_service.record_moderation_action(
         admin_user, action_type="feedback_hide", feedback_id=feedback_id, reason=reason
     )
+
+
+# Function aliases for specification compatibility
+list_event_feedback = get_event_feedback
+hide_feedback = hide_feedback_via_moderation
+get_user_feedback_history = get_own_feedback
+

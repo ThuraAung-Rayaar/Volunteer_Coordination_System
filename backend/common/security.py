@@ -46,10 +46,12 @@ def normalize_phone(raw_phone: str) -> str:
         Normalized phone string.
 
     Raises:
-        ValueError: If the phone number is invalid.
+        ValidationError: If the phone number is invalid (inherits from DomainError and ValueError).
     """
+    from common.exceptions import ValidationError
+
     if not raw_phone:
-        raise ValueError("Phone number cannot be empty")
+        raise ValidationError("Phone number cannot be empty", code="invalid_phone")
 
     cleaned = re.sub(r"[\s\-\(\)\.]", "", raw_phone.strip())
 
@@ -57,10 +59,10 @@ def normalize_phone(raw_phone: str) -> str:
     digits_only = cleaned.lstrip("+")
 
     if not digits_only.isdigit():
-        raise ValueError("Phone number contains invalid characters")
+        raise ValidationError("Phone number contains invalid characters", code="invalid_phone")
 
     if not (7 <= len(digits_only) <= 15):
-        raise ValueError("Phone number must have 7-15 digits")
+        raise ValidationError("Phone number must have 7-15 digits", code="invalid_phone")
 
     return ("+" if has_plus else "") + digits_only
 
@@ -85,6 +87,10 @@ def compute_phone_hash(phone: str) -> str:
         normalized.encode("utf-8"),
         hashlib.sha256,
     ).hexdigest()
+
+
+# Alias for compute_phone_hash
+hash_phone = compute_phone_hash
 
 
 def encrypt_phone(phone: str) -> str:

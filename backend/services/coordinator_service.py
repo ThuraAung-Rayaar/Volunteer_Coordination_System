@@ -15,7 +15,7 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-from django.db import connection
+from django.db import connection, transaction
 
 from apps.accounts.models import Users
 from apps.coordination.models import CoordinatorProfiles
@@ -58,6 +58,7 @@ def is_approved_coordinator(user: Users) -> bool:
 
 # --- Volunteer-facing operations -------------------------------------------
 
+@transaction.atomic
 def apply_for_coordinator(user: Users, notes: str = "") -> CoordinatorProfiles:
     """
     Create a pending coordinator application.
@@ -108,6 +109,7 @@ def get_coordinator_profile(user: Users) -> Optional[dict]:
     }
 
 
+@transaction.atomic
 def update_coordinator_application(user: Users, notes: str) -> CoordinatorProfiles:
     """A user may edit notes only while their application is still pending."""
     profile = CoordinatorProfiles.objects.filter(user_id=user.id).first()
@@ -139,6 +141,7 @@ def get_pending_coordinator_applications(actor: Users) -> list[dict]:
     )
 
 
+@transaction.atomic
 def decide_coordinator_profile(
     actor: Users,
     target_user_id: int,

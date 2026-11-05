@@ -177,6 +177,19 @@ class EventPostCloseView(APIView):
         return Response({"id": post.id, "status": post.status})
 
 
+# --- View Aliases for Alternative View Naming Conventions -------------------
+CoordinatorEventListView = CoordinatorEventListCreateView
+CoordinatorEventPublishView = EventPublishView
+CoordinatorEventActivateView = EventActivateView
+CoordinatorEventCompleteView = EventCompleteView
+CoordinatorEventCancelView = EventCancelView
+CoordinatorEventHandoverView = EventHandoverView
+CoordinatorEventRetakeView = EventRetakeView
+CoordinatorEventPostListView = CoordinatorEventPostsView
+CoordinatorEventPostDetailView = EventPostDetailView
+
+
+
 
 # ---------------------------------------------------------------------------
 # Phase 6 Views: Coordinator Applications & Assignments
@@ -277,3 +290,51 @@ class EventPostCapacityView(APIView):
         get_event_for_manager_or_404(request.user, event_id, require_write=False)
         capacity = assignment_service.get_post_capacity_summary(event_id)
         return Response({"results": capacity})
+
+
+# Coordinator Application View (W34)
+from bff.volunteer.views import MeCoordinatorView
+CoordinatorApplicationView = MeCoordinatorView
+
+# Phase 6 Specification Action Views & Aliases
+class CoordinatorApplicationAcceptView(APIView):
+    """POST /api/v1/applications/{application_id}/accept/"""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, application_id):
+        serializer = ApplicationDecisionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        app = application_service.accept_application(
+            request.user, application_id, post_id=serializer.validated_data.get("post_id")
+        )
+        return Response({"id": app.id, "status": app.status})
+
+
+class CoordinatorApplicationRejectView(APIView):
+    """POST /api/v1/applications/{application_id}/reject/"""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, application_id):
+        serializer = ApplicationDecisionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        app = application_service.reject_application(
+            request.user, application_id, note=serializer.validated_data.get("note")
+        )
+        return Response({"id": app.id, "status": app.status})
+
+
+class CoordinatorApplicationWaitlistView(APIView):
+    """POST /api/v1/applications/{application_id}/waitlist/"""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, application_id):
+        app = application_service.waitlist_application(request.user, application_id)
+        return Response({"id": app.id, "status": app.status})
+
+
+CoordinatorAutoAssignView = EventAutoAssignView
+CoordinatorManualAssignView = EventManualAssignView
+CoordinatorUnassignedAcceptedView = EventUnassignedView
+CoordinatorPostCapacityView = EventPostCapacityView
+
+

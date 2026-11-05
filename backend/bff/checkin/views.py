@@ -113,30 +113,36 @@ class AttendanceQrCheckinView(APIView):
 
 
 class AttendanceManualCheckinView(APIView):
-    """POST /api/v1/attendance/manual-checkin/ (coordinator only)"""
+    """POST /api/v1/attendance/manual-checkin/ or /events/{event_id}/check-in/ (coordinator only)"""
     permission_classes = [IsAuthenticated]
 
-    def post(self, request):
+    def post(self, request, event_id=None):
         serializer = ManualCheckinSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
+        target_event_id = event_id or data.get("event_id")
+        if not target_event_id:
+            return Response({"detail": "event_id is required."}, status=status.HTTP_400_BAD_REQUEST)
         att = attendance_service.manual_check_in(
-            request.user, data["event_id"], data["user_id"], data.get("note", "")
+            request.user, target_event_id, data["user_id"], data.get("note", "")
         )
         return Response({"id": att.id, "status": att.status, "method": att.method})
 
 
 class AttendanceGeoCheckinView(APIView):
-    """POST /api/v1/attendance/geo-checkin/"""
+    """POST /api/v1/attendance/geo-checkin/ or /events/{event_id}/geo-check-in/"""
     permission_classes = [IsAuthenticated]
 
-    def post(self, request):
+    def post(self, request, event_id=None):
         serializer = GeoCheckinSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
+        target_event_id = event_id or data.get("event_id")
+        if not target_event_id:
+            return Response({"detail": "event_id is required."}, status=status.HTTP_400_BAD_REQUEST)
         result = geo_service.submit_geo_check_in(
             request.user,
-            data["event_id"],
+            target_event_id,
             data["latitude"],
             data["longitude"],
             accuracy_m=data.get("accuracy_m"),
@@ -258,4 +264,30 @@ class MyFeedbackView(APIView):
         from services import feedback_service
         rows = feedback_service.get_own_feedback(request.user)
         return Response({"results": rows})
+
+
+# --- Self-Service Volunteer Attendance History (BR-PRIV-T4) -----------------
+
+class UserAttendanceHistoryView(APIView):
+    """GET /api/v1/me/attendance/"""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        records = attendance_service.get_user_attendance_history(request.user)
+        return Response({"results": records})
+
+
+# --- Spec & BFF View Aliases ------------------------------------------------
+
+EventOnboardingStatusView = EventOnboardingView
+EventQrTokenCreateView = QrTokenCreateView
+EventQrTokenRevokeView = QrTokenRevokeView
+EventQrTokenRedeemView = QrRedeemView
+GeoCheckInView = AttendanceGeoCheckinView
+ManualCheckInView = AttendanceManualCheckinView
+CheckOutView = AttendanceCheckoutView
+AttendanceConfirmView = CoordinatorConfirmAttendanceView
+AttendanceRejectView = CoordinatorRejectAttendanceView
+EventAttendanceRosterView = CoordinatorAttendanceBoardView
+
 

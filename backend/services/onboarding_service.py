@@ -13,9 +13,17 @@ from __future__ import annotations
 
 import logging
 
+from django.db import (
+    IntegrityError,
+    InternalError,
+    ProgrammingError,
+    transaction,
+)
+
 from apps.accounts.models import OnboardingAcknowledgments
 from apps.events.models import EventApplications, Events
-from common.exceptions import DomainError
+from common.db_context import get_db_session_context, set_db_session_context
+from common.exceptions import DomainError, translate_db_exception
 from common.permissions import get_visible_event_or_404
 
 logger = logging.getLogger(__name__)
@@ -40,6 +48,7 @@ def get_event_onboarding(user, event_id: int) -> dict:
     }
 
 
+@transaction.atomic
 def acknowledge_event_onboarding(user, event_id: int) -> OnboardingAcknowledgments:
     """
     Record an app_tick acknowledgment for the event's current onboarding version.
@@ -66,15 +75,27 @@ def acknowledge_event_onboarding(user, event_id: int) -> OnboardingAcknowledgmen
     if existing is not None:
         return existing  # idempotent; never overwrite
 
-    ack = OnboardingAcknowledgments.objects.create(
-        user=user,
-        event=event,
-        onboarding_version=event.onboarding_version,
-        method="app_tick",
-    )
+    prev_user_id, prev_ip = get_db_session_context()
+    set_db_session_context(user.id)
+    try:
+        ack = OnboardingAcknowledgments.objects.create(
+            user=user,
+            event=event,
+            onboarding_version=event.onboarding_version,
+            method="app_tick",
+        )
+    except (IntegrityError, InternalError, ProgrammingError) as exc:
+        raise translate_db_exception(exc) from exc
+    else:
+        set_db_session_context(prev_user_id, prev_ip)
+
     logger.info(
         "Onboarding acknowledged",
         extra={"user_id": user.id, "event_id": event_id, "version": event.onboarding_version},
     )
     return ack
+
+
+# Service function alias for spec/BFF compatibility
+get_event_onboarding_status = get_event_onboarding
 

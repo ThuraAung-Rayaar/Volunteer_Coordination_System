@@ -179,8 +179,9 @@ def get_visible_event_or_404(user, event_id: int):
     from apps.events.models import Events
 
     try:
-        event = Events.objects.get(id=event_id)
-    except Events.DoesNotExist:
+        eid = int(event_id)
+        event = Events.objects.get(id=eid)
+    except (ValueError, TypeError, Events.DoesNotExist):
         raise ResourceMaskedNotFound()
 
     # Deleted events: admin only
@@ -329,18 +330,32 @@ IsCoordinator = IsApprovedCoordinator
 class AllowListSerializerMixin:
     """
     Mixin for DRF serializers that strictly enforces allow-listing of input fields.
-    Rejects any input key that is not explicitly declared on the serializer.
+    Rejects any input key that is not explicitly declared on the serializer,
+    as well as incoming payload updates on read_only=True fields.
     """
 
     def to_internal_value(self, data):
         from rest_framework.exceptions import ValidationError as DRFValidationError
 
         if hasattr(data, "keys"):
-            unknown_keys = set(data.keys()) - set(self.fields.keys())
-            if unknown_keys:
-                raise DRFValidationError(
-                    {key: ["Unexpected or forbidden field."] for key in sorted(unknown_keys)}
-                )
+            errors = {}
+            declared_fields = set(self.fields.keys())
+            incoming_keys = set(data.keys())
+
+            # Check for unknown / undeclared fields
+            unknown_keys = incoming_keys - declared_fields
+            for key in sorted(unknown_keys):
+                errors[key] = ["Unexpected or forbidden field."]
+
+            # Check for read_only fields sent in request body
+            for key in incoming_keys & declared_fields:
+                field = self.fields[key]
+                if getattr(field, "read_only", False):
+                    errors[key] = ["Read-only field cannot be modified."]
+
+            if errors:
+                raise DRFValidationError(errors)
+
         return super().to_internal_value(data)
 
 

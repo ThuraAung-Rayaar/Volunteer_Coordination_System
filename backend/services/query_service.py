@@ -123,7 +123,12 @@ def list_public_events(params: dict[str, Any]) -> QuerySet:
                     | Q(location_name__icontains=term)
                 )
         elif key == "charity_field":
-            qs = qs.filter(charity_fields__contains=[str(value)])
+            tags = [t.strip() for t in str(value).split(",") if t.strip()]
+            if tags:
+                if len(tags) == 1:
+                    qs = qs.filter(charity_fields__contains=tags)
+                else:
+                    qs = qs.filter(charity_fields__overlap=tags)
         elif key == "starts_after":
             qs = qs.filter(start_at__gte=_parse_datetime(value, key))
         elif key == "starts_before":
@@ -144,6 +149,14 @@ def list_public_events(params: dict[str, Any]) -> QuerySet:
     return qs.order_by(SORT_FIELDS[sort], EVENT_LOOKUP_FIELD)
 
 
+# --- Taxonomy & Classification (Domain 18 - W161) --------------------------
+
+def list_active_charity_fields() -> QuerySet:
+    """Return active charity taxonomy fields ordered by sort_order, code (W161)."""
+    from apps.events.models import CharityFields
+    return CharityFields.objects.filter(active=True).order_by("sort_order", "code")
+
+
 # --- Event detail ----------------------------------------------------------
 
 def get_public_event(event_id: int | str) -> VPublicEvents:
@@ -159,13 +172,17 @@ def get_public_event(event_id: int | str) -> VPublicEvents:
         raise ResourceMaskedNotFound(message="The requested event was not found.")
 
 
-def get_event_posts(event_id: int | str) -> list[dict[str, Any]]:
+def get_event_posts(event_id: int | str, verified_visible: bool = False) -> list[dict[str, Any]]:
     """Return posts (with capacity from v_event_post_capacity) for a public event.
 
-    Raises a masked 404 if the event is not publicly visible.
+    Raises a masked 404 if the event is not publicly visible and verified_visible is False.
     """
-    event = get_public_event(event_id)
-    eid = event.event_id
+    if not verified_visible:
+        get_public_event(event_id)
+    try:
+        eid = int(event_id)
+    except (ValueError, TypeError):
+        raise ResourceMaskedNotFound(message="The requested event was not found.")
 
     capacity = {
         row.post_id: row
@@ -247,5 +264,30 @@ def get_user_moderation_summary(user_id: int) -> dict | None:
         "block_count": row.block_count,
         "last_block_at": row.last_block_at,
     }
+
+
+def list_flagged_feedback(limit: int = 100) -> list[dict]:
+    """Return feedback records flagged or hidden by administrative moderation."""
+    from apps.audit.models import Feedback
+    rows = Feedback.objects.filter(status="hidden").order_by("-created_at")[:limit]
+    return [
+        {
+            "id": fb.id,
+            "event_id": fb.event_id,
+            "rater_user_id": fb.rater_user_id,
+            "target_user_id": fb.target_user_id,
+            "direction": fb.direction,
+            "score": fb.score,
+            "status": fb.status,
+            "comment": fb.comment,
+            "created_at": fb.created_at,
+        }
+        for fb in rows
+    ]
+
+
+# Function aliases for specification compatibility
+get_admin_dashboard_metrics = get_admin_dashboard
+
 
 
