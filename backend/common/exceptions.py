@@ -100,6 +100,13 @@ class PermissionDeniedError(DomainError):
     default_status = status.HTTP_403_FORBIDDEN
 
 
+class InsufficientPrivilegeError(PermissionDeniedError):
+    """Operation requires superuser privilege."""
+    default_code = "insufficient_privilege"
+    default_message = "Only a Super Admin can create events via the Admin Portal."
+    default_status = status.HTTP_403_FORBIDDEN
+
+
 class OwnerMonitorReadOnlyError(DomainError):
     """Event owner is in read-only monitor mode (coordination delegated)."""
     default_code = "owner_monitor_read_only"

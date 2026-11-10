@@ -1,0 +1,302 @@
+{% extends "admin_portal/base_admin.html" %}
+
+{% block title %}Feedback Intelligence & Review Moderation — Super Admin Control Center{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <!-- Top Header -->
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl backdrop-blur">
+        <div>
+            <div class="flex items-center gap-2 mb-1">
+                <span class="p-2 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                    </svg>
+                </span>
+                <h1 class="text-xl font-bold text-white tracking-tight">Feedback Intelligence & Review Moderation</h1>
+            </div>
+            <p class="text-xs text-slate-400">Comprehensive multi-directional sentiment analysis, satisfaction scores, and administrative feedback suppression.</p>
+        </div>
+
+        <div class="flex items-center gap-2">
+            <span class="text-xs font-mono px-3 py-1.5 rounded-xl bg-slate-800 text-slate-300 border border-slate-700">
+                Total Reviews: <strong class="text-white">{{ analytics.total_reviews }}</strong>
+            </span>
+        </div>
+    </div>
+
+    <!-- 1. Top Feedback Analytics Strip -->
+    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+        <!-- Metric 1: Overall Average Score -->
+        <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-lg backdrop-blur">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Average Score</span>
+            <div class="flex items-baseline gap-1.5">
+                <span class="text-2xl font-black text-amber-400">{{ analytics.avg_score }}</span>
+                <span class="text-xs text-slate-500 font-medium">/ 5.0</span>
+            </div>
+            <span class="text-[10px] text-amber-400/80 block mt-1 font-mono">★★★★★</span>
+        </div>
+
+        <!-- Metric 2: Active Reviews -->
+        <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-lg backdrop-blur">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Active Reviews</span>
+            <span class="text-2xl font-black text-emerald-400">{{ analytics.total_active }}</span>
+            <span class="text-[10px] text-slate-500 block mt-1">Live in community</span>
+        </div>
+
+        <!-- Metric 3: Hidden Reviews -->
+        <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-lg backdrop-blur">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Hidden Reviews</span>
+            <span class="text-2xl font-black text-rose-400">{{ analytics.total_hidden }}</span>
+            <span class="text-[10px] text-slate-500 block mt-1">Suppressed by admin</span>
+        </div>
+
+        <!-- Metric 4: Low Score Alerts -->
+        <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-lg backdrop-blur">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Low-Score Alerts</span>
+            <div class="flex items-baseline gap-1.5">
+                <span class="text-2xl font-black text-rose-400">{{ analytics.low_score_count }}</span>
+                <span class="text-[10px] font-mono text-rose-400/70">≤ 2★</span>
+            </div>
+            <span class="text-[10px] text-slate-500 block mt-1">Grievance alerts</span>
+        </div>
+
+        <!-- Direction 1: Volunteer -> Event -->
+        <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-lg backdrop-blur">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-blue-400 block mb-1">Vol → Event</span>
+            <div class="flex items-baseline gap-1.5">
+                <span class="text-xl font-black text-white">{{ analytics.by_direction.volunteer_to_event.avg_score }}</span>
+                <span class="text-[10px] text-slate-400 font-mono">({{ analytics.by_direction.volunteer_to_event.count }})</span>
+            </div>
+            <span class="text-[10px] text-slate-500 block mt-1">Event satisfaction</span>
+        </div>
+
+        <!-- Direction 2: Volunteer -> Coordinator -->
+        <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-lg backdrop-blur">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-purple-400 block mb-1">Vol → Coord</span>
+            <div class="flex items-baseline gap-1.5">
+                <span class="text-xl font-black text-white">{{ analytics.by_direction.volunteer_to_coordinator.avg_score }}</span>
+                <span class="text-[10px] text-slate-400 font-mono">({{ analytics.by_direction.volunteer_to_coordinator.count }})</span>
+            </div>
+            <span class="text-[10px] text-slate-500 block mt-1">Leadership rating</span>
+        </div>
+
+        <!-- Direction 3: Coordinator -> Volunteer -->
+        <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-lg backdrop-blur">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-400 block mb-1">Coord → Vol</span>
+            <div class="flex items-baseline gap-1.5">
+                <span class="text-xl font-black text-white">{{ analytics.by_direction.coordinator_to_volunteer.avg_score }}</span>
+                <span class="text-[10px] text-slate-400 font-mono">({{ analytics.by_direction.coordinator_to_volunteer.count }})</span>
+            </div>
+            <span class="text-[10px] text-slate-500 block mt-1">Performance review</span>
+        </div>
+    </div>
+
+    <!-- 2. Filter Bar -->
+    <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-xl backdrop-blur">
+        <form method="GET" action="" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-3 items-end">
+            <!-- Filter: Direction -->
+            <div>
+                <label class="block text-[11px] font-semibold text-slate-400 mb-1">Direction</label>
+                <select name="direction" class="w-full px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 text-xs focus:outline-none focus:border-blue-500">
+                    <option value="all" {% if filter_direction == 'all' %}selected{% endif %}>All Directions</option>
+                    <option value="volunteer_to_event" {% if filter_direction == 'volunteer_to_event' %}selected{% endif %}>Volunteer → Event</option>
+                    <option value="volunteer_to_coordinator" {% if filter_direction == 'volunteer_to_coordinator' %}selected{% endif %}>Volunteer → Coordinator</option>
+                    <option value="coordinator_to_volunteer" {% if filter_direction == 'coordinator_to_volunteer' %}selected{% endif %}>Coordinator → Volunteer</option>
+                </select>
+            </div>
+
+            <!-- Filter: Star Rating -->
+            <div>
+                <label class="block text-[11px] font-semibold text-slate-400 mb-1">Star Score</label>
+                <select name="score" class="w-full px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 text-xs focus:outline-none focus:border-blue-500">
+                    <option value="all" {% if filter_score == 'all' %}selected{% endif %}>All Ratings</option>
+                    <option value="5" {% if filter_score == '5' %}selected{% endif %}>★★★★★ (5 Stars)</option>
+                    <option value="4" {% if filter_score == '4' %}selected{% endif %}>★★★★☆ (4 Stars)</option>
+                    <option value="3" {% if filter_score == '3' %}selected{% endif %}>★★★☆☆ (3 Stars)</option>
+                    <option value="2" {% if filter_score == '2' %}selected{% endif %}>★★☆☆☆ (2 Stars)</option>
+                    <option value="1" {% if filter_score == '1' %}selected{% endif %}>★☆☆☆☆ (1 Star)</option>
+                </select>
+            </div>
+
+            <!-- Filter: Status -->
+            <div>
+                <label class="block text-[11px] font-semibold text-slate-400 mb-1">Review Status</label>
+                <select name="status" class="w-full px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 text-xs focus:outline-none focus:border-blue-500">
+                    <option value="all" {% if filter_status == 'all' %}selected{% endif %}>All Statuses</option>
+                    <option value="active" {% if filter_status == 'active' %}selected{% endif %}>Active (Visible)</option>
+                    <option value="hidden" {% if filter_status == 'hidden' %}selected{% endif %}>Hidden (Moderated)</option>
+                </select>
+            </div>
+
+            <!-- Filter: Event -->
+            <div>
+                <label class="block text-[11px] font-semibold text-slate-400 mb-1">Filter by Event</label>
+                <select name="event_id" class="w-full px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 text-xs focus:outline-none focus:border-blue-500">
+                    <option value="all" {% if filter_event_id == 'all' %}selected{% endif %}>All Events</option>
+                    {% for ev in events_list %}
+                    <option value="{{ ev.id }}" {% if filter_event_id == ev.id|stringformat:"s" %}selected{% endif %}>
+                        #{{ ev.id }} - {{ ev.title|truncatechars:25 }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Search Query -->
+            <div>
+                <label class="block text-[11px] font-semibold text-slate-400 mb-1">Keyword Search</label>
+                <input type="text" name="q" value="{{ search_query }}" placeholder="Comment, user, or event..." class="w-full px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs placeholder-slate-500 focus:outline-none focus:border-blue-500" />
+            </div>
+
+            <!-- Submit & Reset -->
+            <div class="flex items-center gap-2">
+                <button type="submit" class="flex-1 px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs rounded-xl transition shadow-md shadow-blue-900/20 cursor-pointer">
+                    Filter
+                </button>
+                <a href="/api/v1/admin/ui/feedback/" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 rounded-xl text-xs font-semibold border border-slate-700 transition">
+                    Reset
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <!-- 3. Detailed Feedback Table (Admin T4 View) -->
+    <div class="bg-slate-900/90 border border-slate-800 rounded-2xl shadow-xl overflow-hidden backdrop-blur">
+        <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
+            <div>
+                <h2 class="text-sm font-bold text-white uppercase tracking-wider">Detailed Feedback Records (Admin T4 Unmasked View)</h2>
+                <p class="text-xs text-slate-400">Inspecting {{ feedbacks|length }} feedback rows with full audit metadata and administrative suppression controls</p>
+            </div>
+            <span class="text-xs font-mono text-slate-400">{{ feedbacks|length }} records loaded</span>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs text-slate-300">
+                <thead class="bg-slate-950/80 text-[10px] uppercase font-bold text-slate-400 tracking-wider border-b border-slate-800">
+                    <tr>
+                        <th class="px-5 py-3">ID & Event</th>
+                        <th class="px-5 py-3">Direction</th>
+                        <th class="px-5 py-3">Rater & Target</th>
+                        <th class="px-5 py-3">Score & Rating</th>
+                        <th class="px-5 py-3">Comment & Tags</th>
+                        <th class="px-5 py-3">Status & Date</th>
+                        <th class="px-5 py-3 text-right">Moderation</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-800/60 font-medium">
+                    {% for fb in feedbacks %}
+                    <tr class="hover:bg-slate-800/40 transition">
+                        <!-- ID & Event -->
+                        <td class="px-5 py-4">
+                            <span class="font-mono text-xs font-bold text-white block">#{{ fb.id }}</span>
+                            <span class="text-slate-300 text-xs block font-semibold max-w-[180px] truncate" title="{{ fb.event.title }}">{{ fb.event.title }}</span>
+                            <span class="text-[10px] font-mono text-slate-500">Event ID #{{ fb.event_id }}</span>
+                        </td>
+
+                        <!-- Direction Badge -->
+                        <td class="px-5 py-4">
+                            <span class="inline-block px-2.5 py-1 rounded-full text-[10px] font-mono font-bold
+                                {% if fb.direction == 'volunteer_to_event' %}bg-blue-500/10 text-blue-400 border border-blue-500/20
+                                {% elif fb.direction == 'volunteer_to_coordinator' %}bg-purple-500/10 text-purple-400 border border-purple-500/20
+                                {% else %}bg-emerald-500/10 text-emerald-400 border border-emerald-500/20{% endif %}">
+                                {{ fb.direction }}
+                            </span>
+                        </td>
+
+                        <!-- Rater & Target -->
+                        <td class="px-5 py-4">
+                            <div class="space-y-1">
+                                <div>
+                                    <span class="text-[10px] uppercase text-slate-500 font-bold block">Rater:</span>
+                                    <a href="/api/v1/admin/ui/users/?user_id={{ fb.rater_user_id }}" class="text-white hover:text-blue-400 font-semibold hover:underline">
+                                        {{ fb.rater_user.display_name }}
+                                    </a>
+                                    <span class="font-mono text-[10px] text-slate-500">#{{ fb.rater_user_id }}</span>
+                                </div>
+                                {% if fb.target_user %}
+                                <div>
+                                    <span class="text-[10px] uppercase text-slate-500 font-bold block">Target:</span>
+                                    <a href="/api/v1/admin/ui/users/?user_id={{ fb.target_user_id }}" class="text-slate-300 hover:text-blue-400 font-semibold hover:underline">
+                                        {{ fb.target_user.display_name }}
+                                    </a>
+                                    <span class="font-mono text-[10px] text-slate-500">#{{ fb.target_user_id }}</span>
+                                </div>
+                                {% else %}
+                                <span class="text-[10px] text-slate-500 italic">Target: Event Overall</span>
+                                {% endif %}
+                            </div>
+                        </td>
+
+                        <!-- Score & Visual Stars -->
+                        <td class="px-5 py-4">
+                            <div class="flex items-center gap-1 font-bold text-sm
+                                {% if fb.score >= 4 %}text-emerald-400{% elif fb.score == 3 %}text-amber-400{% else %}text-rose-400{% endif %}">
+                                <span>★ {{ fb.score }}</span>
+                                <span class="text-[11px] text-slate-500 font-normal">/ 5</span>
+                            </div>
+                            <div class="text-[10px] text-amber-400/90 font-mono tracking-widest mt-0.5">
+                                {% if fb.score == 5 %}★★★★★
+                                {% elif fb.score == 4 %}★★★★☆
+                                {% elif fb.score == 3 %}★★★☆☆
+                                {% elif fb.score == 2 %}★★☆☆☆
+                                {% elif fb.score == 1 %}★☆☆☆☆
+                                {% endif %}
+                            </div>
+                        </td>
+
+                        <!-- Comment & Tags -->
+                        <td class="px-5 py-4 max-w-sm">
+                            <p class="text-xs text-slate-200 bg-slate-950/70 p-2.5 rounded-xl border border-slate-800/80 mb-2 italic">
+                                "{{ fb.comment|default:"No comment text submitted." }}"
+                            </p>
+                            {% if fb.tags %}
+                            <div class="flex flex-wrap gap-1">
+                                {% for tag in fb.tags %}
+                                <span class="px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 border border-slate-700 text-[10px] font-mono">
+                                    #{{ tag }}
+                                </span>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </td>
+
+                        <!-- Status & Date -->
+                        <td class="px-5 py-4 font-mono text-[11px]">
+                            <span class="px-2.5 py-1 rounded-full text-[10px] font-bold block w-fit
+                                {% if fb.status == 'active' %}bg-emerald-500/10 text-emerald-400 border border-emerald-500/30
+                                {% else %}bg-rose-500/10 text-rose-400 border border-rose-500/30{% endif %}">
+                                {{ fb.status|upper }}
+                            </span>
+                            <span class="text-slate-400 block mt-1.5 text-[10px]">{{ fb.created_at|date:"Y-m-d H:i" }}</span>
+                        </td>
+
+                        <!-- Moderation -->
+                        <td class="px-5 py-4 text-right">
+                            {% if fb.status == 'active' %}
+                            <form method="POST" action="" class="space-y-1.5 inline-block text-right">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="feedback_hide">
+                                <input type="hidden" name="feedback_id" value="{{ fb.id }}">
+                                <input type="text" name="reason" placeholder="Suppression reason..." required class="px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-700 text-white text-[11px] placeholder-slate-500 focus:outline-none focus:border-rose-500 w-36 block mb-1 text-left" />
+                                <button type="submit" class="px-3 py-1 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded-xl shadow-md shadow-rose-900/20 transition cursor-pointer">
+                                    Hide Review
+                                </button>
+                            </form>
+                            {% else %}
+                            <span class="text-[11px] text-slate-500 italic block font-mono">Hidden by Admin</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="px-6 py-10 text-center text-slate-500 text-xs">No feedback reviews matching your filter criteria.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

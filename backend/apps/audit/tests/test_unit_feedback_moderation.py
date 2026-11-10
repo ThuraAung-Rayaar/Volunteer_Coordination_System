@@ -116,3 +116,15 @@ class UnitFeedbackModerationSerializerTests(SimpleTestCase):
         self.assertFalse(s_extra.is_valid())
         self.assertIn("auto_approve", str(s_extra.errors))
 
+    def test_feedback_submit_rejects_from_user_id_tampering(self):
+        """BR-PRIV-ANON: Submitting feedback must never allow specifying from_user_id."""
+        payload = {
+            "direction": "volunteer_to_event",
+            "score": 5,
+            "from_user_id": 12345,
+        }
+        serializer = FeedbackSubmitSerializer(data=payload)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("from_user_id", str(serializer.errors))
+
+

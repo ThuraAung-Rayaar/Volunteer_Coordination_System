@@ -3,296 +3,6 @@ info:
   title: Volunteer Coordination System API
   version: 0.6.0
 paths:
-  /api/v1/admin/api/v1/admin/audit/:
-    get:
-      operationId: admin_api_v1_admin_audit_list
-      description: GET /api/v1/admin/audit/ — Super Admin only (A05).
-      tags:
-      - admin
-      security:
-      - tokenAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/AdminAuditLog'
-          description: ''
-  /api/v1/admin/api/v1/admin/audit-logs/:
-    get:
-      operationId: admin_api_v1_admin_audit_logs_list
-      description: GET /api/v1/admin/audit/ — Super Admin only (A05).
-      tags:
-      - admin
-      security:
-      - tokenAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/AdminAuditLog'
-          description: ''
-  /api/v1/admin/api/v1/admin/coordinator-history/:
-    get:
-      operationId: admin_api_v1_admin_coordinator_history_list
-      description: GET /api/v1/admin/coordinator-history/
-      tags:
-      - admin
-      security:
-      - tokenAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/AdminCoordinatorHistory'
-          description: ''
-  /api/v1/admin/api/v1/admin/dashboard/:
-    get:
-      operationId: admin_api_v1_admin_dashboard_retrieve
-      description: GET /api/v1/admin/dashboard/ — A01.
-      tags:
-      - admin
-      security:
-      - tokenAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AdminDashboardMetrics'
-          description: ''
-  /api/v1/admin/api/v1/admin/events/{event_id}/{action}/:
-    post:
-      operationId: admin_api_v1_admin_events_create
-      description: POST /api/v1/admin/events/{id}/{action}/ where action is cancel|delete|restore.
-      parameters:
-      - in: path
-        name: action
-        schema:
-          type: string
-        required: true
-      - in: path
-        name: event_id
-        schema:
-          type: integer
-        required: true
-      tags:
-      - admin
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/BlockUser'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/BlockUser'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/BlockUser'
-      security:
-      - tokenAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AdminActionSuccess'
-          description: ''
-  /api/v1/admin/api/v1/admin/feedback/:
-    get:
-      operationId: admin_api_v1_admin_feedback_list
-      description: GET /api/v1/admin/feedback/ — list feedback for moderation review.
-      tags:
-      - admin
-      security:
-      - tokenAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/AdminFeedback'
-          description: ''
-  /api/v1/admin/api/v1/admin/feedback/{feedback_id}/hide/:
-    post:
-      operationId: admin_api_v1_admin_feedback_hide_create
-      description: POST /api/v1/admin/feedback/{id}/hide/
-      parameters:
-      - in: path
-        name: feedback_id
-        schema:
-          type: integer
-        required: true
-      tags:
-      - admin
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/HideFeedback'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/HideFeedback'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/HideFeedback'
-      security:
-      - tokenAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AdminActionSuccess'
-          description: ''
-  /api/v1/admin/api/v1/admin/geo-attempts/:
-    get:
-      operationId: admin_api_v1_admin_geo_attempts_list
-      description: GET /api/v1/admin/geo-monitoring/ — geo attempt telemetry for fraud
-        review.
-      tags:
-      - admin
-      security:
-      - tokenAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/AdminGeoAttempt'
-          description: ''
-  /api/v1/admin/api/v1/admin/geo-monitoring/:
-    get:
-      operationId: admin_api_v1_admin_geo_monitoring_list
-      description: GET /api/v1/admin/geo-monitoring/ — geo attempt telemetry for fraud
-        review.
-      tags:
-      - admin
-      security:
-      - tokenAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/AdminGeoAttempt'
-          description: ''
-  /api/v1/admin/api/v1/admin/maintenance/run/:
-    post:
-      operationId: admin_api_v1_admin_maintenance_run_create
-      description: POST /api/v1/admin/maintenance/run/ — Super Admin only (A12).
-      tags:
-      - admin
-      security:
-      - tokenAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AdminMaintenanceResponse'
-          description: ''
-  /api/v1/admin/api/v1/admin/moderation/:
-    post:
-      operationId: admin_api_v1_admin_moderation_create
-      description: POST /api/v1/admin/moderation/ — generic insert-to-apply moderation.
-      tags:
-      - admin
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ModerationAction'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/ModerationAction'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/ModerationAction'
-        required: true
-      security:
-      - tokenAuth: []
-      responses:
-        '201':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ModerationActionResponse'
-          description: ''
-  /api/v1/admin/api/v1/admin/users/{user_id}/{action}/:
-    post:
-      operationId: admin_api_v1_admin_users_create
-      description: |-
-        POST /api/v1/admin/users/{id}/{action}/ where action is
-        warn|block|unblock|close|reinstate.
-      parameters:
-      - in: path
-        name: action
-        schema:
-          type: string
-        required: true
-      - in: path
-        name: user_id
-        schema:
-          type: integer
-        required: true
-      tags:
-      - admin
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/BlockUser'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/BlockUser'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/BlockUser'
-      security:
-      - tokenAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AdminActionSuccess'
-          description: ''
-  /api/v1/admin/api/v1/admin/users/{user_id}/moderation-summary/:
-    get:
-      operationId: admin_api_v1_admin_users_moderation_summary_retrieve
-      description: GET /api/v1/admin/users/{id}/moderation-summary/
-      parameters:
-      - in: path
-        name: user_id
-        schema:
-          type: integer
-        required: true
-      tags:
-      - admin
-      security:
-      - tokenAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AdminModerationSummary'
-          description: ''
   /api/v1/admin/audit/:
     get:
       operationId: admin_audit_list
@@ -301,6 +11,7 @@ paths:
       - admin
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -318,6 +29,7 @@ paths:
       - admin
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -335,6 +47,7 @@ paths:
       - admin
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -352,6 +65,7 @@ paths:
       - admin
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -382,6 +96,7 @@ paths:
       - admin
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -397,12 +112,64 @@ paths:
       - admin
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AdminDashboardMetrics'
+          description: ''
+  /api/v1/admin/events/:
+    get:
+      operationId: admin_events_list
+      description: |-
+        GET /api/v1/admin/events/ — Super Admin / Admin lists events from VEventSummary.
+        POST /api/v1/admin/events/ — Super Admin creates event adhering to all event rules.
+      tags:
+      - admin
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AdminEventSummary'
+          description: ''
+    post:
+      operationId: admin_create_event
+      description: |-
+        GET /api/v1/admin/events/ — Super Admin / Admin lists events from VEventSummary.
+        POST /api/v1/admin/events/ — Super Admin creates event adhering to all event rules.
+      tags:
+      - admin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminEventCreate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AdminEventCreate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AdminEventCreate'
+        required: true
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AdminEventResponse'
           description: ''
   /api/v1/admin/events/{event_id}/{action}/:
     post:
@@ -434,6 +201,7 @@ paths:
               $ref: '#/components/schemas/BlockUser'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -449,6 +217,7 @@ paths:
       - admin
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -483,6 +252,7 @@ paths:
               $ref: '#/components/schemas/HideFeedback'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -499,6 +269,7 @@ paths:
       - admin
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -517,6 +288,7 @@ paths:
       - admin
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -534,6 +306,7 @@ paths:
       - admin
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -561,6 +334,7 @@ paths:
         required: true
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '201':
           content:
@@ -600,6 +374,7 @@ paths:
               $ref: '#/components/schemas/BlockUser'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -621,6 +396,7 @@ paths:
       - admin
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -637,6 +413,7 @@ paths:
       - admin
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -660,6 +437,7 @@ paths:
       - admin
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -694,6 +472,7 @@ paths:
         required: true
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -731,6 +510,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -763,6 +543,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -795,6 +576,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -827,6 +609,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -861,6 +644,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -876,6 +660,7 @@ paths:
       - apply
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -901,6 +686,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -926,6 +712,7 @@ paths:
               $ref: '#/components/schemas/PatchedEmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -958,6 +745,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -990,6 +778,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -1022,6 +811,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -1048,6 +838,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -1075,6 +866,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -1101,6 +893,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -1127,6 +920,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -1247,6 +1041,7 @@ paths:
       - availability
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -1273,6 +1068,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -1288,6 +1084,7 @@ paths:
       - availability
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -1313,6 +1110,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -1339,6 +1137,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -1360,6 +1159,7 @@ paths:
       - availability
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '204':
           description: No response body
@@ -1382,6 +1182,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -1398,6 +1199,7 @@ paths:
       - charity-fields
       security:
       - tokenAuth: []
+      - cookieAuth: []
       - {}
       responses:
         '200':
@@ -1433,6 +1235,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -1459,6 +1262,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -1486,6 +1290,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -1512,6 +1317,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -1544,6 +1350,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -1576,6 +1383,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -1597,6 +1405,7 @@ paths:
       - checkin
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -1618,6 +1427,7 @@ paths:
       - checkin
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -1639,6 +1449,7 @@ paths:
       - checkin
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -1660,6 +1471,7 @@ paths:
       - checkin
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -1692,6 +1504,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -1724,6 +1537,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -1757,6 +1571,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -1789,6 +1604,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -1822,6 +1638,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -1854,6 +1671,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -1875,6 +1693,7 @@ paths:
       - checkin
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -1906,6 +1725,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -1927,6 +1747,7 @@ paths:
       - checkin
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -1961,6 +1782,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -1993,6 +1815,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -2014,6 +1837,7 @@ paths:
       - checkin
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -2046,6 +1870,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -2067,6 +1892,7 @@ paths:
       - checkin
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -2082,6 +1908,7 @@ paths:
       - checkin
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -2097,6 +1924,7 @@ paths:
       - checkin
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -2123,6 +1951,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -2186,6 +2015,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -2218,6 +2048,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -2250,6 +2081,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -2282,6 +2114,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -2299,6 +2132,7 @@ paths:
       - coordinator
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -2324,6 +2158,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -2349,6 +2184,7 @@ paths:
               $ref: '#/components/schemas/PatchedEmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -2381,6 +2217,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -2413,6 +2250,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -2450,6 +2288,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -2482,6 +2321,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -2514,6 +2354,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -2546,6 +2387,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -2563,6 +2405,7 @@ paths:
       - coordinator
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -2590,6 +2433,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -2624,6 +2468,7 @@ paths:
               $ref: '#/components/schemas/PatchedEmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -2645,6 +2490,7 @@ paths:
       - coordinator
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -2666,6 +2512,7 @@ paths:
       - coordinator
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -2698,6 +2545,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -2730,6 +2578,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -2762,6 +2611,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -2794,6 +2644,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -2815,6 +2666,7 @@ paths:
       - coordinator
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -2836,6 +2688,7 @@ paths:
       - coordinator
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -2867,6 +2720,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -2892,6 +2746,7 @@ paths:
       - coordinator
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -2913,6 +2768,7 @@ paths:
       - coordinator
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -2928,6 +2784,7 @@ paths:
       - coordinator
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -2955,6 +2812,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -2989,6 +2847,7 @@ paths:
               $ref: '#/components/schemas/PatchedEmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -3021,6 +2880,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -3042,6 +2902,7 @@ paths:
       - coordinator
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -3063,6 +2924,7 @@ paths:
       - coordinator
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -3095,6 +2957,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -3127,6 +2990,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -3148,6 +3012,7 @@ paths:
       - coordinator
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -3169,6 +3034,7 @@ paths:
       - coordinator
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -3190,6 +3056,7 @@ paths:
       - coordinator
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -3222,6 +3089,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -3254,6 +3122,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -3286,6 +3155,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -3307,6 +3177,7 @@ paths:
       - coordinator
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -3339,6 +3210,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -3371,6 +3243,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -3392,6 +3265,7 @@ paths:
       - coordinator
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -3413,6 +3287,7 @@ paths:
       - coordinator
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -3444,6 +3319,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -3476,6 +3352,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -3508,6 +3385,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -3540,6 +3418,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -3565,6 +3444,7 @@ paths:
       - coordinator
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -3586,6 +3466,7 @@ paths:
       - coordinator
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -3618,6 +3499,7 @@ paths:
               $ref: '#/components/schemas/PatchedEmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -3650,6 +3532,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -3682,6 +3565,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -3697,6 +3581,7 @@ paths:
       - events
       security:
       - tokenAuth: []
+      - cookieAuth: []
       - {}
       responses:
         '200':
@@ -3725,6 +3610,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -3749,6 +3635,7 @@ paths:
       - events
       security:
       - tokenAuth: []
+      - cookieAuth: []
       - {}
       responses:
         '200':
@@ -3781,6 +3668,7 @@ paths:
               $ref: '#/components/schemas/PatchedEmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -3813,6 +3701,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -3834,6 +3723,7 @@ paths:
       - events
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -3866,6 +3756,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -3887,6 +3778,7 @@ paths:
       - events
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -3919,6 +3811,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -3951,6 +3844,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -3983,6 +3877,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -4015,6 +3910,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -4036,6 +3932,7 @@ paths:
       - events
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -4067,6 +3964,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -4100,6 +3998,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -4132,6 +4031,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -4165,6 +4065,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -4197,6 +4098,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -4229,6 +4131,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -4250,6 +4153,7 @@ paths:
       - events
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -4281,6 +4185,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -4302,6 +4207,7 @@ paths:
       - events
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -4336,6 +4242,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -4368,6 +4275,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -4400,6 +4308,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -4432,6 +4341,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -4453,6 +4363,7 @@ paths:
       - events
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -4485,6 +4396,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -4506,6 +4418,7 @@ paths:
       - events
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -4527,6 +4440,7 @@ paths:
       - events
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -4549,6 +4463,7 @@ paths:
       - events
       security:
       - tokenAuth: []
+      - cookieAuth: []
       - {}
       responses:
         '200':
@@ -4581,6 +4496,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -4613,6 +4529,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -4645,6 +4562,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -4670,6 +4588,7 @@ paths:
       - events
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -4691,6 +4610,7 @@ paths:
       - events
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -4706,6 +4626,7 @@ paths:
       - me
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -4731,6 +4652,7 @@ paths:
               $ref: '#/components/schemas/PatchedEmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -4746,6 +4668,7 @@ paths:
       - me
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -4761,6 +4684,7 @@ paths:
       - me
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -4776,6 +4700,7 @@ paths:
       - me
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -4792,6 +4717,7 @@ paths:
       - me
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -4818,6 +4744,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -4833,6 +4760,7 @@ paths:
       - me
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -4858,6 +4786,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -4884,6 +4813,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -4905,6 +4835,7 @@ paths:
       - me
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '204':
           description: No response body
@@ -4927,6 +4858,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -4942,6 +4874,7 @@ paths:
       - me
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -4967,6 +4900,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -4982,6 +4916,7 @@ paths:
       - me
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -5007,6 +4942,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -5032,6 +4968,7 @@ paths:
               $ref: '#/components/schemas/PatchedEmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -5047,6 +4984,7 @@ paths:
       - me
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -5062,6 +5000,7 @@ paths:
       - me
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -5087,6 +5026,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -5119,6 +5059,7 @@ paths:
               $ref: '#/components/schemas/PatchedEmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -5151,6 +5092,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -5166,6 +5108,7 @@ paths:
       - profile
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -5191,6 +5134,7 @@ paths:
               $ref: '#/components/schemas/PatchedEmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -5217,6 +5161,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -5266,6 +5211,7 @@ paths:
       - users
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -5281,6 +5227,7 @@ paths:
       - verification-images
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -5306,6 +5253,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -5338,6 +5286,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -5370,6 +5319,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -5402,6 +5352,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -5418,6 +5369,7 @@ paths:
       - volunteer
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -5444,6 +5396,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -5459,6 +5412,7 @@ paths:
       - volunteer
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -5484,6 +5438,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -5510,6 +5465,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -5531,6 +5487,7 @@ paths:
       - volunteer
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '204':
           description: No response body
@@ -5553,6 +5510,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -5569,6 +5527,7 @@ paths:
       - volunteer
       security:
       - tokenAuth: []
+      - cookieAuth: []
       - {}
       responses:
         '200':
@@ -5587,6 +5546,7 @@ paths:
       - volunteer
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -5612,6 +5572,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -5637,6 +5598,7 @@ paths:
               $ref: '#/components/schemas/PatchedEmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -5652,6 +5614,7 @@ paths:
       - volunteer
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -5677,6 +5640,7 @@ paths:
               $ref: '#/components/schemas/PatchedEmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -5692,6 +5656,7 @@ paths:
       - volunteer
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -5707,6 +5672,7 @@ paths:
       - volunteer
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -5723,6 +5689,7 @@ paths:
       - volunteer
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -5749,6 +5716,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -5764,6 +5732,7 @@ paths:
       - volunteer
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -5789,6 +5758,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -5815,6 +5785,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -5836,6 +5807,7 @@ paths:
       - volunteer
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '204':
           description: No response body
@@ -5858,6 +5830,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -5873,6 +5846,7 @@ paths:
       - volunteer
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -5898,6 +5872,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -5913,6 +5888,7 @@ paths:
       - volunteer
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -5938,6 +5914,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -5963,6 +5940,7 @@ paths:
               $ref: '#/components/schemas/PatchedEmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -5978,6 +5956,7 @@ paths:
       - volunteer
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -6003,6 +5982,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -6018,6 +5998,7 @@ paths:
       - volunteer
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -6043,6 +6024,7 @@ paths:
               $ref: '#/components/schemas/PatchedEmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -6066,6 +6048,7 @@ paths:
       - volunteer
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -6081,6 +6064,7 @@ paths:
       - volunteer
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -6106,6 +6090,7 @@ paths:
               $ref: '#/components/schemas/EmptyResponse'
       security:
       - tokenAuth: []
+      - cookieAuth: []
       responses:
         '200':
           content:
@@ -6373,6 +6358,210 @@ components:
       - pending_checkin_confirmations
       - users_pending_verification
       - warnings_last_30d
+    AdminEventCreate:
+      type: object
+      description: |-
+        Mixin for DRF serializers that strictly enforces allow-listing of input fields.
+        Rejects any input key that is not explicitly declared on the serializer,
+        as well as incoming payload updates on read_only=True fields.
+      properties:
+        title:
+          type: string
+          maxLength: 200
+        description:
+          type: string
+          nullable: true
+        category:
+          type: string
+          nullable: true
+        start_time:
+          type: string
+          format: date-time
+        end_time:
+          type: string
+          format: date-time
+        start_at:
+          type: string
+          format: date-time
+        end_at:
+          type: string
+          format: date-time
+        venue_name:
+          type: string
+          nullable: true
+        venue_address:
+          type: string
+          nullable: true
+        venue_lat:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,6})?$
+          nullable: true
+        venue_lng:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,6})?$
+          nullable: true
+        geofence_radius_m:
+          type: integer
+          maximum: 2000
+          minimum: 50
+          default: 150
+        checkin_open_minutes_before:
+          type: integer
+          maximum: 720
+          minimum: 0
+          default: 30
+        checkin_close_minutes_after:
+          type: integer
+          maximum: 720
+          minimum: 0
+          default: 60
+        waitlist_enabled:
+          type: boolean
+          default: true
+        Waitlist_enabled:
+          type: boolean
+          default: true
+        auto_assign_enabled:
+          type: boolean
+          default: false
+        minimum_verification_tier:
+          allOf:
+          - $ref: '#/components/schemas/MinimumVerificationTierEnum'
+          default: none
+        Minimum_verification_tier:
+          $ref: '#/components/schemas/MinimumVerificationTierEnum'
+        briefing_text:
+          type: string
+          nullable: true
+        safety_notes:
+          type: string
+          nullable: true
+        skill_tags:
+          type: array
+          items:
+            type: string
+        charity_field_ids:
+          type: array
+          items:
+            type: integer
+        charity_field_codes:
+          type: array
+          items:
+            type: string
+        owner_user_id:
+          type: integer
+          nullable: true
+      required:
+      - title
+    AdminEventResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+        event_id:
+          type: integer
+        title:
+          type: string
+        status:
+          type: string
+        owner_id:
+          type: integer
+        current_coordinator_id:
+          type: integer
+        start_time:
+          type: string
+          format: date-time
+        start_at:
+          type: string
+          format: date-time
+        end_time:
+          type: string
+          format: date-time
+        end_at:
+          type: string
+          format: date-time
+      required:
+      - current_coordinator_id
+      - end_at
+      - end_time
+      - event_id
+      - id
+      - owner_id
+      - start_at
+      - start_time
+      - status
+      - title
+    AdminEventSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        event_id:
+          type: integer
+        title:
+          type: string
+        status:
+          type: string
+        owner_id:
+          type: integer
+        current_coordinator_id:
+          type: integer
+        start_time:
+          type: string
+          format: date-time
+        start_at:
+          type: string
+          format: date-time
+        end_time:
+          type: string
+          format: date-time
+        end_at:
+          type: string
+          format: date-time
+        acceptance_mode:
+          type: string
+        auto_assign_enabled:
+          type: boolean
+        max_participants:
+          type: integer
+          nullable: true
+        geo_checkin_enabled:
+          type: boolean
+        pending_count:
+          type: integer
+        accepted_count:
+          type: integer
+        waitlisted_count:
+          type: integer
+        assignment_count:
+          type: integer
+        checked_in_count:
+          type: integer
+        pending_confirmations:
+          type: integer
+      required:
+      - acceptance_mode
+      - accepted_count
+      - assignment_count
+      - auto_assign_enabled
+      - checked_in_count
+      - current_coordinator_id
+      - end_at
+      - end_time
+      - event_id
+      - geo_checkin_enabled
+      - id
+      - max_participants
+      - owner_id
+      - pending_confirmations
+      - pending_count
+      - start_at
+      - start_time
+      - status
+      - title
+      - waitlisted_count
     AdminFeedback:
       type: object
       description: |-
@@ -6660,6 +6849,16 @@ components:
         * `mock_selfie` - Mock Selfie
         * `id_license` - ID License
         * `driver_license` - Driver License
+    MinimumVerificationTierEnum:
+      enum:
+      - none
+      - light
+      - full
+      type: string
+      description: |-
+        * `none` - none
+        * `light` - light
+        * `full` - full
     ModerationAction:
       type: object
       description: |-
@@ -6785,6 +6984,10 @@ components:
         * `no_match` - no_match
         * `needs_review` - needs_review
   securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: sessionid
     tokenAuth:
       type: apiKey
       in: header

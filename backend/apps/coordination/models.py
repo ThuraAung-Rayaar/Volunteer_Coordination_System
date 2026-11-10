@@ -38,6 +38,10 @@ class CoordinatorProfiles(models.Model):
         managed = False
         db_table = "coordinator_profiles"
 
+    @property
+    def coordinator_status(self):
+        return self.status
+
 
 class EventCoordinatorHistory(models.Model):
     id = models.BigAutoField(primary_key=True)
@@ -164,4 +168,8 @@ class VEventCoordinatorHistory(models.Model):
     class Meta:
         managed = False
         db_table = "v_event_coordinator_history"
+
+    @property
+    def assigned_at(self):
+        return self.changed_at
 

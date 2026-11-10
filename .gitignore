@@ -34,6 +34,8 @@ ENV/
 media/
 staticfiles/
 *.sqlite3
+backend/private_media/
+private_media/
 
 # Logs
 *.log

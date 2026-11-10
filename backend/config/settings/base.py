@@ -20,6 +20,10 @@ PHONE_ENCRYPTION_KEY = os.getenv(
     'PHONE_ENCRYPTION_KEY',
     'IcY3lXCl1k0P1NawgjDSeCYOqcNRWJStRaqbWN21nGs='
 )
+CARTO_API_KEY = os.getenv(
+    'CARTO_API_KEY',
+    'cb1_5490_1_395a9eafc491da9c508bf094'
+)
 
 DEBUG = os.getenv('DEBUG', 'false').lower() == 'true'
 
@@ -115,7 +119,16 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'common.authentication.BlockedAwareTokenAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
     ],
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '60/min',
+        'user': '300/min',
+    },
     'EXCEPTION_HANDLER': 'common.exceptions.custom_exception_handler',
     'DEFAULT_SCHEMA_CLASS': 'common.schema.CleanAutoSchema',
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
@@ -147,6 +160,7 @@ VERIFICATION_MAX_DIMENSION = 6000                 # px
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_ALL_ORIGINS = os.environ.get('CORS_ALLOW_ALL_ORIGINS', 'True' if DEBUG else 'False').lower() in ('true', '1')
+CORS_ALLOWED_ORIGINS = [o.strip() for o in os.environ.get('CORS_ALLOWED_ORIGINS', '').split(',') if o.strip()]
 
 TEST_RUNNER = 'config.test_runner.SqlFileTestRunner'

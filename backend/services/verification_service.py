@@ -288,6 +288,17 @@ def get_pending_images_for_admin(
     )
 
 
+def list_pending_verifications() -> list[dict]:
+    """Return pending verification images for the admin dashboard queue."""
+    qs = UserVerificationImages.objects.filter(is_current=True, status="pending").select_related("user")
+    return list(
+        qs.order_by("created_at").values(
+            "id", "user_id", "user__display_name", "image_type", "image_path",
+            "status", "comparison_status", "is_current", "created_at",
+        )
+    )
+
+
 # --- Private file resolution (for the admin streaming view) ----------------
 
 def resolve_private_image_path(image: UserVerificationImages) -> Path:

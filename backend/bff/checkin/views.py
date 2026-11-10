@@ -243,7 +243,8 @@ class EventFeedbackSubmitView(APIView):
     def get(self, request, event_id):
         from services import feedback_service
         rows = feedback_service.get_event_feedback(request.user, event_id)
-        return Response({"results": rows})
+        summary = feedback_service.get_user_feedback_summary(request.user.id)
+        return Response({"results": rows, "summary": summary})
 
 
 class EventFeedbackListView(APIView):
@@ -253,7 +254,8 @@ class EventFeedbackListView(APIView):
     def get(self, request, event_id):
         from services import feedback_service
         rows = feedback_service.get_event_feedback(request.user, event_id)
-        return Response({"results": rows})
+        summary = feedback_service.get_user_feedback_summary(request.user.id)
+        return Response({"results": rows, "summary": summary})
 
 
 class MyFeedbackView(APIView):
@@ -263,7 +265,8 @@ class MyFeedbackView(APIView):
     def get(self, request):
         from services import feedback_service
         rows = feedback_service.get_own_feedback(request.user)
-        return Response({"results": rows})
+        summary = feedback_service.get_user_feedback_summary(request.user.id)
+        return Response({"results": rows, "summary": summary})
 
 
 # --- Self-Service Volunteer Attendance History (BR-PRIV-T4) -----------------

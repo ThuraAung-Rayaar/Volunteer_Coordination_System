@@ -1,0 +1,385 @@
+{% extends "admin_portal/base_admin.html" %}
+
+{% block title %}Users Directory & Governance Inspector — Super Admin Control Center{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <!-- Top Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+            <h1 class="text-xl font-bold text-white flex items-center gap-2.5">
+                <span class="w-8 h-8 rounded-xl bg-blue-600/20 text-blue-400 flex items-center justify-center">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+                </span>
+                Users Directory & Identity Inspector
+            </h1>
+            <p class="text-xs text-slate-400 mt-0.5">Comprehensive volunteer and coordinator registry with decrypted phones, identity reviews, and governance controls</p>
+        </div>
+        {% if is_superuser %}
+        <a href="/api/v1/admin/ui/user-create/" class="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs transition flex items-center gap-2 shadow-lg shadow-blue-600/20">
+            <span>+ Provision New User</span>
+        </a>
+        {% endif %}
+    </div>
+
+    <!-- Filter Tabs & Search Bar -->
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 bg-slate-900/90 border border-slate-800 p-3 rounded-2xl shadow-lg">
+        <!-- Sub-Tabs -->
+        <div class="flex items-center gap-1 overflow-x-auto text-xs font-medium scrollbar-none">
+            <a href="?role=all" class="px-3 py-1.5 rounded-lg transition whitespace-nowrap {% if role_filter == 'all' %}bg-blue-600 text-white font-semibold shadow-sm{% else %}text-slate-400 hover:text-white hover:bg-slate-800{% endif %}">
+                All Users
+            </a>
+            <a href="?role=volunteers" class="px-3 py-1.5 rounded-lg transition whitespace-nowrap {% if role_filter == 'volunteers' %}bg-blue-600 text-white font-semibold shadow-sm{% else %}text-slate-400 hover:text-white hover:bg-slate-800{% endif %}">
+                Volunteers
+            </a>
+            <a href="?role=coordinators" class="px-3 py-1.5 rounded-lg transition whitespace-nowrap {% if role_filter == 'coordinators' %}bg-blue-600 text-white font-semibold shadow-sm{% else %}text-slate-400 hover:text-white hover:bg-slate-800{% endif %}">
+                Approved Coordinators
+            </a>
+            <a href="?role=admins" class="px-3 py-1.5 rounded-lg transition whitespace-nowrap {% if role_filter == 'admins' %}bg-blue-600 text-white font-semibold shadow-sm{% else %}text-slate-400 hover:text-white hover:bg-slate-800{% endif %}">
+                Admins
+            </a>
+            <a href="?role=blocked" class="px-3 py-1.5 rounded-lg transition whitespace-nowrap {% if role_filter == 'blocked' %}bg-blue-600 text-white font-semibold shadow-sm{% else %}text-slate-400 hover:text-white hover:bg-slate-800{% endif %}">
+                Blocked / Warned
+            </a>
+        </div>
+
+        <!-- Search Form -->
+        <form method="GET" action="" class="flex items-center gap-2 w-full md:w-auto">
+            <input type="hidden" name="role" value="{{ role_filter }}">
+            <input
+                type="text"
+                name="q"
+                value="{{ search_query }}"
+                placeholder="Search name or ID..."
+                class="w-full md:w-64 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+            />
+            <button type="submit" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs text-white font-medium transition cursor-pointer">
+                Search
+            </button>
+            {% if search_query %}
+            <a href="?role={{ role_filter }}" class="text-xs text-slate-400 hover:text-white p-1">✕</a>
+            {% endif %}
+        </form>
+    </div>
+
+    <!-- Split Grid: Users Table + Selected User Inspector -->
+    <div class="grid grid-cols-1 {% if selected_user %}lg:grid-cols-12{% endif %} gap-6 items-start">
+
+        <!-- Master: Users List Table -->
+        <div class="{% if selected_user %}lg:col-span-5{% else %}w-full{% endif %} bg-slate-900/90 border border-slate-800 rounded-2xl shadow-xl overflow-hidden">
+            <div class="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
+                <div>
+                    <h2 class="text-sm font-bold text-white">Registered User Registry</h2>
+                    <p class="text-[11px] text-slate-400">Decrypted phones visible via T4 administrator role</p>
+                </div>
+                <span class="text-xs font-mono text-slate-400 bg-slate-800 px-2 py-0.5 rounded">
+                    {{ users_list|length }} results
+                </span>
+            </div>
+
+            <div class="overflow-x-auto max-h-[720px] overflow-y-auto">
+                <table class="w-full text-left text-xs text-slate-300">
+                    <thead class="bg-slate-950/80 uppercase font-semibold text-slate-400 border-b border-slate-800 text-[10px] sticky top-0 z-20">
+                        <tr>
+                            <th class="px-4 py-2.5">User</th>
+                            <th class="px-4 py-2.5">Decrypted Phone</th>
+                            <th class="px-4 py-2.5">Role</th>
+                            <th class="px-4 py-2.5">Verification</th>
+                            <th class="px-4 py-2.5 text-right">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-800/60 font-sans">
+                        {% for u in users_list %}
+                        <tr class="hover:bg-slate-800/40 transition {% if selected_user and selected_user.id == u.id %}bg-blue-600/10 border-l-2 border-blue-500{% endif %}">
+                            <td class="px-4 py-3">
+                                <div class="font-medium text-white">{{ u.display_name|default:"Unnamed" }}</div>
+                                <div class="text-[10px] font-mono text-slate-500">ID #{{ u.id }}</div>
+                            </td>
+                            <td class="px-4 py-3 font-mono text-sky-400 text-[11px]">
+                                {{ u.decrypted_phone|default:"—" }}
+                            </td>
+                            <td class="px-4 py-3">
+                                {% if u.is_superuser %}
+                                <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/30">Super Admin</span>
+                                {% elif u.is_admin %}
+                                <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-sky-500/10 text-sky-400 border border-sky-500/30">Admin</span>
+                                {% elif u.coordinator_status == 'approved' %}
+                                <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-purple-500/10 text-purple-400 border border-purple-500/30">Coordinator</span>
+                                {% else %}
+                                <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-800 text-slate-400">Volunteer</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3">
+                                {% if u.verification_status == 'verified' or u.verification_status == 'full' %}
+                                <span class="text-emerald-400 font-semibold text-[11px]">✓ Verified</span>
+                                {% elif u.verification_status == 'pending' %}
+                                <span class="text-amber-400 font-semibold text-[11px]">⏳ Pending</span>
+                                {% elif u.verification_status == 'rejected' %}
+                                <span class="text-rose-400 font-semibold text-[11px]">✕ Rejected</span>
+                                {% else %}
+                                <span class="text-slate-500 text-[11px]">None</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3 text-right">
+                                <a href="?user_id={{ u.id }}&role={{ role_filter }}&q={{ search_query }}" class="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium text-[11px] transition inline-block">
+                                    Inspect
+                                </a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="px-6 py-8 text-center text-slate-500">No users match this filter.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Detail: Selected User Inspector Panel (7 cols) -->
+        {% if selected_user %}
+        <div class="lg:col-span-7 space-y-6">
+
+            <!-- 1. Personal & Capability Profile Card -->
+            <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+                <div class="flex items-start justify-between gap-3">
+                    <div>
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="font-mono text-xs px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">User #{{ selected_user.id }}</span>
+                            <span class="px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider
+                                {% if selected_user.account_status == 'active' %}bg-emerald-500/10 text-emerald-400 border border-emerald-500/30
+                                {% elif selected_user.account_status == 'blocked' %}bg-rose-500/10 text-rose-400 border border-rose-500/30
+                                {% else %}bg-slate-800 text-slate-400{% endif %}">
+                                {{ selected_user.account_status }}
+                            </span>
+                            <span class="font-mono text-[10px] text-slate-500">{{ selected_user.uuid }}</span>
+                        </div>
+                        <h2 class="text-lg font-bold text-white">{{ selected_user.display_name }}</h2>
+                        <p class="font-mono text-xs text-sky-400 mt-0.5">📞 {{ selected_user.decrypted_phone|default:"No Phone Recorded" }}</p>
+                    </div>
+
+                    <a href="?role={{ role_filter }}&q={{ search_query }}" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white text-xs transition">
+                        ✕ Close
+                    </a>
+                </div>
+
+                <!-- Attributes Grid -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 border-t border-slate-800 text-xs">
+                    <div class="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+                        <span class="text-slate-400 text-[10px] uppercase font-semibold">Blood Type</span>
+                        <p class="text-white font-mono font-bold mt-0.5 uppercase">{{ selected_user.blood_type|default:"Unknown" }}</p>
+                    </div>
+                    <div class="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+                        <span class="text-slate-400 text-[10px] uppercase font-semibold">Home Area</span>
+                        <p class="text-white font-medium truncate mt-0.5">{{ selected_user.home_area|default:"Not specified" }}</p>
+                    </div>
+                    <div class="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+                        <span class="text-slate-400 text-[10px] uppercase font-semibold">Emergency Contact</span>
+                        <p class="text-white font-medium truncate mt-0.5">{{ selected_user.emergency_contact_name|default:"—" }}</p>
+                    </div>
+                    <div class="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+                        <span class="text-slate-400 text-[10px] uppercase font-semibold">Warnings / Blocks</span>
+                        <p class="font-mono text-[11px] mt-0.5">
+                            <span class="text-amber-400 font-bold">{{ selected_user_summary.warning_count|default:0 }}W</span> &bull; 
+                            <span class="text-rose-400 font-bold">{{ selected_user_summary.block_count|default:0 }}B</span>
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Skills Tags -->
+                <div>
+                    <span class="text-[10px] uppercase font-semibold text-slate-400 block mb-1">Declared Capabilities & Skills</span>
+                    <div class="flex flex-wrap gap-1.5">
+                        {% for sk in selected_user.skills %}
+                        <span class="px-2 py-0.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 text-[11px] font-mono">{{ sk }}</span>
+                        {% empty %}
+                        <span class="text-xs text-slate-500 italic">No skill tags listed.</span>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. Identity Verification Documents & Review Action -->
+            <div class="bg-slate-900/90 border border-slate-800 rounded-2xl shadow-xl overflow-hidden">
+                <div class="px-5 py-3 border-b border-slate-800 flex items-center justify-between">
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-white">Identity Verification Documents</h3>
+                    <span class="text-xs font-mono text-slate-400">{{ selected_images|length }} images</span>
+                </div>
+                <div class="p-4 space-y-3">
+                    {% for img in selected_images %}
+                    <div class="bg-slate-950/60 p-3.5 rounded-xl border border-slate-800/80 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <span class="font-mono text-xs text-blue-400 font-semibold uppercase">{{ img.image_type }}</span>
+                                <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold
+                                    {% if img.status == 'verified' %}bg-emerald-500/10 text-emerald-400 border border-emerald-500/30
+                                    {% elif img.status == 'pending' %}bg-amber-500/10 text-amber-400 border border-amber-500/30
+                                    {% else %}bg-rose-500/10 text-rose-400 border border-rose-500/30{% endif %}">
+                                    {{ img.status }}
+                                </span>
+                            </div>
+                            <div class="text-[10px] font-mono text-slate-500 mt-1">Uploaded: {{ img.created_at|date:"Y-m-d H:i" }}</div>
+                            <div class="mt-1.5">
+                                <a href="/api/v1/admin/verification-images/{{ img.id }}/file/" target="_blank" class="text-xs text-sky-400 hover:text-sky-300 font-medium hover:underline inline-flex items-center gap-1">
+                                    <span>Stream Photo Preview</span>
+                                    <span>↗</span>
+                                </a>
+                            </div>
+                        </div>
+
+                        <!-- Review Action Form (if pending) -->
+                        {% if img.status == 'pending' %}
+                        <form method="POST" action="" class="flex items-center gap-2">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="review_image">
+                            <input type="hidden" name="image_id" value="{{ img.id }}">
+                            <input type="hidden" name="target_user_id" value="{{ selected_user.id }}">
+                            <input type="text" name="review_note" placeholder="Review note..." class="px-2 py-1 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white placeholder-slate-500 w-32 focus:outline-none" />
+                            <button type="submit" name="decision" value="approved" class="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs transition cursor-pointer">
+                                Approve
+                            </button>
+                            <button type="submit" name="decision" value="rejected" class="px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs transition cursor-pointer">
+                                Reject
+                            </button>
+                        </form>
+                        {% endif %}
+                    </div>
+                    {% empty %}
+                    <p class="text-center text-xs text-slate-500 py-3">No verification photos submitted yet.</p>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- 3. Event Participation & Attendance History -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- Assignments -->
+                <div class="bg-slate-900/90 border border-slate-800 rounded-2xl shadow-xl overflow-hidden">
+                    <div class="px-4 py-3 border-b border-slate-800">
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-white">Event Assignments ({{ selected_assignments|length }})</h3>
+                    </div>
+                    <div class="max-h-52 overflow-y-auto">
+                        <table class="w-full text-left text-xs text-slate-300">
+                            <thead class="bg-slate-950/80 text-[10px] uppercase font-semibold text-slate-400 border-b border-slate-800">
+                                <tr>
+                                    <th class="px-3 py-2">Event</th>
+                                    <th class="px-3 py-2">Role</th>
+                                    <th class="px-3 py-2">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-800/60">
+                                {% for a in selected_assignments %}
+                                <tr class="hover:bg-slate-800/40">
+                                    <td class="px-3 py-2 font-medium text-white max-w-[140px] truncate">{{ a.event.title }}</td>
+                                    <td class="px-3 py-2 text-[11px] text-slate-400">{{ a.post.title|default:"General" }}</td>
+                                    <td class="px-3 py-2 font-mono text-[10px] text-blue-400">{{ a.status }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr><td colspan="3" class="px-3 py-4 text-center text-slate-500 text-xs">No assignments.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Attendance History -->
+                <div class="bg-slate-900/90 border border-slate-800 rounded-2xl shadow-xl overflow-hidden">
+                    <div class="px-4 py-3 border-b border-slate-800">
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-white">Attendance History ({{ selected_attendance|length }})</h3>
+                    </div>
+                    <div class="max-h-52 overflow-y-auto">
+                        <table class="w-full text-left text-xs text-slate-300">
+                            <thead class="bg-slate-950/80 text-[10px] uppercase font-semibold text-slate-400 border-b border-slate-800">
+                                <tr>
+                                    <th class="px-3 py-2">Event</th>
+                                    <th class="px-3 py-2">Method</th>
+                                    <th class="px-3 py-2">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-800/60">
+                                {% for att in selected_attendance %}
+                                <tr class="hover:bg-slate-800/40">
+                                    <td class="px-3 py-2 font-medium text-white max-w-[140px] truncate">{{ att.event.title }}</td>
+                                    <td class="px-3 py-2 font-mono text-[10px] text-slate-400">{{ att.method }}</td>
+                                    <td class="px-3 py-2 font-semibold text-[10px]
+                                        {% if att.status == 'checked_in' or att.status == 'completed' %}text-emerald-400{% else %}text-amber-400{% endif %}">
+                                        {{ att.status }}
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr><td colspan="3" class="px-3 py-4 text-center text-slate-500 text-xs">No attendance check-ins.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 4. Governance & Moderation Controls -->
+            <div class="bg-slate-900/90 border border-slate-800 rounded-2xl shadow-xl p-5 space-y-4">
+                <h3 class="text-xs font-bold uppercase tracking-wider text-white flex items-center gap-2">
+                    <svg class="w-4 h-4 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                    Governance & Sanctions Controls
+                </h3>
+
+                <form method="POST" action="" class="space-y-3">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="moderation_action">
+                    <input type="hidden" name="target_user_id" value="{{ selected_user.id }}">
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-300 mb-1">Action Type</label>
+                            <select name="action_type" class="w-full px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none">
+                                <option value="user_warning">Issue Formal Warning</option>
+                                <option value="user_block">Temporary Account Block</option>
+                                <option value="user_unblock">Unblock Account</option>
+                                {% if is_superuser %}
+                                <option value="account_close">Permanently Close Account (Super Admin)</option>
+                                <option value="account_reinstate">Reinstate Account (Super Admin)</option>
+                                {% endif %}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-300 mb-1">Block Expiry (Optional)</label>
+                            <input type="datetime-local" name="expires_at" class="w-full px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs font-mono" />
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-300 mb-1">Reason & Audit Justification</label>
+                        <input type="text" name="reason" required placeholder="Mandatory audit justification for this moderation action..." class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs placeholder-slate-500 focus:outline-none focus:border-blue-500" />
+                    </div>
+
+                    <div class="flex justify-end pt-2">
+                        <button type="submit" class="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs rounded-xl shadow-md transition cursor-pointer">
+                            Execute Moderation Action
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Moderation History Trail -->
+                <div class="pt-3 border-t border-slate-800">
+                    <h4 class="text-[11px] uppercase font-semibold text-slate-400 mb-2">Previous Sanctions History</h4>
+                    <div class="space-y-1.5 max-h-36 overflow-y-auto">
+                        {% for m in selected_moderations %}
+                        <div class="flex items-center justify-between text-[11px] bg-slate-950/40 p-2 rounded-lg border border-slate-800">
+                            <div>
+                                <strong class="text-rose-400 font-mono">{{ m.action_type }}</strong> &bull; 
+                                <span class="text-slate-300">{{ m.reason }}</span>
+                            </div>
+                            <span class="text-slate-500 font-mono text-[10px]">{{ m.created_at|date:"M d, H:i" }}</span>
+                        </div>
+                        {% empty %}
+                        <p class="text-[11px] text-slate-500 italic">No prior moderation actions recorded for this user.</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+        </div>
+        {% endif %}
+
+    </div>
+</div>
+{% endblock %}

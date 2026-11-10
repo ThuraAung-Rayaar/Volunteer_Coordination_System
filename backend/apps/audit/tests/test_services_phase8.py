@@ -122,9 +122,13 @@ class Phase8ServiceIntegrationTests(TestCase):
         )
         self.assertEqual(fb2.target_user_id, self.vol.id)
 
-        # 3. List feedback
-        event_fbs = feedback_service.list_event_feedback(self.coord, self.event.id)
-        self.assertEqual(len(event_fbs), 2)
+        # 3. List feedback (coordinator only sees own authored feedback; admin sees all)
+        coord_fbs = feedback_service.list_event_feedback(self.coord, self.event.id)
+        self.assertEqual(len(coord_fbs), 1)
+        self.assertEqual(coord_fbs[0]["id"], fb2.id)
+
+        admin_fbs = feedback_service.list_event_feedback(self.standard_admin, self.event.id)
+        self.assertEqual(len(admin_fbs), 2)
 
         # 4. Volunteer history
         vol_history = feedback_service.get_user_feedback_history(self.vol)
@@ -240,3 +244,71 @@ class Phase8ServiceIntegrationTests(TestCase):
                     reason="Test crash",
                 )
         self.assertEqual(ModerationActions.objects.count(), initial_count)
+
+    def test_anonymous_feedback_summary_and_privacy(self):
+        """
+        Verify:
+        - get_user_feedback_summary returns accurate averages and counts without from_user_id or comments.
+        - Neither a volunteer nor a coordinator can see from_user_id when querying feedback.
+        - Non-admins calling list_feedback_for_user only receive the aggregate summary.
+        - Admins can see from_user_id and raw feedback.
+        """
+        # 1. Submit coordinator -> volunteer feedback
+        fb1 = feedback_service.submit_event_feedback(
+            self.coord,
+            self.event.id,
+            "coordinator_to_volunteer",
+            score=4,
+            tags=["punctual", "reliable"],
+            comment="Great effort during shift",
+            target_user_id=self.vol.id,
+        )
+
+        # 2. Verify get_user_feedback_summary
+        summary = feedback_service.get_user_feedback_summary(self.vol.id)
+        self.assertEqual(summary["user_id"], self.vol.id)
+        self.assertEqual(summary["total_count"], 1)
+        self.assertEqual(summary["overall_avg_rating"], 4.0)
+        self.assertEqual(summary["as_volunteer"]["count"], 1)
+        self.assertEqual(summary["as_volunteer"]["avg_overall"], 4.0)
+        self.assertEqual(summary["as_volunteer"]["avg_punctuality"], 4.0)
+        self.assertEqual(summary["as_volunteer"]["avg_attitude"], 4.0)
+        self.assertEqual(summary["as_volunteer"]["avg_task_completion"], 4.0)
+        self.assertEqual(summary["as_coordinator"]["count"], 0)
+        self.assertIsNone(summary["as_coordinator"]["avg_overall"])
+        self.assertEqual(summary["rating_distribution"]["4"], 1)
+        self.assertEqual(summary["rating_distribution"]["5"], 0)
+
+        # Ensure NO from_user_id, rater_user_id, event_id, or comment in summary
+        self.assertNotIn("from_user_id", summary)
+        self.assertNotIn("rater_user_id", summary)
+        self.assertNotIn("comment", summary)
+        self.assertNotIn("comments", summary)
+        self.assertNotIn("event_id", summary)
+
+        # 3. Test list_feedback_for_user privacy
+        # Volunteer query: returns aggregate summary, never exposes from_user_id or raw comments
+        vol_view = feedback_service.list_feedback_for_user(self.vol, self.vol.id)
+        self.assertEqual(len(vol_view), 1)
+        self.assertNotIn("from_user_id", vol_view[0])
+        self.assertNotIn("comment", vol_view[0])
+
+        # Coordinator query: also returns aggregate summary for target user, no from_user_id or comments
+        coord_view = feedback_service.list_feedback_for_user(self.coord, self.vol.id)
+        self.assertEqual(len(coord_view), 1)
+        self.assertNotIn("from_user_id", coord_view[0])
+        self.assertNotIn("comment", coord_view[0])
+
+        # Event feedback query: volunteer should not see from_user_id of other reviewers
+        event_fb = feedback_service.get_event_feedback(self.vol, self.event.id)
+        for item in event_fb:
+            if item.get("rater_user_id") != self.vol.id:
+                self.assertIsNone(item.get("from_user_id"))
+
+        # Admin query: standard_admin CAN see individual rows with from_user_id and comment
+        admin_view = feedback_service.list_feedback_for_user(self.standard_admin, self.vol.id)
+        self.assertEqual(len(admin_view), 1)
+        self.assertIn("from_user_id", admin_view[0])
+        self.assertEqual(admin_view[0]["from_user_id"], self.coord.id)
+        self.assertEqual(admin_view[0]["comment"], "Great effort during shift")
+

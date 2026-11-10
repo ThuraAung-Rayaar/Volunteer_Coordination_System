@@ -1,0 +1,336 @@
+{% extends "admin_portal/base_admin.html" %}
+
+{% block title %}Provision User & Coordinator Appointment — Super Admin Control Center{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <!-- Header Section -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+            <h1 class="text-xl font-bold text-white flex items-center gap-2.5">
+                <span class="w-8 h-8 rounded-xl bg-blue-600/20 text-blue-400 flex items-center justify-center">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>
+                </span>
+                User Provisioning & Coordinator Appointment
+            </h1>
+            <p class="text-xs text-slate-400 mt-0.5">Direct onboarding with Myanmar phone auto-hashing, identity verification, and atomic coordinator governance</p>
+        </div>
+        <div class="flex items-center gap-2">
+            <span class="px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/30">
+                Super Admin Exclusive
+            </span>
+        </div>
+    </div>
+
+    <!-- Main Grid: Left (Provision New User) + Right (Promote & Recent) -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+        <!-- Left 7 Columns: Provision New User -->
+        <div class="lg:col-span-7 bg-slate-900/90 border border-slate-800 rounded-2xl shadow-xl overflow-hidden">
+            <div class="px-6 py-4 bg-slate-900 border-b border-slate-800 flex items-center justify-between">
+                <div>
+                    <h2 class="text-sm font-bold text-white">Create New User Account</h2>
+                    <p class="text-[11px] text-slate-400">Atomic registration and immediate role assignment</p>
+                </div>
+                <span class="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded">
+                    Atomic Triggers Verified
+                </span>
+            </div>
+
+            <form method="POST" action="/api/v1/admin/ui/user-create/" class="p-6 space-y-5">
+                {% csrf_token %}
+                <input type="hidden" name="form_action" value="provision_user">
+
+                <!-- Phone Input with Live Auto-Hash Preview -->
+                <div>
+                    <label for="prov-phone" class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1">
+                        Myanmar Phone Number <span class="text-rose-400">*</span>
+                    </label>
+                    <input
+                        type="text"
+                        id="prov-phone"
+                        name="phone"
+                        required
+                        placeholder="09... / +959... / 9..."
+                        class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-blue-500 font-mono"
+                    />
+                    <p class="text-[11px] text-slate-400 mt-1">Accepts <code class="text-blue-400">+959</code>, <code class="text-blue-400">+9509</code>, <code class="text-blue-400">09</code>, or <code class="text-blue-400">9...</code></p>
+
+                    <!-- Hash Preview Strip -->
+                    <div id="prov-hash-box" class="mt-2 p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-xs hidden space-y-1">
+                        <div class="flex justify-between text-[11px]">
+                            <span class="text-slate-400">Normalized Canonical:</span>
+                            <span id="prov-canonical" class="font-mono text-sky-400 font-semibold">—</span>
+                        </div>
+                        <div class="flex flex-col gap-0.5 text-[10px]">
+                            <span class="text-slate-500">SHA-256 HMAC Hash:</span>
+                            <span id="prov-hash" class="font-mono text-slate-400 break-all select-all">—</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Display Name & Password -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1">
+                            Full Display Name <span class="text-rose-400">*</span>
+                        </label>
+                        <input
+                            type="text"
+                            name="display_name"
+                            required
+                            placeholder="e.g. Daw Khin Khin Lay"
+                            class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-blue-500"
+                        />
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1">
+                            Initial Password
+                        </label>
+                        <input
+                            type="password"
+                            name="password"
+                            placeholder="Optional (Default: AdminDemo123!)"
+                            class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-blue-500"
+                        />
+                    </div>
+                </div>
+
+                <!-- Role Selection Radio Cards -->
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-2">
+                        Target System Role <span class="text-rose-400">*</span>
+                    </label>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <!-- Role 1: Coordinator -->
+                        <label class="relative flex flex-col p-3.5 rounded-xl border border-purple-500/40 bg-purple-950/20 hover:bg-purple-900/30 cursor-pointer transition group">
+                            <div class="flex items-center justify-between mb-1.5">
+                                <span class="font-bold text-xs text-purple-300">Coordinator</span>
+                                <input type="radio" name="assign_role" value="coordinator" checked class="text-purple-600 focus:ring-purple-500" />
+                            </div>
+                            <p class="text-[11px] text-purple-400/80 leading-relaxed">
+                                Auto-verified identity and immediately approved coordinator profile.
+                            </p>
+                        </label>
+
+                        <!-- Role 2: Volunteer -->
+                        <label class="relative flex flex-col p-3.5 rounded-xl border border-slate-800 bg-slate-950/60 hover:bg-slate-800/40 cursor-pointer transition group">
+                            <div class="flex items-center justify-between mb-1.5">
+                                <span class="font-bold text-xs text-emerald-400">Volunteer</span>
+                                <input type="radio" name="assign_role" value="volunteer" class="text-blue-600 focus:ring-blue-500" />
+                            </div>
+                            <p class="text-[11px] text-slate-400 leading-relaxed">
+                                Active verified volunteer ready for event assignments.
+                            </p>
+                        </label>
+
+                        <!-- Role 3: Staff Admin -->
+                        <label class="relative flex flex-col p-3.5 rounded-xl border border-slate-800 bg-slate-950/60 hover:bg-slate-800/40 cursor-pointer transition group">
+                            <div class="flex items-center justify-between mb-1.5">
+                                <span class="font-bold text-xs text-sky-400">Staff Admin</span>
+                                <input type="radio" name="assign_role" value="staff_admin" class="text-blue-600 focus:ring-blue-500" />
+                            </div>
+                            <p class="text-[11px] text-slate-400 leading-relaxed">
+                                Operations admin with moderation and portal review rights.
+                            </p>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Profile Capabilities & Health Attributes -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-slate-800">
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-300 mb-1">Blood Type</label>
+                        <select name="blood_type" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none">
+                            <option value="unknown">Unknown</option>
+                            <option value="o_pos">O Positive (O+)</option>
+                            <option value="o_neg">O Negative (O-)</option>
+                            <option value="a_pos">A Positive (A+)</option>
+                            <option value="a_neg">A Negative (A-)</option>
+                            <option value="b_pos">B Positive (B+)</option>
+                            <option value="b_neg">B Negative (B-)</option>
+                            <option value="ab_pos">AB Positive (AB+)</option>
+                            <option value="ab_neg">AB Negative (AB-)</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-300 mb-1">Home Area / Township</label>
+                        <input
+                            type="text"
+                            name="home_area"
+                            placeholder="e.g. Kamayut, Yangon"
+                            class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none"
+                        />
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-300 mb-1">Skills (Comma-Separated)</label>
+                    <input
+                        type="text"
+                        name="skills"
+                        placeholder="e.g. first_aid, translation, crowd_management, driving"
+                        class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs font-mono placeholder-slate-500 focus:outline-none"
+                    />
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-300 mb-1">Governance Notes</label>
+                    <textarea
+                        name="notes"
+                        rows="2"
+                        placeholder="Audit justification or coordinator credentials verification note..."
+                        class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs placeholder-slate-500 focus:outline-none"
+                    ></textarea>
+                </div>
+
+                <!-- Submit Button -->
+                <div class="pt-3 border-t border-slate-800 flex justify-end">
+                    <button
+                        type="submit"
+                        class="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl shadow-lg shadow-blue-600/30 transition text-xs flex items-center gap-2 cursor-pointer"
+                    >
+                        <span>Provision & Assign Role</span>
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Right 5 Columns: Quick Promote & Recent Provisioned Users -->
+        <div class="lg:col-span-5 space-y-6">
+
+            <!-- Card: Promote Existing Volunteer to Coordinator -->
+            <div class="bg-slate-900/90 border border-slate-800 rounded-2xl shadow-xl p-5 space-y-4">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-sm font-bold text-white flex items-center gap-2">
+                        <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+                        Promote to Approved Coordinator
+                    </h2>
+                    <span class="text-[10px] font-mono text-purple-400 bg-purple-500/10 border border-purple-500/30 px-2 py-0.5 rounded">
+                        Quick Action
+                    </span>
+                </div>
+                <p class="text-xs text-slate-400 leading-relaxed">
+                    Instantly grants coordinator privileges to any existing verified volunteer account.
+                </p>
+
+                <form method="POST" action="/api/v1/admin/ui/user-create/" class="space-y-3">
+                    {% csrf_token %}
+                    <input type="hidden" name="form_action" value="promote_coordinator">
+
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-300 mb-1">Select Volunteer</label>
+                        <select name="target_user_id" required class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none">
+                            <option value="">Choose an eligible volunteer...</option>
+                            {% for v in eligible_volunteers %}
+                            <option value="{{ v.id }}">
+                                {{ v.display_name }} (#{{ v.id }}) &bull; {{ v.decrypted_phone|default:"No phone" }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-300 mb-1">Appointment Justification</label>
+                        <input
+                            type="text"
+                            name="notes"
+                            value="Promoted directly by Super Admin"
+                            class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none"
+                        />
+                    </div>
+
+                    <button
+                        type="submit"
+                        class="w-full py-2 px-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-semibold text-xs transition shadow-lg shadow-purple-600/20 cursor-pointer"
+                    >
+                        Approve & Promote as Coordinator
+                    </button>
+                </form>
+            </div>
+
+            <!-- Card: Recently Provisioned Users Table -->
+            <div class="bg-slate-900/90 border border-slate-800 rounded-2xl shadow-xl overflow-hidden">
+                <div class="px-5 py-3 border-b border-slate-800 flex items-center justify-between">
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-white">Recently Provisioned Accounts</h3>
+                    <span class="text-xs font-mono text-slate-400">{{ recent_provisioned_users|length }} recent</span>
+                </div>
+                <div class="overflow-x-auto max-h-72 overflow-y-auto">
+                    <table class="w-full text-left text-xs text-slate-300">
+                        <thead class="bg-slate-950/80 uppercase font-semibold text-slate-400 border-b border-slate-800 text-[10px]">
+                            <tr>
+                                <th class="px-3.5 py-2">User</th>
+                                <th class="px-3.5 py-2">Decrypted Phone</th>
+                                <th class="px-3.5 py-2">Role</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-800/60 font-sans">
+                            {% for u in recent_provisioned_users %}
+                            <tr class="hover:bg-slate-800/40">
+                                <td class="px-3.5 py-2.5 font-medium text-white truncate max-w-[120px]">
+                                    {{ u.display_name }}
+                                    <div class="text-[10px] text-slate-500 font-mono">#{{ u.id }}</div>
+                                </td>
+                                <td class="px-3.5 py-2.5 font-mono text-[11px] text-sky-400">
+                                    {{ u.decrypted_phone|default:"—" }}
+                                </td>
+                                <td class="px-3.5 py-2.5">
+                                    {% if u.is_admin %}
+                                    <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-sky-500/10 text-sky-400">Admin</span>
+                                    {% else %}
+                                    <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-800 text-slate-400">User</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="3" class="px-3.5 py-4 text-center text-slate-500 text-xs">No users recorded.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+</div>
+{% endblock %}
+
+{% block script_extra %}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const phoneInput = document.getElementById("prov-phone");
+    const hashBox = document.getElementById("prov-hash-box");
+    const canonicalLabel = document.getElementById("prov-canonical");
+    const hashLabel = document.getElementById("prov-hash");
+
+    let timer = null;
+    phoneInput.addEventListener("input", function () {
+        clearTimeout(timer);
+        timer = setTimeout(async () => {
+            const val = phoneInput.value.trim();
+            if (!val) {
+                hashBox.classList.add("hidden");
+                return;
+            }
+            try {
+                const resp = await fetch("/api/v1/admin/ui/phone-lookup/?phone=" + encodeURIComponent(val));
+                const data = await resp.json();
+                if (data.valid) {
+                    hashBox.classList.remove("hidden");
+                    canonicalLabel.textContent = data.normalized_phone || "(Hash)";
+                    hashLabel.textContent = data.phone_hash || "—";
+                } else {
+                    hashBox.classList.add("hidden");
+                }
+            } catch (e) {
+                console.error("Lookup error:", e);
+            }
+        }, 200);
+    });
+});
+</script>
+{% endblock %}

@@ -14,6 +14,18 @@ class CharityFields(models.Model):
         managed = False
         db_table = "charity_fields"
 
+    @property
+    def is_active(self):
+        return self.active
+
+    @property
+    def name(self):
+        return self.label
+
+    @property
+    def display_order(self):
+        return self.sort_order
+
 
 class Events(models.Model):
     class PurposeType(models.TextChoices):
@@ -340,6 +352,14 @@ class VPublicEvents(models.Model):
     def id(self):
         return self.event_id
 
+    @property
+    def start_time(self):
+        return self.start_at
+
+    @property
+    def end_time(self):
+        return self.end_at
+
 
 class VEventSummary(models.Model):
     event_id = models.BigIntegerField(primary_key=True)
@@ -368,3 +388,11 @@ class VEventSummary(models.Model):
     @property
     def id(self):
         return self.event_id
+
+    @property
+    def start_time(self):
+        return self.start_at
+
+    @property
+    def end_time(self):
+        return self.end_at

@@ -251,6 +251,21 @@ def get_admin_dashboard() -> dict:
     }
 
 
+def get_admin_dashboard_kpis() -> dict:
+    """Return administrative KPIs with friendly template aliases."""
+    data = get_admin_dashboard()
+    from apps.attendance.models import AttendanceGeoAttempts
+    from apps.audit.models import Feedback
+    data["active_events"] = data.get("events_active", 0)
+    data["active_volunteers"] = data.get("active_users", 0)
+    data["pending_verifications"] = data.get("images_pending_review", 0)
+    data["pending_coordinators"] = data.get("coordinators_pending_approval", 0)
+    data["pending_geo_reviews"] = AttendanceGeoAttempts.objects.filter(review_status="pending").count()
+    data["active_feedbacks"] = Feedback.objects.filter(status="active").count()
+    data["hidden_feedbacks"] = Feedback.objects.filter(status="hidden").count()
+    return data
+
+
 def get_user_moderation_summary(user_id: int) -> dict | None:
     """Return v_user_moderation_summary for a single user."""
     from apps.audit.models import VUserModerationSummary

@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-950">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign In — Admin Control Center v2.0</title>
+
+    <!-- Tailwind CSS (CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        slate: {
+                            850: '#151f33',
+                            950: '#070b14',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="min-h-full bg-slate-950 text-slate-100 flex flex-col justify-center items-center p-4 font-sans antialiased selection:bg-blue-600 selection:text-white">
+
+    <div class="w-full max-w-md">
+        <!-- Logo & Branding Header -->
+        <div class="text-center mb-8">
+            <div class="inline-flex w-14 h-14 rounded-2xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-sky-400 items-center justify-center shadow-xl shadow-blue-500/20 mb-4 ring-1 ring-white/20">
+                <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                </svg>
+            </div>
+            <h1 class="text-2xl font-bold tracking-tight text-white">Super Admin Control Center</h1>
+            <p class="text-sm text-slate-400 mt-1">Volunteer Coordination System <span class="font-mono text-xs text-blue-400">v0.6.0</span></p>
+        </div>
+
+        <!-- Login Card -->
+        <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-7 shadow-2xl backdrop-blur">
+            <!-- Error Alert -->
+            {% if error_message %}
+            <div class="mb-5 p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 flex items-start gap-3 text-xs leading-relaxed shadow-sm">
+                <svg class="w-4 h-4 text-rose-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <span>{{ error_message }}</span>
+            </div>
+            {% endif %}
+
+            <form method="POST" action="/api/v1/admin/ui/login/" class="space-y-5" autocomplete="on">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ next|default:'/api/v1/admin/ui/dashboard/' }}">
+
+                <!-- Phone / Hash Input -->
+                <div>
+                    <label for="phone-input" class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
+                        Myanmar Phone or Phone Hash
+                    </label>
+                    <div class="relative">
+                        <input
+                            type="text"
+                            id="phone-input"
+                            name="phone"
+                            value="{{ entered_phone|default:'' }}"
+                            required
+                            autocomplete="username"
+                            placeholder="09... / +959... / 64-char hex hash"
+                            class="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-700/80 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition font-mono"
+                        />
+                        <div id="lookup-spinner" class="hidden absolute right-3 top-3">
+                            <svg class="animate-spin h-4 w-4 text-blue-400" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                            </svg>
+                        </div>
+                    </div>
+                    <p class="text-[11px] text-slate-400 mt-1">
+                        Accepts <code class="text-blue-400">+959</code>, <code class="text-blue-400">+9509</code>, <code class="text-blue-400">09</code>, or <code class="text-blue-400">9...</code> (auto-normalizes to E.164).
+                    </p>
+
+                    <!-- Live Auto-Hash & Identity Preview Box -->
+                    <div id="hash-preview-card" class="mt-3 p-3 rounded-xl bg-slate-950/70 border border-slate-800 text-xs space-y-2 hidden">
+                        <div class="flex items-center justify-between">
+                            <span class="text-slate-400 text-[11px]">Normalized Phone:</span>
+                            <span id="preview-canonical" class="font-mono text-xs font-semibold text-sky-400">—</span>
+                        </div>
+                        <div class="flex flex-col gap-0.5">
+                            <span class="text-slate-400 text-[11px]">SHA-256 HMAC Hash:</span>
+                            <span id="preview-hash" class="font-mono text-[10px] text-slate-400 break-all select-all bg-slate-900/80 px-2 py-1 rounded border border-slate-800">—</span>
+                        </div>
+                        <div class="pt-1 flex items-center justify-between border-t border-slate-800/80">
+                            <span class="text-slate-400 text-[11px]">Admin Status:</span>
+                            <span id="preview-badge" class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium">—</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Password Input -->
+                <div>
+                    <div class="flex items-center justify-between mb-1.5">
+                        <label for="password-input" class="block text-xs font-semibold uppercase tracking-wider text-slate-300">
+                            Password
+                        </label>
+                        <span class="text-[10px] text-slate-500 font-mono">Demo: AdminDemo123!</span>
+                    </div>
+                    <input
+                        type="password"
+                        id="password-input"
+                        name="password"
+                        required
+                        autocomplete="current-password"
+                        placeholder="••••••••••••"
+                        class="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-700/80 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition"
+                    />
+                </div>
+
+                <!-- Submit Button -->
+                <button
+                    type="submit"
+                    class="w-full py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-semibold text-sm shadow-lg shadow-blue-600/30 transition-all flex items-center justify-center gap-2 group cursor-pointer"
+                >
+                    <span>Sign In to Control Center</span>
+                    <svg class="w-4 h-4 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                    </svg>
+                </button>
+            </form>
+        </div>
+
+        <!-- Footer Privacy Note -->
+        <div class="mt-6 text-center text-xs text-slate-500 space-y-1">
+            <p>Protected by Zero-Knowledge HMAC Phone Privacy</p>
+            <p class="text-[11px] text-slate-600">&copy; Volunteer Coordination System &bull; All Rights Reserved</p>
+        </div>
+    </div>
+
+    <!-- Live Phone Auto-Hash & Identity Lookup Script -->
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const phoneInput = document.getElementById("phone-input");
+            const spinner = document.getElementById("lookup-spinner");
+            const previewCard = document.getElementById("hash-preview-card");
+            const previewCanonical = document.getElementById("preview-canonical");
+            const previewHash = document.getElementById("preview-hash");
+            const previewBadge = document.getElementById("preview-badge");
+
+            let debounceTimer = null;
+
+            async function performLookup(val) {
+                const cleaned = (val || "").trim();
+                if (!cleaned) {
+                    previewCard.classList.add("hidden");
+                    return;
+                }
+
+                spinner.classList.remove("hidden");
+                try {
+                    const resp = await fetch("/api/v1/admin/ui/phone-lookup/?phone=" + encodeURIComponent(cleaned));
+                    const data = await resp.json();
+
+                    previewCard.classList.remove("hidden");
+                    if (data.valid) {
+                        previewCanonical.textContent = data.normalized_phone || "(64-char Hash)";
+                        previewHash.textContent = data.phone_hash || "—";
+
+                        if (data.account_found) {
+                            previewBadge.className = "inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30";
+                            previewBadge.innerHTML = "<span>✓</span> Admin Account Verified";
+                        } else {
+                            previewBadge.className = "inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/30";
+                            previewBadge.innerHTML = "<span>⚠</span> Not Found";
+                        }
+                    } else {
+                        previewCanonical.textContent = "—";
+                        previewHash.textContent = "—";
+                        previewBadge.className = "inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/30";
+                        previewBadge.innerHTML = `<span>✕</span> ${data.error || 'Invalid Phone'}`;
+                    }
+                } catch (err) {
+                    console.error("Lookup error:", err);
+                } finally {
+                    spinner.classList.add("hidden");
+                }
+            }
+
+            phoneInput.addEventListener("input", function () {
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(() => {
+                    performLookup(phoneInput.value);
+                }, 200);
+            });
+
+            // Initial check if prefilled
+            if (phoneInput.value && phoneInput.value.trim().length > 0) {
+                performLookup(phoneInput.value);
+            }
+        });
+    </script>
+</body>
+</html>

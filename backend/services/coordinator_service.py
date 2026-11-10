@@ -141,6 +141,18 @@ def get_pending_coordinator_applications(actor: Users) -> list[dict]:
     )
 
 
+def list_coordinator_applications(status_filter: str = "pending") -> list[dict]:
+    qs = CoordinatorProfiles.objects.all().select_related("user")
+    if status_filter:
+        qs = qs.filter(status=status_filter)
+    return list(
+        qs.order_by("-created_at").values(
+            "user_id", "user__display_name", "user__verification_status",
+            "status", "notes", "created_at", "approved_at", "approved_by_id",
+        )
+    )
+
+
 @transaction.atomic
 def decide_coordinator_profile(
     actor: Users,

@@ -446,4 +446,18 @@ VolunteerConfirmAssignmentView = AssignmentConfirmView
 VolunteerCancelAssignmentView = AssignmentCancelView
 
 
+class VolunteerFeedbackView(APIView):
+    """GET /api/v1/volunteer/feedback/ — volunteer aggregate feedback summary."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from services import feedback_service
+        summary = feedback_service.get_user_feedback_summary(request.user.id)
+        rows = feedback_service.get_own_feedback(request.user)
+        return Response({"results": rows, "summary": summary})
+
+
+VolunteerFeedbackSummaryView = VolunteerFeedbackView
+
+
 

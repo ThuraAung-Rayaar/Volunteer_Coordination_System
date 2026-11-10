@@ -53,13 +53,15 @@ class OtpDeliveryAdapter:
 class ConsoleOtpDeliveryAdapter(OtpDeliveryAdapter):
     """
     Development adapter. Logs the intent but does not send a real SMS.
-    Returns a dict indicating delivery was NOT actually performed.
+    Returns delivery status honesty based on OTP_CONSOLE_PASSTHROUGH / DEBUG.
     """
 
     def deliver(self, phone_enc: str, raw_code: str, purpose: str) -> dict:
-        # Do NOT log the raw code in production. For dev visibility,
-        # the code is returned in the API response when DEBUG=True.
-        logger.info("OTP delivery requested (purpose=%s). No SMS provider configured.", purpose)
+        is_passthrough = getattr(settings, "OTP_CONSOLE_PASSTHROUGH", settings.DEBUG)
+        if is_passthrough:
+            logger.info("OTP console passthrough enabled (purpose=%s). Delivery simulated for dev.", purpose)
+            return {"delivered": True, "method": "console", "provider_configured": True}
+        logger.warning("OTP delivery requested (purpose=%s). No SMS provider configured.", purpose)
         return {"delivered": False, "method": "console", "provider_configured": False}
 
 

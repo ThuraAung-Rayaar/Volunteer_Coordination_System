@@ -193,3 +193,97 @@ class AdminActionSuccessSerializer(AllowListSerializerMixin, serializers.Seriali
     success = serializers.BooleanField(default=True)
     message = serializers.CharField(required=False, allow_blank=True)
 
+
+class CharityFieldIdField(serializers.IntegerField):
+    """Allow integer IDs or string codes for charity fields."""
+    def to_internal_value(self, data):
+        try:
+            return super().to_internal_value(data)
+        except serializers.ValidationError:
+            if isinstance(data, str) and data.strip():
+                return data.strip()
+            raise
+
+
+class AdminEventCreateSerializer(AllowListSerializerMixin, serializers.Serializer):
+    title = serializers.CharField(max_length=200)
+    description = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    category = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    start_time = serializers.DateTimeField(required=False)
+    end_time = serializers.DateTimeField(required=False)
+    start_at = serializers.DateTimeField(required=False)
+    end_at = serializers.DateTimeField(required=False)
+    venue_name = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    venue_address = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    venue_lat = serializers.DecimalField(max_digits=9, decimal_places=6, required=False, allow_null=True)
+    venue_lng = serializers.DecimalField(max_digits=9, decimal_places=6, required=False, allow_null=True)
+    geofence_radius_m = serializers.IntegerField(required=False, min_value=50, max_value=2000, default=150)
+    checkin_open_minutes_before = serializers.IntegerField(required=False, min_value=0, max_value=720, default=30)
+    checkin_close_minutes_after = serializers.IntegerField(required=False, min_value=0, max_value=720, default=60)
+    waitlist_enabled = serializers.BooleanField(required=False, default=True)
+    Waitlist_enabled = serializers.BooleanField(required=False, default=True)
+    auto_assign_enabled = serializers.BooleanField(required=False, default=False)
+    minimum_verification_tier = serializers.ChoiceField(choices=["none", "light", "full"], default="none")
+    Minimum_verification_tier = serializers.ChoiceField(choices=["none", "light", "full"], required=False)
+    briefing_text = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    safety_notes = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    skill_tags = serializers.ListField(child=serializers.CharField(), required=False, default=list)
+    charity_field_ids = serializers.ListField(child=CharityFieldIdField(), required=False)
+    charity_field_codes = serializers.ListField(child=serializers.CharField(), required=False)
+    owner_user_id = serializers.IntegerField(required=False, allow_null=True)
+
+    def validate(self, data):
+        start = data.get("start_time") or data.get("start_at")
+        end = data.get("end_time") or data.get("end_at")
+        if not start:
+            raise serializers.ValidationError({"start_time": "Event start_time is required."})
+        if not end:
+            raise serializers.ValidationError({"end_time": "Event end_time is required."})
+        if end <= start:
+            raise serializers.ValidationError({"end_time": "Event end_time must be strictly after start_time."})
+
+        charity_ids = data.get("charity_field_ids")
+        charity_codes = data.get("charity_field_codes")
+        c_list = charity_ids if charity_ids is not None else charity_codes
+        if not c_list or len(c_list) < 1 or len(c_list) > 3:
+            raise serializers.ValidationError({"charity_field_ids": "Ensure between 1 and 3 charity fields are provided."})
+        return data
+
+
+class AdminEventResponseSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    event_id = serializers.IntegerField()
+    title = serializers.CharField()
+    status = serializers.CharField()
+    owner_id = serializers.IntegerField()
+    current_coordinator_id = serializers.IntegerField()
+    start_time = serializers.DateTimeField()
+    start_at = serializers.DateTimeField()
+    end_time = serializers.DateTimeField()
+    end_at = serializers.DateTimeField()
+
+
+class AdminEventSummarySerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    event_id = serializers.IntegerField()
+    title = serializers.CharField()
+    status = serializers.CharField()
+    owner_id = serializers.IntegerField()
+    current_coordinator_id = serializers.IntegerField()
+    start_time = serializers.DateTimeField()
+    start_at = serializers.DateTimeField()
+    end_time = serializers.DateTimeField()
+    end_at = serializers.DateTimeField()
+    acceptance_mode = serializers.CharField()
+    auto_assign_enabled = serializers.BooleanField()
+    max_participants = serializers.IntegerField(allow_null=True)
+    geo_checkin_enabled = serializers.BooleanField()
+    pending_count = serializers.IntegerField()
+    accepted_count = serializers.IntegerField()
+    waitlisted_count = serializers.IntegerField()
+    assignment_count = serializers.IntegerField()
+    checked_in_count = serializers.IntegerField()
+    pending_confirmations = serializers.IntegerField()
+
+
+

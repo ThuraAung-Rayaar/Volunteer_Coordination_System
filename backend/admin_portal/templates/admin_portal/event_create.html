@@ -1,0 +1,391 @@
+{% extends "admin_portal/base_admin.html" %}
+
+{% block title %}Create Event Workspace — Super Admin Control Center{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <!-- Header Section -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+            <h1 class="text-xl font-bold text-white flex items-center gap-2.5">
+                <span class="w-8 h-8 rounded-xl bg-blue-600/20 text-blue-400 flex items-center justify-center">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                </span>
+                Event Provisioning & Dispatch Workspace
+            </h1>
+            <p class="text-xs text-slate-400 mt-0.5">Authoritative event creation with GPS geofence boundary picker and live event catalog</p>
+        </div>
+        <div class="flex items-center gap-2">
+            <span class="px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/30">
+                Super Admin Exclusive
+            </span>
+        </div>
+    </div>
+
+    <!-- Main Grid: Form (7 cols) + Catalog (5 cols) -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+        <!-- Left 7 Columns: Event Creation Form -->
+        <div class="lg:col-span-7 bg-slate-900/90 border border-slate-800 rounded-2xl shadow-xl overflow-hidden">
+            <div class="px-6 py-4 bg-slate-900 border-b border-slate-800 flex items-center justify-between">
+                <div>
+                    <h2 class="text-sm font-bold text-white">Event Specification & Geofence Form</h2>
+                    <p class="text-[11px] text-slate-400">Creates canonical event adhering to PostgreSQL trigger constraints</p>
+                </div>
+                <span class="text-[10px] font-mono text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded">
+                    Draft &bull; Verified
+                </span>
+            </div>
+
+            <form method="POST" action="/api/v1/admin/ui/event-create/" class="p-6 space-y-5" id="event-create-form">
+                {% csrf_token %}
+
+                <!-- Title & Purpose -->
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1">
+                            Event Title <span class="text-rose-400">*</span>
+                        </label>
+                        <input
+                            type="text"
+                            name="title"
+                            required
+                            placeholder="e.g. Inya Lake Clean-Up & Flood Mitigation Drive"
+                            class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition"
+                        />
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1">
+                                Purpose Type
+                            </label>
+                            <select name="purpose_type" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:border-blue-500">
+                                <option value="charity_event">Charity Event</option>
+                                <option value="help_wanted_event">Help Wanted Event</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1">
+                                Acceptance Mode
+                            </label>
+                            <select name="acceptance_mode" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:border-blue-500">
+                                <option value="manual">Manual Coordinator Approval</option>
+                                <option value="auto">Auto-Accept Applications</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1">
+                                Max Capacity
+                            </label>
+                            <input
+                                type="number"
+                                name="max_participants"
+                                min="1"
+                                max="1000"
+                                placeholder="e.g. 50"
+                                class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:border-blue-500"
+                            />
+                        </div>
+                    </div>
+
+                    <!-- Coordinator Owner Selector -->
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1">
+                            Assigned Owner Coordinator
+                        </label>
+                        <select name="owner_user_id" class="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:border-blue-500">
+                            <option value="">Myself (Super Admin Direct Ownership)</option>
+                            {% for coord in approved_coordinators %}
+                            <option value="{{ coord.user_id }}">
+                                {{ coord.user.display_name }} (ID #{{ coord.user_id }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <p class="text-[11px] text-slate-500 mt-1">If unselected, the event will be owned directly by your Super Admin account.</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1">
+                            Description & Briefing
+                        </label>
+                        <textarea
+                            name="description"
+                            rows="2"
+                            placeholder="Detail event objectives, scope of work, volunteer responsibilities..."
+                            class="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-blue-500 transition"
+                        ></textarea>
+                    </div>
+                </div>
+
+                <!-- Schedule Section -->
+                <div class="pt-4 border-t border-slate-800">
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Schedule & Deadlines</h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-300 mb-1">Start Date & Time <span class="text-rose-400">*</span></label>
+                            <input type="datetime-local" name="start_time" required class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:border-blue-500 font-mono" />
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-300 mb-1">End Date & Time <span class="text-rose-400">*</span></label>
+                            <input type="datetime-local" name="end_time" required class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:border-blue-500 font-mono" />
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-300 mb-1">Application Deadline</label>
+                            <input type="datetime-local" name="application_deadline" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:border-blue-500 font-mono" />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Venue & Interactive Geofence Map Picker -->
+                <div class="pt-4 border-t border-slate-800 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">Interactive Venue & Geofence Picker</h3>
+                        <span class="text-[11px] text-blue-400 font-mono">Click map to set GPS coordinates</span>
+                    </div>
+
+                    <!-- Leaflet Geofence Picker Map -->
+                    <div class="relative rounded-xl overflow-hidden border border-slate-700 shadow-inner">
+                        <div id="picker-map" class="h-60 w-full bg-slate-950"></div>
+                        <div class="absolute bottom-2 left-2 bg-slate-900/90 backdrop-blur px-2.5 py-1 rounded-lg border border-slate-700 text-[10px] text-slate-300 pointer-events-none z-[1000]">
+                            📍 Selected: <span id="lbl-coords" class="font-mono text-sky-400">16.80528, 96.15611</span>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-300 mb-1">Venue Name</label>
+                            <input type="text" name="venue_name" id="input-venue-name" placeholder="e.g. Inya Lake Civic Center" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:border-blue-500" />
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-300 mb-1">Venue Address / Landmark</label>
+                            <input type="text" name="venue_address" placeholder="e.g. Near Parami Road Gate 2" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:border-blue-500" />
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-300 mb-1">Geofence Radius: <span id="lbl-radius" class="font-mono text-blue-400">150m</span></label>
+                            <input type="range" min="50" max="2000" step="25" value="150" name="geofence_radius_m" id="input-radius" class="w-full accent-blue-500 cursor-pointer mt-1.5" />
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-[11px] font-mono text-slate-400 mb-1">Latitude</label>
+                            <input type="number" step="0.000001" name="venue_lat" id="input-lat" value="16.805280" class="w-full px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-white text-xs font-mono" />
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-mono text-slate-400 mb-1">Longitude</label>
+                            <input type="number" step="0.000001" name="venue_lng" id="input-lng" value="96.156110" class="w-full px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-white text-xs font-mono" />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Charity Fields (1 to 3 required) -->
+                <div class="pt-4 border-t border-slate-800">
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1">
+                        Charity Fields (Select 1 to 3) <span class="text-rose-400">*</span>
+                    </label>
+                    <p class="text-[11px] text-slate-400 mb-2.5">PostgreSQL database trigger enforces between 1 and 3 linked causes.</p>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                        {% for cf in charity_fields %}
+                        <label class="flex items-center gap-2 p-2.5 rounded-xl border border-slate-800 bg-slate-950/60 hover:bg-slate-800/40 cursor-pointer text-xs transition">
+                            <input type="checkbox" name="charity_field_ids" value="{{ cf.code }}" class="rounded text-blue-600 focus:ring-blue-500" />
+                            <span class="font-medium text-slate-200">{{ cf.label }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Initial Role Post (Optional) -->
+                <div class="pt-4 border-t border-slate-800 space-y-2">
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">Initial Role Post (Optional)</h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div class="sm:col-span-2">
+                            <label class="block text-[11px] font-semibold text-slate-300 mb-1">Role Title</label>
+                            <input type="text" name="role_title" placeholder="e.g. Registration & Intake Officer" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:border-blue-500" />
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-300 mb-1">Required Headcount</label>
+                            <input type="number" name="role_headcount" min="1" max="100" placeholder="5" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:border-blue-500" />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Volunteer Support & Logistics -->
+                <div class="pt-4 border-t border-slate-800 space-y-2.5">
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">Support & Volunteer Provisions</h3>
+                    <div class="grid grid-cols-3 gap-3">
+                        <label class="flex items-center gap-2 p-2 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-300 cursor-pointer">
+                            <input type="checkbox" name="meals_provided" class="rounded text-blue-600 focus:ring-blue-500" />
+                            <span>Meals Provided</span>
+                        </label>
+                        <label class="flex items-center gap-2 p-2 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-300 cursor-pointer">
+                            <input type="checkbox" name="lodging_provided" class="rounded text-blue-600 focus:ring-blue-500" />
+                            <span>Lodging Provided</span>
+                        </label>
+                        <label class="flex items-center gap-2 p-2 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-300 cursor-pointer">
+                            <input type="checkbox" name="travel_support_provided" class="rounded text-blue-600 focus:ring-blue-500" />
+                            <span>Travel Support</span>
+                        </label>
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-300 mb-1">Onboarding / Briefing Instructions</label>
+                        <textarea name="onboarding_text" rows="2" placeholder="Specific dress code, assembly point, tools to bring..." class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:border-blue-500"></textarea>
+                    </div>
+                </div>
+
+                <!-- Submit Button -->
+                <div class="pt-4 border-t border-slate-800 flex justify-end">
+                    <button
+                        type="submit"
+                        class="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-semibold rounded-xl shadow-lg shadow-blue-600/30 transition text-xs flex items-center gap-2 cursor-pointer"
+                    >
+                        <span>Create Event & Publish Geofence</span>
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Right 5 Columns: Live Browsable Event Catalog -->
+        <div class="lg:col-span-5 space-y-4">
+            <div class="bg-slate-900/90 border border-slate-800 rounded-2xl shadow-xl p-5">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="text-sm font-bold text-white flex items-center gap-2">
+                        <svg class="w-4 h-4 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                        Browsable Event Catalog
+                    </h2>
+                    <span class="text-xs font-mono text-slate-400">{{ all_events|length }} events</span>
+                </div>
+
+                <!-- Search Input -->
+                <div class="mb-3">
+                    <input
+                        type="text"
+                        id="catalog-search"
+                        placeholder="Search by event title or ID..."
+                        class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                    />
+                </div>
+
+                <!-- Event Cards List -->
+                <div class="space-y-2.5 max-h-[680px] overflow-y-auto pr-1" id="catalog-list">
+                    {% for ev in all_events %}
+                    <div class="catalog-item bg-slate-950/70 border border-slate-800/80 p-3.5 rounded-xl hover:border-slate-700 transition" data-title="{{ ev.title|lower }}" data-id="{{ ev.event_id }}">
+                        <div class="flex items-start justify-between gap-2 mb-1.5">
+                            <span class="font-bold text-white text-xs truncate max-w-[220px]" title="{{ ev.title }}">
+                                {{ ev.title }}
+                            </span>
+                            <span class="font-mono text-[10px] text-slate-500">#{{ ev.event_id }}</span>
+                        </div>
+
+                        <div class="flex items-center justify-between text-[11px] mb-2">
+                            <div>
+                                {% if ev.status == 'active' %}
+                                <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">Active</span>
+                                {% elif ev.status == 'published' %}
+                                <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/30">Published</span>
+                                {% elif ev.status == 'draft' %}
+                                <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/30">Draft</span>
+                                {% else %}
+                                <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-800 text-slate-400">{{ ev.status }}</span>
+                                {% endif %}
+                            </div>
+                            <span class="font-mono text-[10px] text-slate-400">
+                                {{ ev.start_at|date:"M d, Y" }}
+                            </span>
+                        </div>
+
+                        <div class="flex items-center justify-between pt-2 border-t border-slate-800/60 text-[11px] text-slate-400">
+                            <span>Assigned: <strong class="text-white">{{ ev.assignment_count|default:0 }}</strong></span>
+                            <a href="/api/v1/admin/ui/events/?event_id={{ ev.event_id }}" class="text-xs text-blue-400 hover:text-blue-300 font-medium hover:underline flex items-center gap-1">
+                                <span>Inspect</span>
+                                <span>→</span>
+                            </a>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <p class="text-center text-xs text-slate-500 py-6">No events currently recorded.</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}
+
+{% block script_extra %}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const latInput = document.getElementById("input-lat");
+    const lngInput = document.getElementById("input-lng");
+    const radiusInput = document.getElementById("input-radius");
+    const lblCoords = document.getElementById("lbl-coords");
+    const lblRadius = document.getElementById("lbl-radius");
+
+    let initialLat = parseFloat(latInput.value) || 16.805280;
+    let initialLng = parseFloat(lngInput.value) || 96.156110;
+    let initialRadius = parseInt(radiusInput.value) || 150;
+
+    // Leaflet map setup for geofence picker
+    const pickerMap = L.map("picker-map", {
+        scrollWheelZoom: true,
+    }).setView([initialLat, initialLng], 13);
+
+    // Self-Hosted Asymmetric VCSMapEngine Tile Layer
+    window.VCSMapEngine.attachTileLayer(pickerMap, { maxZoom: 19 });
+
+    // Initial marker & circle
+    let marker = L.marker([initialLat, initialLng], { draggable: true }).addTo(pickerMap);
+    let circle = L.circle([initialLat, initialLng], {
+        radius: initialRadius,
+        color: "#3b82f6",
+        fillColor: "#3b82f6",
+        fillOpacity: 0.2,
+        weight: 2
+    }).addTo(pickerMap);
+
+    function updatePosition(lat, lng) {
+        latInput.value = lat.toFixed(6);
+        lngInput.value = lng.toFixed(6);
+        lblCoords.textContent = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+        marker.setLatLng([lat, lng]);
+        circle.setLatLng([lat, lng]);
+    }
+
+    pickerMap.on("click", function (e) {
+        updatePosition(e.latlng.lat, e.latlng.lng);
+    });
+
+    marker.on("dragend", function (e) {
+        const pos = e.target.getLatLng();
+        updatePosition(pos.lat, pos.lng);
+    });
+
+    radiusInput.addEventListener("input", function () {
+        const rad = parseInt(radiusInput.value);
+        lblRadius.textContent = `${rad}m`;
+        circle.setRadius(rad);
+    });
+
+    // Catalog search filter
+    const searchInput = document.getElementById("catalog-search");
+    const catalogItems = document.querySelectorAll(".catalog-item");
+
+    searchInput.addEventListener("input", function () {
+        const term = searchInput.value.toLowerCase().trim();
+        catalogItems.forEach(item => {
+            const title = item.getAttribute("data-title") || "";
+            const id = item.getAttribute("data-id") || "";
+            if (!term || title.includes(term) || id.includes(term)) {
+                item.style.display = "block";
+            } else {
+                item.style.display = "none";
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

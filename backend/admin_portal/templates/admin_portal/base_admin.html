@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-950">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Super Admin Control Center — Volunteer Coordination System{% endblock %}</title>
+
+    <!-- Tailwind CSS (CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        slate: {
+                            850: '#151f33',
+                            950: '#070b14',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Leaflet 1.9.4 CSS & JS (CDN) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+    <style>
+        .scrollbar-none::-webkit-scrollbar { display: none; }
+        .scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+
+    {% block head_extra %}{% endblock %}
+</head>
+<body class="min-h-full min-w-[768px] bg-slate-950 text-slate-100 flex flex-col font-sans antialiased selection:bg-blue-600 selection:text-white">
+
+    <!-- Sticky Top Navigation Bar -->
+    <header class="sticky top-0 z-50 bg-slate-900/95 backdrop-blur border-b border-slate-800 shadow-lg">
+        <!-- Top Row: Logo, System Title, Role Badge, Display Name & Logout -->
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <a href="/api/v1/admin/ui/dashboard/" class="flex items-center gap-2.5 group">
+                    <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center shadow-md shadow-blue-500/20 group-hover:scale-105 transition-transform">
+                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                        </svg>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="font-bold text-white tracking-tight text-base">Volunteer Coordination System</span>
+                            <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">v0.6.0</span>
+                        </div>
+                        <p class="text-[11px] text-slate-400">Super Admin Control Center v2.0</p>
+                    </div>
+                </a>
+            </div>
+
+            <!-- Admin Profile & Actions -->
+            <div class="flex items-center gap-3">
+                {% if request.user.is_superuser %}
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/30 shadow-sm">
+                    <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+                    Super Admin
+                </span>
+                {% else %}
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-sky-500/10 text-sky-400 border border-sky-500/30 shadow-sm">
+                    <span class="w-1.5 h-1.5 rounded-full bg-sky-400"></span>
+                    Staff Admin
+                </span>
+                {% endif %}
+
+                <div class="hidden sm:flex flex-col text-right">
+                    <span class="text-xs font-medium text-slate-200 max-w-[160px] truncate">{{ request.user.display_name|default:"Administrator" }}</span>
+                    <span class="text-[10px] font-mono text-slate-400">ID #{{ request.user.id }}</span>
+                </div>
+
+                <a href="/api/v1/admin/ui/logout/" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 border border-rose-500/20 transition-colors" title="Sign out of Admin Session">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                    Logout
+                </a>
+            </div>
+        </div>
+
+        <!-- Second Row: Sticky 8-Tab Navigation Bar -->
+        <div class="border-t border-slate-800/80 bg-slate-900/60">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6">
+                <nav class="flex items-center space-x-1 overflow-x-auto py-1.5 scrollbar-none text-xs">
+                    <!-- Tab 1: Dashboard -->
+                    <a href="/api/v1/admin/ui/dashboard/"
+                       class="px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors whitespace-nowrap {% if active_tab == 'dashboard' %}bg-blue-600 text-white font-semibold shadow-sm shadow-blue-500/20{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 font-medium{% endif %}">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                        </svg>
+                        Dashboard
+                    </a>
+
+                    <!-- Tab 2: Create Event (Super Admin) -->
+                    {% if request.user.is_superuser %}
+                    <a href="/api/v1/admin/ui/event-create/"
+                       class="px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors whitespace-nowrap {% if active_tab == 'event_create' %}bg-blue-600 text-white font-semibold shadow-sm shadow-blue-500/20{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 font-medium{% endif %}">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Create Event
+                    </a>
+                    {% endif %}
+
+                    <!-- Tab 3: Events & Geo Map -->
+                    <a href="/api/v1/admin/ui/events/"
+                       class="px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors whitespace-nowrap {% if active_tab == 'events' %}bg-blue-600 text-white font-semibold shadow-sm shadow-blue-500/20{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 font-medium{% endif %}">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        Events & Geo Map
+                    </a>
+
+                    <!-- Tab 4: Users Directory -->
+                    <a href="/api/v1/admin/ui/users/"
+                       class="px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors whitespace-nowrap {% if active_tab == 'users' %}bg-blue-600 text-white font-semibold shadow-sm shadow-blue-500/20{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 font-medium{% endif %}">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
+                        Users Directory
+                    </a>
+
+                    <!-- Tab 5: Provision User (Super Admin) -->
+                    {% if request.user.is_superuser %}
+                    <a href="/api/v1/admin/ui/user-create/"
+                       class="px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors whitespace-nowrap {% if active_tab == 'user_create' %}bg-blue-600 text-white font-semibold shadow-sm shadow-blue-500/20{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 font-medium{% endif %}">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                        </svg>
+                        Provision User
+                    </a>
+                    {% endif %}
+
+                    <!-- Tab 6: Coordinator Board -->
+                    <a href="/api/v1/admin/ui/coordinators/"
+                       class="px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors whitespace-nowrap {% if active_tab == 'coordinators' %}bg-blue-600 text-white font-semibold shadow-sm shadow-blue-500/20{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 font-medium{% endif %}">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        Coordinator Board
+                    </a>
+
+                    <!-- Tab 7: Feedback -->
+                    <a href="/api/v1/admin/ui/feedback/"
+                       class="px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors whitespace-nowrap {% if active_tab == 'feedback' %}bg-blue-600 text-white font-semibold shadow-sm shadow-blue-500/20{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 font-medium{% endif %}">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                        </svg>
+                        Feedback
+                    </a>
+
+                    <!-- Tab 8: Settings -->
+                    <a href="/api/v1/admin/ui/settings/"
+                       class="px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors whitespace-nowrap {% if active_tab == 'settings' %}bg-blue-600 text-white font-semibold shadow-sm shadow-blue-500/20{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 font-medium{% endif %}">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        Settings
+                    </a>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6">
+        <!-- Global Messages & Notifications -->
+        {% if success_message %}
+        <div class="mb-5 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 flex items-center justify-between shadow-lg shadow-emerald-900/10">
+            <div class="flex items-center gap-3">
+                <span class="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-sm">✓</span>
+                <span class="font-medium text-sm">{{ success_message }}</span>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if error_message %}
+        <div class="mb-5 p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 flex items-center justify-between shadow-lg shadow-rose-900/10">
+            <div class="flex items-center gap-3">
+                <span class="w-6 h-6 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center font-bold text-sm">⚠</span>
+                <span class="font-medium text-sm">{{ error_message }}</span>
+            </div>
+        </div>
+        {% endif %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-900 bg-slate-950/80 py-4 text-center text-xs text-slate-500">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-2">
+            <span>Volunteer Coordination System &bull; Super Admin Control Center v2.0</span>
+            <span class="font-mono text-[11px] text-slate-600">Zero-Knowledge SHA-256 HMAC &bull; Role-Based Governance</span>
+        </div>
+    </footer>
+
+    <!-- VCS Map Engine Global Helper (MAP-TASK-02) -->
+    <script>
+    window.VCSMapEngine = {
+        regions: {
+            // ==========================================
+            // OVERVIEW MACRO LAYER
+            // ==========================================
+            asean_macro: { 
+                name: "🌏 ASEAN Macro View (z0–z9)", 
+                center: [16.8661, 96.1951], 
+                zoom: 6 
+            },
+
+            // ==========================================
+            // 7 REGIONS (DIVISIONS) - MICRO DETAIL
+            // ==========================================
+            yangon: { 
+                name: "📍 Yangon Region (Micro Detail)", 
+                center: [16.80528, 96.15611], 
+                zoom: 13 
+            },
+            mandalay: { 
+                name: "📍 Mandalay Region (Micro Detail)", 
+                center: [21.9588, 96.0891], 
+                zoom: 13 
+            },
+            bago: { 
+                name: "📍 Bago Region — Incl. Pyay / Pyi (Micro Detail)", 
+                center: [17.3304, 96.4814], 
+                zoom: 12 
+            },
+            bagan_magway: { 
+                name: "📍 Central Dry Zone — Bagan & Magway (Micro Detail)", 
+                center: [21.1717, 94.8585], 
+                zoom: 12 
+            },
+            ayeyarwady: { 
+                name: "📍 Ayeyarwady — Pathein (Micro Detail)", 
+                center: [16.7792, 94.7321], 
+                zoom: 12 
+            },
+            sagaing: { 
+                name: "📍 Sagaing Region — Monywa & Northwest (Micro)", 
+                center: [22.1142, 95.1353], 
+                zoom: 11 
+            },
+            tanintharyi: { 
+                name: "📍 Tanintharyi Region — Southern Tail (Micro)", 
+                center: [14.0828, 98.1940], 
+                zoom: 11 
+            },
+
+            // ==========================================
+            // 7 STATES (ETHNIC HOMELANDS) - MICRO DETAIL
+            // ==========================================
+            rakhine: { 
+                name: "📍 Rakhine State — Sittwe & Coast (Micro Detail)", 
+                center: [20.1442, 92.8961], 
+                zoom: 12 
+            },
+            shan: { 
+                name: "📍 Shan State — Taunggyi/Inle (Micro Detail)", 
+                center: [20.7892, 97.0378], 
+                zoom: 12 
+            },
+            kachin: { 
+                name: "📍 Kachin State — Myitkyina & Far North (Micro)", 
+                center: [25.3833, 97.4000], 
+                zoom: 11 
+            },
+            chin: { 
+                name: "📍 Chin State — Hakha & Western Hills (Micro)", 
+                center: [22.6413, 93.6181], 
+                zoom: 11 
+            },
+            mawlamyine_south: { 
+                name: "📍 Mon/Kayin — Mawlamyine & Hpa-An (Micro)", 
+                center: [16.4905, 97.6282], 
+                zoom: 12 
+            },
+            kayah: { 
+                name: "📍 Kayah State — Loikaw Sector (Micro)", 
+                center: [19.6742, 97.2094], 
+                zoom: 12 
+            },
+
+            // ==========================================
+            // 1 UNION TERRITORY - MICRO DETAIL
+            // ==========================================
+            naypyidaw: { 
+                name: "📍 Naypyidaw Territory (Micro Detail)", 
+                center: [19.7633, 96.0785], 
+                zoom: 12 
+            }
+        },
+
+        attachTileLayer: function(map, options) {
+            // Primary: Self-Hosted Django Tile Gatekeeper (serves local MBTiles first, caches mirror, or renders Offline SVG)
+            const selfHostedUrl = "/api/v1/maps/tiles/{z}/{x}/{y}.png";
+            const layer = L.tileLayer(selfHostedUrl, {
+                maxZoom: (options && options.maxZoom) || 19,
+                attribution: '&copy; Self-Hosted VCS Asymmetric Map Engine (ASEAN Macro + Myanmar Micro) &bull; &copy; OpenStreetMap contributors'
+            });
+            // Fallback if local endpoint ever errors
+            layer.on("tileerror", function(err) {
+                if (err.tile && !err.tile.dataset.fallbackTried) {
+                    err.tile.dataset.fallbackTried = "1";
+                    const c = err.coords;
+                    err.tile.src = `/api/v1/maps/tiles/${c.z}/${c.x}/${c.y}.png?offline=1`;
+                }
+            });
+            layer.addTo(map);
+            this.attachRegionControl(map);
+            return layer;
+        },
+        attachRegionControl: function(map) {
+            const self = this;
+            const RegionControl = L.Control.extend({
+                options: { position: "topright" },
+                onAdd: function() {
+                    const div = L.DomUtil.create("div", "leaflet-bar leaflet-control");
+                    div.style.background = "rgba(15, 23, 42, 0.92)";
+                    div.style.padding = "4px 6px";
+                    div.style.borderRadius = "8px";
+                    div.style.border = "1px solid #334155";
+                    const select = document.createElement("select");
+                    select.style.background = "#0f172a";
+                    select.style.color = "#f8fafc";
+                    select.style.fontSize = "11px";
+                    select.style.fontFamily = "monospace";
+                    select.style.border = "none";
+                    select.style.outline = "none";
+                    select.style.cursor = "pointer";
+                    Object.keys(self.regions).forEach(function(key) {
+                        const opt = document.createElement("option");
+                        opt.value = key;
+                        opt.textContent = self.regions[key].name;
+                        if (key === "yangon") opt.selected = true;
+                        select.appendChild(opt);
+                    });
+                    L.DomEvent.disableClickPropagation(div);
+                    select.addEventListener("change", function() {
+                        const r = self.regions[select.value];
+                        if (r) map.flyTo(r.center, r.zoom, { duration: 0.8 });
+                    });
+                    div.appendChild(select);
+                    return div;
+                }
+            });
+            map.addControl(new RegionControl());
+        }
+    };
+    </script>
+
+    {% block script_extra %}{% endblock %}
+</body>
+</html>

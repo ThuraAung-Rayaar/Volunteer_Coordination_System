@@ -9,8 +9,7 @@ class SqlFileTestRunner(DiscoverRunner):
 
         candidates = [
             Path(settings.BASE_DIR).parent / "postgres sql" / "updated_volunteer_coordination_system_Database.sql",
-            Path(settings.BASE_DIR) / "postgres sql" / "updated_volunteer_coordination_system_Database.sql",
-            Path(settings.BASE_DIR).parent / "postgres sql" / "ex1_volunteer_coordination_system_database_schema_v0_5_2.sql",
+            Path(settings.BASE_DIR).parent / "prompt code" / "spec" / "updated_volunteer_coordination_system_Database.sql",
         ]
 
         sql_file = None
@@ -22,9 +21,12 @@ class SqlFileTestRunner(DiscoverRunner):
         if not sql_file:
             sql_dir = Path(settings.BASE_DIR).parent / "postgres sql"
             if sql_dir.exists():
-                sql_files = list(sql_dir.glob("*.sql"))
+                sql_files = [p for p in sorted(sql_dir.glob("*.sql")) if p.name != "self_test.sql"]
                 if sql_files:
                     sql_file = sql_files[0]
+
+        if not sql_file or not sql_file.exists():
+            raise RuntimeError("SqlFileTestRunner: could not find updated_volunteer_coordination_system_Database.sql")
 
         orig_create_test_db = connection.creation._create_test_db
 
@@ -47,10 +49,9 @@ class SqlFileTestRunner(DiscoverRunner):
                     cur.execute("SELECT to_regclass('public.app_settings')")
                     row = cur.fetchone()
                     if not row or row[0] is None:
-                        if sql_file and sql_file.exists():
-                            with open(sql_file, "r", encoding="utf-8") as f:
-                                sql = f.read()
-                            cur.execute(sql)
+                        with open(sql_file, "r", encoding="utf-8") as f:
+                            sql = f.read()
+                        cur.execute(sql)
             finally:
                 conn.close()
 

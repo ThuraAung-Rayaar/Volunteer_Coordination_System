@@ -150,8 +150,12 @@ class FeedbackTests(TestCase):
 
     def test_retrieve_event_feedback(self):
         feedback_service.submit_event_feedback(self.vol, self.event.id, "volunteer_to_event", score=5)
-        rows = feedback_service.get_event_feedback(self.coord, self.event.id)
+        # Admin can view all event feedback
+        rows = feedback_service.get_event_feedback(self.admin, self.event.id)
         self.assertGreaterEqual(len(rows), 1)
+        # Coordinator cannot view individual volunteer feedback
+        coord_rows = feedback_service.get_event_feedback(self.coord, self.event.id)
+        self.assertEqual(len(coord_rows), 0)
 
     def test_feedback_visibility_for_rater(self):
         feedback_service.submit_event_feedback(self.vol, self.event.id, "volunteer_to_event", score=5)

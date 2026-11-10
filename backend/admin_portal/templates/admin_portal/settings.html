@@ -1,0 +1,420 @@
+{% extends "admin_portal/base_admin.html" %}
+
+{% block title %}System Settings & Administrative Maintenance — Super Admin Control Center{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <!-- Top Header -->
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl backdrop-blur">
+        <div>
+            <div class="flex items-center gap-2 mb-1">
+                <span class="p-2 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                </span>
+                <h1 class="text-xl font-bold text-white tracking-tight">System Settings & Maintenance Control</h1>
+            </div>
+            <p class="text-xs text-slate-400">Account credentials management, phone number re-encryption with automatic hashing, and database maintenance routines.</p>
+        </div>
+
+        <div class="flex items-center gap-2">
+            <span class="text-xs font-mono px-3 py-1.5 rounded-xl bg-slate-800 text-slate-300 border border-slate-700">
+                Logged in as: <strong class="text-white">{{ request.user.display_name }}</strong> (#{{ request.user.id }})
+            </span>
+        </div>
+    </div>
+
+    <!-- 2x2 Grid of Management Cards -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        <!-- Card 1: Change My Admin Password -->
+        <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl backdrop-blur flex flex-col justify-between">
+            <div>
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center font-bold">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                    </div>
+                    <div>
+                        <h2 class="text-sm font-bold text-white uppercase tracking-wider">Change My Password</h2>
+                        <p class="text-xs text-slate-400">Update password for currently authenticated admin account</p>
+                    </div>
+                </div>
+
+                <form method="POST" action="" class="space-y-4">
+                    {% csrf_token %}
+                    <input type="hidden" name="form_action" value="change_own_password">
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">New Password</label>
+                        <input type="password" name="new_password" required minlength="8" placeholder="••••••••••••" class="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition" />
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Confirm New Password</label>
+                        <input type="password" name="confirm_password" required minlength="8" placeholder="••••••••••••" class="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition" />
+                    </div>
+
+                    <div class="pt-2">
+                        <button type="submit" class="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-emerald-900/20 transition cursor-pointer">
+                            Update My Admin Password
+                        </button>
+                    </div>
+                </form>
+            </div>
+            <p class="text-[11px] text-slate-500 mt-4 italic">Session authentication hash will be updated automatically so you remain logged in.</p>
+        </div>
+
+        <!-- Card 2: Reset User / Admin Password -->
+        <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl backdrop-blur flex flex-col justify-between">
+            <div>
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="w-8 h-8 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 flex items-center justify-center font-bold">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+                    </div>
+                    <div>
+                        <h2 class="text-sm font-bold text-white uppercase tracking-wider">Reset User Password</h2>
+                        <p class="text-xs text-slate-400">Administrative override password for any user or coordinator</p>
+                    </div>
+                </div>
+
+                <form method="POST" action="" class="space-y-4" onsubmit="return confirm('Confirm password reset for selected user?');">
+                    {% csrf_token %}
+                    <input type="hidden" name="form_action" value="reset_user_password">
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Select Target User</label>
+                        <select name="target_user_id" class="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:border-indigo-500 transition">
+                            <option value="">-- Choose from User Directory --</option>
+                            {% for u in all_users %}
+                            <option value="{{ u.id }}">
+                                #{{ u.id }} - {{ u.display_name }} ({{ u.decrypted_phone|default:"No Phone" }}) {% if u.is_admin %}[Admin]{% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">OR Search by Myanmar Phone / Hash</label>
+                        <input type="text" name="phone_search" placeholder="e.g. 09123456789 or +959..." class="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition font-mono" />
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">New Temporary Password</label>
+                        <input type="password" name="new_password" required minlength="8" placeholder="••••••••••••" class="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition" />
+                    </div>
+
+                    <div class="pt-2">
+                        <button type="submit" class="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-indigo-900/20 transition cursor-pointer">
+                            Reset User Password
+                        </button>
+                    </div>
+                </form>
+            </div>
+            <p class="text-[11px] text-slate-500 mt-4 italic">Password resets are recorded in the immutable audit log.</p>
+        </div>
+
+        <!-- Card 3: Change User Phone Number (Auto-Hash & Re-Encrypt) -->
+        <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl backdrop-blur flex flex-col justify-between">
+            <div>
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="w-8 h-8 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20 flex items-center justify-center font-bold">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+                    </div>
+                    <div>
+                        <h2 class="text-sm font-bold text-white uppercase tracking-wider">Change User Phone Number</h2>
+                        <p class="text-xs text-slate-400">Re-normalizes Myanmar format, recomputes SHA-256 hash, and re-encrypts token</p>
+                    </div>
+                </div>
+
+                <form method="POST" action="" class="space-y-4" onsubmit="return confirm('Update phone number for selected user?');">
+                    {% csrf_token %}
+                    <input type="hidden" name="form_action" value="change_user_phone">
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Select Target User</label>
+                        <select name="target_user_id" id="phone_change_user_select" required class="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:border-blue-500 transition">
+                            <option value="">-- Choose Target User --</option>
+                            {% for u in all_users %}
+                            <option value="{{ u.id }}">
+                                #{{ u.id }} - {{ u.display_name }} (Current: {{ u.decrypted_phone|default:"None" }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">New Myanmar Phone Number</label>
+                        <input type="text" id="new_phone_input" name="new_phone" required placeholder="09..., +959..., +9509..., or 9..." class="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs placeholder-slate-500 focus:outline-none focus:border-blue-500 transition font-mono" />
+                    </div>
+
+                    <!-- Live Hash & Format Preview Box -->
+                    <div id="phone_preview_box" class="hidden p-3 rounded-xl bg-slate-950/80 border border-slate-800 space-y-1 text-xs">
+                        <div class="flex items-center justify-between">
+                            <span class="text-slate-400 text-[10px] uppercase font-semibold">Normalized E.164:</span>
+                            <span id="preview_canonical" class="font-mono text-emerald-400 font-bold"></span>
+                        </div>
+                        <div>
+                            <span class="text-slate-400 text-[10px] uppercase font-semibold block">HMAC-SHA256 Hash:</span>
+                            <span id="preview_hash" class="font-mono text-[10px] text-slate-300 block truncate"></span>
+                        </div>
+                    </div>
+
+                    <div class="pt-2">
+                        <button type="submit" class="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-blue-900/20 transition cursor-pointer">
+                            Update & Re-Encrypt Phone Number
+                        </button>
+                    </div>
+                </form>
+            </div>
+            <p class="text-[11px] text-slate-500 mt-4 italic">Validates uniqueness against all registered phone hashes before committing.</p>
+        </div>
+
+        <!-- Card 4: Database Maintenance & System Settings -->
+        <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl backdrop-blur flex flex-col justify-between">
+            <div>
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20 flex items-center justify-center font-bold">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"/></svg>
+                        </div>
+                        <div>
+                            <h2 class="text-sm font-bold text-white uppercase tracking-wider">Database Maintenance</h2>
+                            <p class="text-xs text-slate-400">Execute PostgreSQL vacuum & cleanup procedures</p>
+                        </div>
+                    </div>
+                    {% if is_superuser %}
+                    <span class="text-[10px] font-bold px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/30">Super Admin</span>
+                    {% else %}
+                    <span class="text-[10px] font-bold px-2.5 py-1 rounded-full bg-slate-800 text-slate-400 border border-slate-700">Restricted</span>
+                    {% endif %}
+                </div>
+
+                {% if is_superuser %}
+                <form method="POST" action="" class="space-y-4 mb-4" onsubmit="return confirm('Execute all PostgreSQL maintenance routines?');">
+                    {% csrf_token %}
+                    <input type="hidden" name="form_action" value="run_maintenance">
+                    <button type="submit" class="w-full py-2.5 px-4 bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-purple-900/20 transition cursor-pointer flex items-center justify-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                        Run All PostgreSQL Maintenance Routines
+                    </button>
+                </form>
+
+                {% if maintenance_result %}
+                <div class="grid grid-cols-2 gap-2 mb-4">
+                    <div class="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-center">
+                        <span class="text-[10px] text-slate-400 block">Released Blocks</span>
+                        <span class="text-base font-bold text-emerald-400">{{ maintenance_result.released_expired_blocks }}</span>
+                    </div>
+                    <div class="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-center">
+                        <span class="text-[10px] text-slate-400 block">Expired Apps</span>
+                        <span class="text-base font-bold text-blue-400">{{ maintenance_result.expired_stale_applications }}</span>
+                    </div>
+                    <div class="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-center">
+                        <span class="text-[10px] text-slate-400 block">Purged OTPs</span>
+                        <span class="text-base font-bold text-amber-400">{{ maintenance_result.purged_expired_otps }}</span>
+                    </div>
+                    <div class="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-center">
+                        <span class="text-[10px] text-slate-400 block">Purged Geo Privacy</span>
+                        <span class="text-base font-bold text-purple-400">{{ maintenance_result.purged_geo_evidence }}</span>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% else %}
+                <div class="p-4 rounded-xl bg-slate-950/60 border border-slate-800 text-slate-400 text-xs mb-4">
+                    <p>Super Admin privileges required to execute database maintenance routines.</p>
+                </div>
+                {% endif %}
+
+                <!-- App Settings Table -->
+                <div>
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-slate-300 mb-2">Live System Thresholds (app_settings)</h3>
+                    <div class="max-h-48 overflow-y-auto rounded-xl border border-slate-800">
+                        <table class="w-full text-left text-xs text-slate-300">
+                            <thead class="bg-slate-950/80 text-[10px] uppercase font-bold text-slate-400 border-b border-slate-800">
+                                <tr>
+                                    <th class="px-3 py-2">Parameter</th>
+                                    <th class="px-3 py-2 text-right">Value</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-800/60 font-mono text-[11px]">
+                                {% for s in app_settings %}
+                                <tr class="hover:bg-slate-800/40">
+                                    <td class="px-3 py-2 text-slate-300">
+                                        {{ s.key }}
+                                        <span class="block text-[10px] font-sans text-slate-500 font-normal">{{ s.description }}</span>
+                                    </td>
+                                    <td class="px-3 py-2 text-right font-bold text-blue-400">{{ s.value_int }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr><td colspan="2" class="px-3 py-4 text-center text-slate-500 text-xs font-sans">No settings found.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <p class="text-[11px] text-slate-500 mt-4 italic">PostgreSQL triggers automatically apply these operational parameters.</p>
+        </div>
+
+    </div>
+
+    <!-- Full-Width Card: Self-Hosted Asymmetric Map Engine (ASEAN Macro + Myanmar Regional Micro Packs) -->
+    <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl backdrop-blur">
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-sky-500/10 text-sky-400 border border-sky-500/20 flex items-center justify-center font-bold">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                    </svg>
+                </div>
+                <div>
+                    <h2 class="text-base font-bold text-white tracking-tight">Self-Hosted Asymmetric Map Engine (ASEAN Macro + Myanmar Regional Micro Packs)</h2>
+                    <p class="text-xs text-slate-400">Air-gapped MBTiles permanent storage, HTTP 206 Range streaming, and monthly OSM mirror cache synchronization.</p>
+                </div>
+            </div>
+
+            <!-- Storage Metrics Badges -->
+            <div class="flex flex-wrap items-center gap-2">
+                <span class="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-300 font-mono">
+                    Store: <strong class="text-emerald-400">{% if map_catalog.total_cached_tiles %}{{ map_catalog.total_cached_tiles }}{% else %}0{% endif %} tiles</strong>
+                </span>
+                <span class="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-300 font-mono">
+                    Size: <strong class="text-sky-400">{{ map_catalog.file_size_bytes|default:"0" }} bytes</strong>
+                </span>
+                <span class="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-300 font-mono">
+                    Last Refresh: <strong class="text-amber-400">{{ map_catalog.last_refreshed_at|default:"Pending Sync" }}</strong>
+                </span>
+            </div>
+        </div>
+
+        <!-- Global / All Regions Sync Form -->
+        <div class="bg-slate-950/60 border border-slate-800/80 rounded-xl p-4 mb-6 flex flex-col md:flex-row items-center justify-between gap-4">
+            <div class="text-xs text-slate-300">
+                <span class="font-bold text-white">Monthly Scheduled Sync Schedule:</span>
+                <span class="text-slate-400 ml-1">Automated background synchronization refreshes cached tiles monthly via compliant gatekeeper.</span>
+            </div>
+            <form method="POST" action="" class="flex items-center gap-3">
+                {% csrf_token %}
+                <input type="hidden" name="form_action" value="sync_offline_maps">
+                <input type="hidden" name="region_code" value="all">
+                <label class="flex items-center gap-1.5 text-xs text-slate-400 cursor-pointer">
+                    <input type="checkbox" name="fetch_remote" value="1" class="rounded bg-slate-900 border-slate-700 text-blue-600 focus:ring-0">
+                    Fetch Remote Carto
+                </label>
+                <button type="submit" class="py-1.5 px-3.5 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs rounded-xl shadow-md transition cursor-pointer">
+                    Sync All Regions Now
+                </button>
+            </form>
+        </div>
+
+        <!-- Regions Table -->
+        <div class="overflow-x-auto rounded-xl border border-slate-800">
+            <table class="w-full text-left text-xs text-slate-300">
+                <thead class="bg-slate-950/80 text-[10px] uppercase font-bold text-slate-400 border-b border-slate-800">
+                    <tr>
+                        <th class="px-4 py-3">Region / Pack</th>
+                        <th class="px-4 py-3">Zoom Range</th>
+                        <th class="px-4 py-3">Center Coordinate</th>
+                        <th class="px-4 py-3 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-800/60 font-mono text-xs">
+                    <!-- ASEAN Macro Row -->
+                    <tr class="hover:bg-slate-800/40 bg-slate-900/40">
+                        <td class="px-4 py-3 text-white font-semibold">
+                            <span class="text-emerald-400 mr-1.5">🌏</span> {{ map_catalog.macro.name|default:"ASEAN Macro Overview" }}
+                            <span class="block text-[10px] text-slate-500 font-sans font-normal">Base Layer: Myanmar &amp; ASEAN Corridor</span>
+                        </td>
+                        <td class="px-4 py-3 text-blue-400 font-bold">z{{ map_catalog.macro.min_zoom|default:0 }} – z{{ map_catalog.macro.max_zoom|default:9 }}</td>
+                        <td class="px-4 py-3 text-slate-400">{{ map_catalog.macro.center|default:"[16.8661, 96.1951]" }}</td>
+                        <td class="px-4 py-3 text-right">
+                            <div class="flex items-center justify-end gap-2">
+                                <a href="/api/v1/maps/regions/asean_macro/download/" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-sky-300 border border-slate-700 text-[11px] font-sans transition">
+                                    Download .mbtiles Pack
+                                </a>
+                                <form method="POST" action="" class="inline-block">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="form_action" value="sync_offline_maps">
+                                    <input type="hidden" name="region_code" value="asean_macro">
+                                    <button type="submit" class="px-2.5 py-1 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-[11px] font-sans transition">
+                                        Sync / Refresh Region Now
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    <!-- Myanmar Micro Regions -->
+                    {% for code, reg in map_catalog.regions.items %}
+                    <tr class="hover:bg-slate-800/40">
+                        <td class="px-4 py-3 text-slate-200">
+                            <span class="text-sky-400 mr-1.5">📍</span> {{ reg.name }}
+                            <span class="block text-[10px] text-slate-500 font-sans font-normal">Code: <code class="text-slate-400">{{ code }}</code></span>
+                        </td>
+                        <td class="px-4 py-3 text-indigo-400 font-bold">z{{ reg.min_zoom }} – z{{ reg.max_zoom }}</td>
+                        <td class="px-4 py-3 text-slate-400">{{ reg.center }}</td>
+                        <td class="px-4 py-3 text-right">
+                            <div class="flex items-center justify-end gap-2">
+                                <a href="/api/v1/maps/regions/{{ code }}/download/" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-sky-300 border border-slate-700 text-[11px] font-sans transition">
+                                    Download .mbtiles Pack
+                                </a>
+                                <form method="POST" action="" class="inline-block">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="form_action" value="sync_offline_maps">
+                                    <input type="hidden" name="region_code" value="{{ code }}">
+                                    <button type="submit" class="px-2.5 py-1 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-[11px] font-sans transition">
+                                        Sync / Refresh Region Now
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+<script>
+// Live Phone Normalization & Hash Preview
+document.addEventListener("DOMContentLoaded", function() {
+    const phoneInput = document.getElementById("new_phone_input");
+    const previewBox = document.getElementById("phone_preview_box");
+    const previewCanonical = document.getElementById("preview_canonical");
+    const previewHash = document.getElementById("preview_hash");
+
+    if (!phoneInput) return;
+
+    let debounceTimer;
+    phoneInput.addEventListener("input", function() {
+        clearTimeout(debounceTimer);
+        const val = phoneInput.value.trim();
+        if (val.length < 5) {
+            previewBox.classList.add("hidden");
+            return;
+        }
+
+        debounceTimer = setTimeout(async function() {
+            try {
+                const res = await fetch(`/api/v1/admin/ui/phone-lookup/?phone=${encodeURIComponent(val)}`);
+                const data = await res.json();
+                if (data.valid) {
+                    previewCanonical.textContent = data.normalized_phone;
+                    previewHash.textContent = data.phone_hash;
+                    previewBox.classList.remove("hidden");
+                } else {
+                    previewBox.classList.add("hidden");
+                }
+            } catch (err) {
+                previewBox.classList.add("hidden");
+            }
+        }, 200);
+    });
+});
+</script>
+{% endblock %}
