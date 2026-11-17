@@ -1,5 +1,5 @@
 # Backend Analysis — Volunteer HR Management System
-> **Generated:** 2026-11-15 | **Target folder:** `python_stack/backend/` | **Framework:** Django 5.1 / DRF 3.15
+> **Generated:** 2026-11-15 | **Updated:** 2026-11-16 | **Target folder:** `python_stack/backend/` | **Framework:** Django 5.1 / DRF 3.15
 
 ---
 
@@ -595,25 +595,26 @@ phone → normalize → HMAC(phone_hash) stored for lookup
 
 ## 9. URL Routing Overview
 
-**Root `config/urls.py`** dispatches to three major prefixes:
+**Root `config/urls.py`** dispatches to the following primary URL prefixes:
 
 ```
 /admin-dashboard/        → admin_portal.urls     (HTML UI + Admin APIs)
-/api/v1/                 → apps.*.urls (DRF ViewSets — simple CRUD if any)
-/api/bff/mobile/         → bff.urls (BFF layer, see §6 & §7)
-  ├── auth/              → bff.auth.urls
-  ├── volunteer/         → bff.volunteer.urls
-  ├── checkin/           → bff.checkin.urls
-  ├── coordinator/       → bff.coordinator.urls
-  ├── admin/             → admin_portal.urls
-  └── maps/              → admin_portal.map_views
-/api/schema/             → drf_spectacular schema endpoint
-/api/docs/               → Swagger UI
-/api/redoc/              → ReDoc UI
+/admin/                  → admin.site.urls       (Django native admin)
+/api/v1/                 → bff.urls              (Primary API endpoint for mobile & clients)
+/api/bff/mobile/         → bff.urls              (BFF legacy/semantic alias)
+/api/                    → bff.urls              (Root API convenience alias)
+  ├── auth/              → bff.auth.urls         (OTP request/verify/logout)
+  ├── volunteer/         → bff.volunteer.urls    (Volunteer self-service, events, applications)
+  ├── checkin/           → bff.checkin.urls      (QR, geo-checkin, attendance, onboarding, feedback)
+  ├── coordinator/       → bff.coordinator.urls  (Coordinator workspace, event CRUD, assignments)
+  ├── admin/             → admin_portal.urls     (Admin actions, approvals, moderation)
+  └── maps/              → admin_portal.map_views(Self-hosted map tile catalog and sync)
+/api/schema/             → drf_spectacular SpectacularAPIView (OpenAPI 3.0 schema)
+/api/docs/               → SpectacularSwaggerView (Interactive Swagger UI)
 ```
 
 > [!NOTE]
-> Many BFF endpoints are double-mounted: once under `/coordinator/events/<id>/...` for semantic clarity and once under `/events/<id>/...` as a convenience alias. Both resolve to the same view.
+> All three prefixes (`/api/v1/`, `/api/bff/mobile/`, and `/api/`) route directly into `bff.urls`. In addition, many BFF endpoints are double-mounted: once under `/coordinator/events/<id>/...` for semantic clarity and once under `/events/<id>/...` as a convenience alias. Both resolve to the same view. The React Native mobile client standardizes on `/api/v1/`.
 
 ---
 
@@ -760,6 +761,8 @@ CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
 | Self-hosted map tile engine | MAP-TASK-01 | `map_engine.py`, `map_views.py` |
 | OpenAPI schema (206 KB) | — | `schema.yml` pre-generated |
 | Admin web UI (all 11 template pages) | — | `admin_portal/templates/` |
+| React Native Mobile BFF Integration | v0.10.0 | Full integration across Phases 0–9 (`mobile/src/data/http/`, `endpoints/`, `mappers/`, `core/api/`) |
+| Unified API routing (`/api/v1/`, `/api/bff/mobile/`, `/api/`) | — | All map to `bff.urls` with identical view resolution |
 
 ### ⚠️ Partially Implemented / Dev Stubs
 
@@ -767,7 +770,7 @@ CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
 |---|---|---|
 | SMS OTP delivery | **Stub only** | `ConsoleOtpDeliveryAdapter` logs intent but does not send real SMS; production SMS provider integration not wired |
 | Map tile proxy | **Partial** | `CARTO_API_KEY` suggests external tile source; offline region management implemented but map data likely not bundled |
-| `api/v1/` endpoints | **Unknown** | Root `urls.py` includes `api/v1/` prefix but those app-level `urls.py` files were not inspected; may be minimal or empty |
+| Custom Test Runner SQL path | **Configuration note** | `config/test_runner.py` looks for `postgres sql`; requires directory alias or path update to match `postgres_sql` |
 
 ### ❌ Not Yet Implemented / Missing
 

@@ -1,0 +1,214 @@
+/**
+ * @format
+ */
+
+import type { EventPost } from './event';
+import type { CharityCategoryCode } from './event';
+
+export type CoordinatorEventStatus =
+  | 'draft'
+  | 'published'
+  | 'active'
+  | 'completed'
+  | 'cancelled';
+
+export type EventPurposeType = 'charity_event' | 'help_wanted_event';
+export type AcceptanceMode = 'manual' | 'auto';
+export type LeaderStrategy = 'none' | 'first_assigned' | 'highest_rated';
+export type CompensationKind = 'unpaid' | 'stipend' | 'travel_reimbursement';
+
+export interface CoordinatorOverviewMetrics {
+  totalEventsCount: number;
+  activeEventsCount: number;
+  draftEventsCount: number;
+  pendingApplicationsCount: number;
+  acceptedApplicantsCount: number;
+  checkedInTodayCount: number;
+}
+
+export interface CoordinatorEventSummary {
+  id: string;
+  title: string;
+  description: string;
+  status: CoordinatorEventStatus;
+  purposeType: EventPurposeType;
+  startAt: string;
+  endAt: string;
+  locationName: string;
+  landmarkText?: string;
+  charityFields: CharityCategoryCode[];
+  ownerId: string;
+  currentCoordinatorId: string;
+  coordinatorName: string;
+  isOwnerAsMonitor: boolean;
+  pendingApplicationCount: number;
+  acceptedApplicantCount: number;
+  assignedCount: number;
+  checkedInCount: number;
+}
+
+export interface CreateEventWizardDraft {
+  // Step 1: Basics
+  title: string;
+  description?: string;
+  purposeType: EventPurposeType;
+  charityFieldCodes: CharityCategoryCode[];
+
+  // Step 2: Location
+  locationName: string;
+  landmarkText?: string;
+  latitude: number;
+  longitude: number;
+  geoRadiusM: number;
+  geoCheckinEnabled: boolean;
+  geoCheckinOpensBeforeMin: number;
+  requireCheckinConfirmation: boolean;
+  mapProvider: string;
+
+  // Step 3: Schedule
+  startAt: string;
+  endAt: string;
+  applicationDeadline?: string;
+
+  // Step 4: Capacity & Acceptance
+  acceptanceMode: AcceptanceMode;
+  autoAssignEnabled: boolean;
+  groupSize?: number;
+  leaderStrategy: LeaderStrategy;
+  maxParticipants?: number;
+
+  // Step 5: Support
+  mealsProvided: boolean;
+  lodgingProvided: boolean;
+  travelSupportProvided: boolean;
+  compensationKind: CompensationKind;
+  compensationNote?: string;
+
+  // Step 6: Onboarding & QR
+  onboardingText?: string;
+  requireOnboardingAck: boolean;
+  qrRegistrationEnabled: boolean;
+}
+
+export interface CoordinatorEventDetail extends CoordinatorEventSummary {
+  latitude: number;
+  longitude: number;
+  geoRadiusM: number;
+  geoCheckinEnabled: boolean;
+  geoCheckinOpensBeforeMin: number;
+  requireCheckinConfirmation: boolean;
+  mapProvider: string;
+  applicationDeadline?: string;
+  acceptanceMode: AcceptanceMode;
+  autoAssignEnabled: boolean;
+  groupSize?: number;
+  leaderStrategy: LeaderStrategy;
+  maxParticipants?: number;
+  mealsProvided: boolean;
+  lodgingProvided: boolean;
+  travelSupportProvided: boolean;
+  compensationKind: CompensationKind;
+  compensationNote?: string;
+  onboardingText?: string;
+  onboardingVersion: number;
+  requireOnboardingAck: boolean;
+  qrRegistrationEnabled: boolean;
+  posts: EventPost[];
+}
+
+export type CoordinatorApplicationStatus =
+  | 'pending'
+  | 'accepted'
+  | 'waitlisted'
+  | 'rejected'
+  | 'withdrawn'
+  | 'expired';
+
+export interface VolunteerT2Capabilities {
+  skills: string[];
+  physicalOk: boolean;
+  goodEyesight: boolean;
+  needsGlasses: boolean;
+  canLiftHeavy: boolean;
+  canWorkOutdoor: boolean;
+  hasLeaderExperience: boolean;
+  newToVolunteer: boolean;
+  preferredLanguage: string;
+  homeArea: string;
+  needsMealSupport: boolean;
+  needsTravelSupport: boolean;
+  acceptsUnpaid: boolean;
+  verificationStatus: 'verified' | 'unverified';
+}
+
+export interface CoordinatorApplicationItem {
+  id: string;
+  eventId: string;
+  eventTitle: string;
+  userId: string;
+  applicantName: string;
+  status: CoordinatorApplicationStatus;
+  appliedAt: string;
+  source: 'browse' | 'qr_walkin' | 'invite';
+  postId?: string;
+  postTitle?: string;
+  // T2 semi-private capabilities: strictly present ONLY if status === 'accepted'
+  t2Capabilities?: VolunteerT2Capabilities;
+}
+
+export type CoordinatorAssignmentStatus =
+  | 'assigned'
+  | 'confirmed'
+  | 'cancelled'
+  | 'completed';
+
+export interface CoordinatorAssignmentItem {
+  id: string;
+  eventId: string;
+  eventTitle: string;
+  applicationId: string;
+  userId: string;
+  volunteerName: string;
+  postId: string;
+  postTitle: string;
+  status: CoordinatorAssignmentStatus;
+  groupCode?: string;
+  isGroupLeader: boolean;
+  assignedAt: string;
+}
+
+export type AttendanceRecordStatus =
+  | 'scheduled'
+  | 'pending_confirmation'
+  | 'checked_in'
+  | 'checked_out'
+  | 'completed'
+  | 'no_show';
+
+export type CheckInMethod = 'geo' | 'qr' | 'manual';
+
+export interface CoordinatorGeoAttemptReview {
+  attemptedAt: string;
+  withinGeofence: boolean;
+  distanceMeters?: number;
+  confirmationStatus: 'pending' | 'confirmed' | 'rejected';
+  note?: string;
+}
+
+export interface CoordinatorAttendanceItem {
+  id: string;
+  eventId: string;
+  eventTitle: string;
+  assignmentId: string;
+  userId: string;
+  volunteerName: string;
+  postTitle: string;
+  groupCode?: string;
+  status: AttendanceRecordStatus;
+  checkInMethod?: CheckInMethod;
+  checkedInAt?: string;
+  checkedOutAt?: string;
+  isPendingGeoConfirmation: boolean;
+  geoAttempt?: CoordinatorGeoAttemptReview;
+}
+
