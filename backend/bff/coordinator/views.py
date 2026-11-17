@@ -17,6 +17,7 @@ from bff.volunteer.serializers import ApplicationDecisionSerializer
 from .serializers import (
     AutoAssignResultSerializer,
     CancelEventSerializer,
+    CoordinatorInviteSerializer,
     EventCreateSerializer,
     EventListSerializer,
     EventPostCreateSerializer,
@@ -350,5 +351,47 @@ class CoordinatorFeedbackView(APIView):
 
 
 CoordinatorFeedbackSummaryView = CoordinatorFeedbackView
+
+
+class CoordinatorEventInviteView(APIView):
+    """POST /api/v1/coordinator/events/{event_id}/invite/"""
+    permission_classes = [IsAuthenticated, IsApprovedCoordinator]
+
+    def post(self, request, event_id):
+        serializer = CoordinatorInviteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        app = application_service.invite_volunteer_to_event(
+            actor=request.user,
+            event_id=event_id,
+            volunteer_user_id=data.get("volunteer_user_id"),
+            post_id=data.get("post_id"),
+            note=data.get("note") or "",
+            volunteer_uuid=str(data.get("volunteer_uuid")) if data.get("volunteer_uuid") else None,
+        )
+        return Response(
+            {
+                "id": app.id,
+                "event_id": app.event_id,
+                "user_id": app.user_id,
+                "post_id": app.post_id,
+                "source": app.source,
+                "status": app.status,
+                "applied_at": app.applied_at,
+                "note": app.note,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class CoordinatorEventHistoryView(APIView):
+    """GET /api/v1/coordinator/events/{event_id}/history/"""
+    permission_classes = [IsAuthenticated, IsApprovedCoordinator]
+
+    def get(self, request, event_id):
+        from services import audit_service
+        rows = audit_service.get_event_coordinator_history_for_manager(request.user, event_id)
+        return Response({"results": rows})
+
 
 

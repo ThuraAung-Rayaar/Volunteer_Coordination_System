@@ -9,6 +9,7 @@ import type {
   CoordinatorEventListItemDto,
   EventCreateRequestDto,
   EventSummaryViewDto,
+  ManualAssignResultDto,
 } from '../dto/coordinatorDto';
 import type {
   AttendanceRecordStatus,
@@ -21,8 +22,10 @@ import type {
   CoordinatorEventStatus,
   CoordinatorEventSummary,
   CreateEventWizardDraft,
+  EventPurposeType,
   VolunteerT2Capabilities,
 } from '../../domain/models/coordinator';
+import type { CharityCategoryCode } from '../../domain/models/event';
 
 /**
  * Maps wizard draft to EventCreateRequestDto matching EventCreateSerializer.
@@ -35,6 +38,11 @@ export function mapCreateEventDraftToRequest(
 ): EventCreateRequestDto {
   let leaderStrategy: 'none' | 'first_experienced' | 'manual' = 'none';
   if (
+    draft.leaderStrategy === 'first_experienced' ||
+    draft.leaderStrategy === 'manual'
+  ) {
+    leaderStrategy = draft.leaderStrategy;
+  } else if (
     draft.leaderStrategy === 'first_assigned' ||
     draft.leaderStrategy === 'highest_rated'
   ) {
@@ -44,7 +52,9 @@ export function mapCreateEventDraftToRequest(
   let compensationKind: 'unpaid' | 'arranged_outside_system' = 'unpaid';
   let compensationNote: string | null = draft.compensationNote ?? null;
 
-  if (
+  if (draft.compensationKind === 'arranged_outside_system') {
+    compensationKind = 'arranged_outside_system';
+  } else if (
     draft.compensationKind === 'stipend' ||
     draft.compensationKind === 'travel_reimbursement'
   ) {
@@ -101,19 +111,21 @@ export function mapCoordinatorEventSummary(
   return {
     id: String(dto.id),
     title: dto.title,
-    description: '',
+    description: dto.description ?? '',
     status: dto.status as CoordinatorEventStatus,
-    purposeType: 'charity_event',
+    purposeType: (dto.purpose_type as EventPurposeType) || 'charity_event',
     startAt: dto.start_at,
     endAt: dto.end_at,
-    locationName: 'Event Location',
-    landmarkText: undefined,
-    charityFields: [],
+    locationName: dto.location_name || '',
+    landmarkText: dto.landmark_text ?? undefined,
+    charityFields: (dto.charity_fields || []) as CharityCategoryCode[],
     ownerId: String(dto.owner_id),
     currentCoordinatorId: String(dto.current_coordinator_id),
-    coordinatorName: dto.is_current_coordinator
-      ? 'You (Current Coordinator)'
-      : 'Assigned Coordinator',
+    coordinatorName:
+      dto.coordinator_name ||
+      (dto.is_current_coordinator
+        ? 'You (Current Coordinator)'
+        : 'Assigned Coordinator'),
     isOwnerAsMonitor: Boolean(dto.is_read_only_monitor),
     pendingApplicationCount: summaryDto?.pending_count ?? 0,
     acceptedApplicantCount: summaryDto?.accepted_count ?? 0,
@@ -138,20 +150,20 @@ export function mapCoordinatorApplication(
   let t2Capabilities: VolunteerT2Capabilities | undefined = undefined;
   if (dto.status === 'accepted') {
     t2Capabilities = {
-      skills: dto.skills || [],
+      skills: Array.isArray(dto.skills) ? dto.skills : [],
       physicalOk: Boolean(dto.physical_ok),
-      goodEyesight: true,
-      needsGlasses: false,
+      goodEyesight: Boolean(dto.good_eyesight),
+      needsGlasses: Boolean(dto.needs_glasses),
       canLiftHeavy: Boolean(dto.can_lift_heavy),
-      canWorkOutdoor: true,
+      canWorkOutdoor: Boolean(dto.can_work_outdoor),
       hasLeaderExperience: Boolean(dto.has_leader_experience),
       newToVolunteer: Boolean(dto.new_to_volunteer),
-      preferredLanguage: 'en',
-      homeArea: '',
-      needsMealSupport: false,
-      needsTravelSupport: false,
-      acceptsUnpaid: true,
-      verificationStatus: 'verified',
+      preferredLanguage: dto.preferred_language || 'en',
+      homeArea: dto.home_area || '',
+      needsMealSupport: Boolean(dto.needs_meal_support),
+      needsTravelSupport: Boolean(dto.needs_travel_support),
+      acceptsUnpaid: Boolean(dto.accepts_unpaid),
+      verificationStatus: dto.verification_status || 'none',
     };
   }
 
@@ -164,33 +176,67 @@ export function mapCoordinatorApplication(
     status: dto.status as CoordinatorApplicationStatus,
     appliedAt: dto.applied_at,
     source,
-    postId: dto.post_id !== null && dto.post_id !== undefined ? String(dto.post_id) : undefined,
+    postId:
+      dto.post_id !== null && dto.post_id !== undefined
+        ? String(dto.post_id)
+        : undefined,
     postTitle: dto.post_title ?? 'General Volunteer Support',
     t2Capabilities,
   };
 }
 
 /**
- * Maps CoordinatorAssignmentDto to domain CoordinatorAssignmentItem.
+ * Maps CoordinatorAssignmentDto or ManualAssignResultDto to domain CoordinatorAssignmentItem.
  */
 export function mapCoordinatorAssignment(
-  dto: CoordinatorAssignmentDto,
+  dto: CoordinatorAssignmentDto | ManualAssignResultDto,
   eventId?: string | number,
   eventTitle = 'Volunteer Event',
 ): CoordinatorAssignmentItem {
+  const assignId =
+    'id' in dto && dto.id != null
+      ? dto.id
+      : 'assignment_id' in dto && dto.assignment_id != null
+      ? dto.assignment_id
+      : '';
+  const appId =
+    'application_id' in dto && dto.application_id != null
+      ? dto.application_id
+      : '';
+  const userId =
+    'user_id' in dto && dto.user_id != null ? dto.user_id : '';
+  const volunteerName =
+    'display_name' in dto && dto.display_name ? dto.display_name : 'Volunteer';
+  const postId =
+    'post_id' in dto && dto.post_id != null ? dto.post_id : '';
+  const postTitle =
+    'post_title' in dto && dto.post_title ? dto.post_title : 'Assigned Shift';
+  const status =
+    'status' in dto && dto.status ? dto.status : 'assigned';
+  const groupCode =
+    'group_code' in dto && dto.group_code ? dto.group_code : undefined;
+  const isGroupLeader =
+    'is_group_leader' in dto && dto.is_group_leader != null
+      ? Boolean(dto.is_group_leader)
+      : false;
+  const assignedAt =
+    ('assigned_at' in dto && dto.assigned_at) ||
+    ('schedule_start' in dto && dto.schedule_start) ||
+    new Date().toISOString();
+
   return {
-    id: String(dto.id),
+    id: String(assignId),
     eventId: String(eventId ?? ''),
     eventTitle,
-    applicationId: String(dto.id),
-    userId: String(dto.user_id),
-    volunteerName: dto.display_name,
-    postId: String(dto.post_id ?? ''),
-    postTitle: dto.post_title ?? 'Assigned Shift',
-    status: dto.status as CoordinatorAssignmentStatus,
-    groupCode: dto.group_code ?? undefined,
-    isGroupLeader: Boolean(dto.is_group_leader),
-    assignedAt: dto.confirmed_at ?? dto.schedule_start,
+    applicationId: String(appId),
+    userId: String(userId),
+    volunteerName,
+    postId: String(postId),
+    postTitle,
+    status: status as CoordinatorAssignmentStatus,
+    groupCode,
+    isGroupLeader,
+    assignedAt,
   };
 }
 
@@ -218,8 +264,16 @@ export function mapAttendanceRosterItem(
   }
 
   let checkInMethod: CheckInMethod | undefined = undefined;
-  if (dto.method === 'geo' || dto.method === 'qr' || dto.method === 'manual') {
-    checkInMethod = dto.method;
+  if (dto.method) {
+    if (dto.method === 'qr_scan' || dto.method === 'qr') {
+      checkInMethod = 'qr';
+    } else if (dto.method === 'coordinator_manual' || dto.method === 'manual') {
+      checkInMethod = 'manual';
+    } else if (dto.method === 'geo') {
+      checkInMethod = 'geo';
+    } else if (dto.method === 'system') {
+      checkInMethod = 'system';
+    }
   }
 
   let geoAttempt = undefined;
@@ -245,6 +299,8 @@ export function mapAttendanceRosterItem(
     postTitle: dto.post_title ?? 'General Volunteer',
     groupCode: dto.group_code ?? undefined,
     status,
+    attendanceStatus: (dto.attendance_status as any) ?? null,
+    confirmationStatus: (dto.confirmation_status as any) ?? null,
     checkInMethod,
     checkedInAt: dto.checkin_at ?? undefined,
     isPendingGeoConfirmation,

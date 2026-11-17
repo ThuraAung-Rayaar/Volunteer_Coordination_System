@@ -290,14 +290,14 @@ export function ProfileScreen({
                 color={theme.colors.textSecondary}
                 style={styles.summaryLabel}
               >
-                Email
+                Phone
               </AppText>
               <AppText
                 variant="body"
                 color={theme.colors.textPrimary}
                 style={styles.summaryValue}
               >
-                {profile.email}
+                {profile.phone ?? profile.email ?? 'No phone on file'}
               </AppText>
             </View>
 

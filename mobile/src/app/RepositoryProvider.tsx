@@ -2,8 +2,18 @@
  * @format
  */
 
-import React, { createContext, useContext, useMemo } from 'react';
-import { DataMode, getDataMode } from './configuration/dataMode';
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
+import {
+  addDataModeListener,
+  DataMode,
+  getDataMode,
+} from './configuration/dataMode';
 import type {
   CoordinatorRepository,
   EventRepository,
@@ -52,7 +62,22 @@ export function RepositoryProvider({
   dataMode: explicitDataMode,
   repositories: overrideRepositories,
 }: RepositoryProviderProps): React.JSX.Element {
-  const activeMode = explicitDataMode ?? getDataMode();
+  const [currentMode, setCurrentMode] = useState<DataMode>(
+    () => explicitDataMode ?? getDataMode(),
+  );
+
+  useEffect(() => {
+    if (explicitDataMode !== undefined) {
+      setCurrentMode(explicitDataMode);
+      return;
+    }
+    const unsubscribe = addDataModeListener(newMode => {
+      setCurrentMode(newMode);
+    });
+    return unsubscribe;
+  }, [explicitDataMode]);
+
+  const activeMode = explicitDataMode ?? currentMode;
 
   const contextValue = useMemo<RepositoryContextType>(() => {
     const baseRepositories: Omit<RepositoryContextType, 'dataMode'> =

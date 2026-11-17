@@ -3,6 +3,7 @@
  */
 
 import type { CharityCategoryCode } from './event';
+export * from './feedback';
 
 export type UserLanguage = 'en' | 'my';
 
@@ -35,6 +36,7 @@ export interface VolunteerSupportPreferences {
 
 export interface VolunteerDonationPreferences {
   bloodType: BloodType;
+  isWillingToDonate: boolean;
   isWillingToDonateBlood: boolean;
   isWillingToDonateItems: boolean;
 }
@@ -45,7 +47,8 @@ export interface VolunteerDonationPreferences {
 export interface VolunteerProfile {
   // Read-only system and security attributes (never editable controls)
   readonly id: string;
-  readonly email: string;
+  readonly phone: string | null;
+  readonly email?: string;
   readonly accountStatus: 'active' | 'blocked' | 'closed';
   readonly verificationStatus: 'none' | 'pending' | 'verified' | 'rejected';
   readonly coordinatorStatus:

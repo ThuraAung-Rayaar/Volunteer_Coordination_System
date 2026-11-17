@@ -12,15 +12,21 @@ import type { CoordinatorStatus } from '../../domain/models';
 import type { VolunteerProfile } from '../../domain/models/profile';
 import type { VerificationCoordinatorData } from '../../domain/models/verification';
 import type {
+  AttendanceHistoryItem,
+  AvailabilityCheckResult,
   CoordinatorEligibilityData,
   ProfileOperationResult,
   ProfileRepository,
+  UserUuidLookupResult,
+  VerificationImageUploadResult,
 } from '../contracts/profileRepository';
+import type { MyFeedbackResponse } from '../../domain/models/feedback';
 import { profileApi } from '../endpoints/profileApi';
 import {
   formatToTimeWithSeconds,
   mapAvailability,
   mapAvailabilityRulesReplaceRequest,
+  mapMyFeedbackResponse,
   mapProfileUpdateRequest,
   mapUserProfile,
   mapVerificationCoordinatorData,
@@ -319,6 +325,159 @@ export class HttpProfileRepository implements ProfileRepository {
       success: true,
       message: 'Coordinator application submitted successfully',
     };
+  }
+
+  public async checkAvailabilityForEvent(
+    eventId: string | number,
+  ): Promise<AvailabilityCheckResult> {
+    const res = await profileApi.checkEventAvailability(eventId, this.client);
+    if (!res.ok) {
+      throw new Error(`Failed to check event availability: ${res.error.message}`);
+    }
+    return {
+      isAvailable: res.data.available,
+      scheduleConflict: res.data.schedule_conflict,
+      eventId: res.data.event_id ? String(res.data.event_id) : String(eventId),
+      startAt: res.data.start_at,
+      endAt: res.data.end_at,
+    };
+  }
+
+  public async checkAvailabilityForWindow(
+    startAt: string,
+    endAt: string,
+  ): Promise<AvailabilityCheckResult> {
+    const res = await profileApi.checkWindowAvailability(
+      { start_at: startAt, end_at: endAt },
+      this.client,
+    );
+    if (!res.ok) {
+      throw new Error(`Failed to check window availability: ${res.error.message}`);
+    }
+    return {
+      isAvailable: res.data.available,
+      scheduleConflict: res.data.schedule_conflict,
+      startAt: res.data.start_at ?? startAt,
+      endAt: res.data.end_at ?? endAt,
+    };
+  }
+
+  public async uploadVerificationImage(
+    imageType: string,
+    fileUri: string,
+    mimeType?: string,
+    fileName?: string,
+  ): Promise<VerificationImageUploadResult> {
+    const formData = new FormData();
+    formData.append('image_type', imageType);
+    formData.append('image', {
+      uri: fileUri,
+      type: mimeType || 'image/jpeg',
+      name: fileName || `verification_${imageType}_${Date.now()}.jpg`,
+    } as any);
+
+    const res = await profileApi.uploadVerificationImage(formData, this.client);
+    if (!res.ok) {
+      throw new Error(`Failed to upload verification image: ${res.error.message}`);
+    }
+    return {
+      id: String(res.data.id),
+      imageType: res.data.image_type,
+      status: res.data.status,
+      comparisonStatus: res.data.comparison_status,
+      isCurrent: res.data.is_current,
+      createdAt: res.data.created_at || new Date().toISOString(),
+    };
+  }
+
+  public async updateCoordinatorApplicationNotes(
+    notes: string,
+  ): Promise<ProfileOperationResult> {
+    const res = await profileApi.updateCoordinatorApplicationNotes(
+      notes,
+      this.client,
+    );
+    if (!res.ok) {
+      return {
+        success: false,
+        message: res.error.message,
+      };
+    }
+    return {
+      success: true,
+      message: 'Coordinator application notes updated successfully',
+    };
+  }
+
+  public async lookupUserByUuid(
+    uuid: string,
+    eventId?: string | number,
+  ): Promise<UserUuidLookupResult> {
+    const res = await profileApi.lookupUserByUuid(uuid, eventId, this.client);
+    if (!res.ok) {
+      throw new Error(`Failed to lookup user by UUID: ${res.error.message}`);
+    }
+    return {
+      userId: res.data.user_id,
+      uuid: res.data.uuid,
+      displayName: res.data.display_name,
+      skills: res.data.skills,
+      physicalOk: res.data.physical_ok,
+      goodEyesight: res.data.good_eyesight,
+      needsGlasses: res.data.needs_glasses,
+      canLiftHeavy: res.data.can_lift_heavy,
+      canWorkOutdoor: res.data.can_work_outdoor,
+      hasLeaderExperience: res.data.has_leader_experience,
+      newToVolunteer: res.data.new_to_volunteer,
+      preferredLanguage: res.data.preferred_language,
+      homeArea: res.data.home_area,
+      needsMealSupport: res.data.needs_meal_support,
+      needsTravelSupport: res.data.needs_travel_support,
+      acceptsUnpaid: res.data.accepts_unpaid,
+      verificationStatus: res.data.verification_status,
+    };
+  }
+
+  public async getAttendanceHistory(): Promise<AttendanceHistoryItem[]> {
+    const res = await profileApi.getAttendanceHistory(this.client);
+    if (!res.ok) {
+      throw new Error(`Failed to load attendance history: ${res.error.message}`);
+    }
+    const items = res.data.results || [];
+    return items.map(dto => ({
+      id: String(dto.id),
+      assignmentId:
+        dto.assignment_id !== null && dto.assignment_id !== undefined
+          ? String(dto.assignment_id)
+          : null,
+      eventId: String(dto.event_id),
+      eventTitle: dto.event_title ?? null,
+      locationName: dto.location_name ?? null,
+      postId:
+        dto.post_id !== null && dto.post_id !== undefined
+          ? String(dto.post_id)
+          : null,
+      postTitle: dto.post_title ?? null,
+      scheduleStart: dto.schedule_start ?? null,
+      scheduleEnd: dto.schedule_end ?? null,
+      status: String(dto.status),
+      method: dto.method ? String(dto.method) : null,
+      checkinAt: dto.checkin_at,
+      checkoutAt: dto.checkout_at,
+      confirmationStatus: dto.confirmation_status
+        ? String(dto.confirmation_status)
+        : null,
+      walkInFlag: dto.walk_in_flag ?? false,
+      verifiedHours: dto.verified_hours ?? null,
+    }));
+  }
+
+  public async getOwnFeedback(): Promise<MyFeedbackResponse> {
+    const res = await profileApi.getFeedbackSummary(this.client);
+    if (!res.ok) {
+      throw new Error(`Failed to load feedback summary: ${res.error.message}`);
+    }
+    return mapMyFeedbackResponse(res.data);
   }
 }
 

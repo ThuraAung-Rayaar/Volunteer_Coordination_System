@@ -8,8 +8,11 @@ from .views import (
     CoordinatorApplicationWaitlistView,
     CoordinatorEventApplicationsView,
     CoordinatorEventDetailView,
+    CoordinatorEventHistoryView,
+    CoordinatorEventInviteView,
     CoordinatorEventListCreateView,
     CoordinatorEventPostsView,
+    CoordinatorFeedbackView,
     EventActivateView,
     EventAssignmentsView,
     EventAutoAssignView,
@@ -44,9 +47,15 @@ urlpatterns = [
     path("events/<int:event_id>/complete/", EventCompleteView.as_view(), name="event-complete"),
     path("events/<int:event_id>/cancel/", EventCancelView.as_view(), name="event-cancel"),
 
-    # Coordinator handover & retake
+    # Coordinator handover & retake & history
     path("events/<int:event_id>/handover/", EventHandoverView.as_view(), name="event-handover"),
     path("events/<int:event_id>/retake/", EventRetakeView.as_view(), name="event-retake"),
+    path("coordinator/events/<int:event_id>/history/", CoordinatorEventHistoryView.as_view(), name="coordinator-event-history"),
+    path("events/<int:event_id>/history/", CoordinatorEventHistoryView.as_view(), name="event-history-mount"),
+
+    # Coordinator Feedback
+    path("coordinator/feedback/", CoordinatorFeedbackView.as_view(), name="coordinator-feedback"),
+    path("feedback/", CoordinatorFeedbackView.as_view(), name="coordinator-feedback-direct"),
 
     # Event posts
     path("coordinator/events/<int:event_id>/posts/", CoordinatorEventPostsView.as_view(), name="coordinator-event-posts"),
@@ -55,6 +64,8 @@ urlpatterns = [
     path("posts/<int:post_id>/close/", EventPostCloseView.as_view(), name="event-post-close"),
 
     # Applications & Assignments (Phase 6)
+    path("coordinator/events/<int:event_id>/invite/", CoordinatorEventInviteView.as_view(), name="coordinator-event-invite"),
+    path("events/<int:event_id>/invite/", CoordinatorEventInviteView.as_view(), name="event-invite-mount"),
     path("coordinator/events/<int:event_id>/applications/", CoordinatorEventApplicationsView.as_view(), name="coordinator-event-applications"),
     path("events/<int:event_id>/applications/", CoordinatorEventApplicationsView.as_view(), name="coordinator-event-applications-mount"),
     path("applications/<int:application_id>/<str:action>/", ApplicationDecisionView.as_view(), name="application-decision"),

@@ -14,8 +14,17 @@ export type CoordinatorEventStatus =
 
 export type EventPurposeType = 'charity_event' | 'help_wanted_event';
 export type AcceptanceMode = 'manual' | 'auto';
-export type LeaderStrategy = 'none' | 'first_assigned' | 'highest_rated';
-export type CompensationKind = 'unpaid' | 'stipend' | 'travel_reimbursement';
+export type LeaderStrategy =
+  | 'none'
+  | 'first_experienced'
+  | 'manual'
+  | 'first_assigned'
+  | 'highest_rated';
+export type CompensationKind =
+  | 'unpaid'
+  | 'arranged_outside_system'
+  | 'stipend'
+  | 'travel_reimbursement';
 
 export interface CoordinatorOverviewMetrics {
   totalEventsCount: number;
@@ -138,7 +147,7 @@ export interface VolunteerT2Capabilities {
   needsMealSupport: boolean;
   needsTravelSupport: boolean;
   acceptsUnpaid: boolean;
-  verificationStatus: 'verified' | 'unverified';
+  verificationStatus: string;
 }
 
 export interface CoordinatorApplicationItem {
@@ -185,7 +194,13 @@ export type AttendanceRecordStatus =
   | 'completed'
   | 'no_show';
 
-export type CheckInMethod = 'geo' | 'qr' | 'manual';
+export type CheckInMethod =
+  | 'geo'
+  | 'qr'
+  | 'manual'
+  | 'qr_scan'
+  | 'coordinator_manual'
+  | 'system';
 
 export interface CoordinatorGeoAttemptReview {
   attemptedAt: string;
@@ -205,6 +220,19 @@ export interface CoordinatorAttendanceItem {
   postTitle: string;
   groupCode?: string;
   status: AttendanceRecordStatus;
+  attendanceStatus?:
+    | 'expected'
+    | 'checked_in'
+    | 'absent'
+    | 'completed'
+    | 'cancelled'
+    | null;
+  confirmationStatus?:
+    | 'not_required'
+    | 'pending'
+    | 'confirmed'
+    | 'rejected'
+    | null;
   checkInMethod?: CheckInMethod;
   checkedInAt?: string;
   checkedOutAt?: string;

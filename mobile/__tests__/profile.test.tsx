@@ -261,7 +261,7 @@ describe('ProfileScreen (Summary-First)', () => {
     expect(json).toContain('26 reviews');
 
     // Selected summary fields
-    expect(json).toContain('alex.morgan@volunteer.local');
+    expect(json).toContain('+959111111111');
     expect(json).toContain('Kamayut Township');
     expect(json).toContain('English');
     expect(json).toContain('Taylor Morgan (+959123456789)');

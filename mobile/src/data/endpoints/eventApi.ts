@@ -23,6 +23,8 @@ export interface EventQueryParams {
   upcoming?: boolean | string;
   status?: string;
   page?: number;
+  page_size?: number;
+  sort?: string;
   [key: string]: string | number | boolean | undefined | null | Array<string | number>;
 }
 

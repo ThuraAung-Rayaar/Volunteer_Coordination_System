@@ -40,6 +40,8 @@ export interface PublicEventDto {
   coordinator_name: string | null;
   charity_fields: string[];
   spots_remaining: number;
+  require_onboarding_ack?: boolean;
+  qr_registration_enabled?: boolean;
 }
 
 /**
@@ -69,6 +71,8 @@ export interface PublicEventDetailDto extends PublicEventDto {
   onboarding_text?: string | null;
   onboarding_version?: number;
   compensation_note?: string | null;
+  require_onboarding_ack?: boolean;
+  qr_registration_enabled?: boolean;
 }
 
 /**
@@ -106,15 +110,20 @@ export interface VolunteerApplicationDto {
  */
 export interface VolunteerAssignmentDto {
   id: number;
+  application_id?: number | null;
   event_id: number;
   event_title: string;
   event_status: string;
+  location_name?: string | null;
   post_id: number | null;
   post_title: string | null;
   group_code: string | null;
   is_group_leader: boolean;
   status: string;
+  assigned_at?: string | null;
   schedule_start: string;
   schedule_end: string;
   confirmed_at: string | null;
+  attendance_id?: number | null;
+  attendance_status?: string | null;
 }

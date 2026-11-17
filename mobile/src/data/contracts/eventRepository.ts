@@ -17,6 +17,54 @@ export interface EventApplyResult {
   application?: EventApplicationState;
 }
 
+export interface PaginatedEventsResult {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: EventSummary[];
+}
+
+export interface OnboardingStatusResult {
+  eventId: string;
+  onboardingText: string | null;
+  onboardingVersion: number;
+  requireOnboardingAck: boolean;
+  acknowledged: boolean;
+}
+
+export interface QrResolveResult {
+  eventId: string;
+  purpose: string;
+  isValid: boolean;
+  reason?: string | null;
+}
+
+export interface QrRedeemResult {
+  success: boolean;
+  message: string;
+  result?: string;
+  eventId?: string;
+  attendanceId?: string;
+  applicationId?: string;
+}
+
+export interface GeoCheckInResult {
+  success: boolean;
+  message: string;
+  result?: string;
+  distanceM?: number;
+  confirmationStatus?: string;
+  attendanceId?: string;
+}
+
+export interface EventFeedbackItem {
+  id: string;
+  score: number;
+  comment?: string;
+  tags?: string[];
+  createdAt: string;
+}
+
 export interface EventRepository {
   /**
    * Fetches the list of published/active events matching optional filter criteria.
@@ -24,18 +72,28 @@ export interface EventRepository {
   getEvents(filters?: EventFilters): Promise<EventSummary[]>;
 
   /**
-   * Fetches full event details by ID, including posts and current demo user application state.
+   * Fetches a paginated slice of published/active events (P1-13).
+   */
+  getEventsPage(
+    filters?: EventFilters,
+    page?: number,
+    pageSize?: number,
+  ): Promise<PaginatedEventsResult>;
+
+  /**
+   * Fetches full event details by ID, including posts and current user application state.
    */
   getEventById(id: string): Promise<EventDetail | null>;
 
   /**
    * Fetches active charity fields taxonomy.
    */
-  getCharityFields?(): Promise<Array<{ code: string; label: string; sort_order?: number }>>;
+  getCharityFields(): Promise<
+    Array<{ code: string; label: string; sort_order?: number }>
+  >;
 
   /**
-   * Submits a demo application to an open post on an event.
-   * Note: UI-only phase returns a mock success result clearly marked demo-only.
+   * Submits an application to an open post on an event.
    */
   applyToPost(
     eventId: string,
@@ -63,7 +121,7 @@ export interface EventRepository {
   /**
    * Confirms the volunteer's assigned shift participation.
    */
-  confirmAssignment?(
+  confirmAssignment(
     assignmentId: string,
   ): Promise<{ success: boolean; message: string }>;
 
@@ -76,64 +134,54 @@ export interface EventRepository {
   ): Promise<{ success: boolean; message: string }>;
 
   /**
-   * Fetches the onboarding briefing status for an event.
+   * Fetches the onboarding briefing status for an event (V-31).
    */
-  getEventOnboarding?(eventId: string): Promise<{
-    eventId: string;
-    onboardingText: string | null;
-    onboardingVersion: number;
-    requireOnboardingAck: boolean;
-    acknowledged: boolean;
-  }>;
+  getEventOnboarding(eventId: string): Promise<OnboardingStatusResult>;
 
   /**
-   * Acknowledges the onboarding briefing for an event.
+   * Acknowledges the onboarding briefing for an event (V-32).
    */
-  acknowledgeOnboarding?(
+  acknowledgeOnboarding(
     eventId: string,
     notes?: string,
   ): Promise<{ success: boolean; message: string; acknowledged: boolean }>;
 
   /**
-   * Submits volunteer geo check-in telemetry for an event.
+   * Previews / resolves a QR token without consuming it (V-33).
    */
-  submitGeoCheckIn?(
+  resolveQrToken(token: string): Promise<QrResolveResult>;
+
+  /**
+   * Redeems a QR token (check-in, walk-in, join event) (V-34).
+   */
+  redeemQrToken(token: string): Promise<QrRedeemResult>;
+
+  /**
+   * Checks in using a QR token (V-35).
+   */
+  qrCheckIn(token: string): Promise<QrRedeemResult>;
+
+  /**
+   * Submits volunteer geo check-in telemetry for an event (V-36).
+   */
+  submitGeoCheckIn(
     eventId: string,
     latitude: number,
     longitude: number,
     accuracyM?: number,
-  ): Promise<{
-    success: boolean;
-    message: string;
-    result?: string;
-    distanceM?: number;
-    confirmationStatus?: string;
-    attendanceId?: string;
-  }>;
+  ): Promise<GeoCheckInResult>;
 
   /**
-   * Redeems a QR token (check-in, walk-in, join event).
+   * Checks out of an active attendance shift (V-37).
    */
-  redeemQrToken?(token: string): Promise<{
-    success: boolean;
-    message: string;
-    result?: string;
-    eventId?: string;
-    attendanceId?: string;
-    applicationId?: string;
-  }>;
-
-  /**
-   * Checks out of an active attendance shift.
-   */
-  checkOutAttendance?(
+  checkOutAttendance(
     attendanceId: string,
   ): Promise<{ success: boolean; message: string; checkedOutAt?: string }>;
 
   /**
-   * Submits feedback for an event.
+   * Submits feedback for an event (V-40).
    */
-  submitEventFeedback?(
+  submitEventFeedback(
     eventId: string,
     score: number,
     comment?: string,
@@ -143,4 +191,9 @@ export interface EventRepository {
       | 'volunteer_to_event'
       | 'volunteer_to_coordinator',
   ): Promise<{ success: boolean; message: string; feedbackId?: string }>;
+
+  /**
+   * Fetches public feedback list for an event (P1-12).
+   */
+  getEventFeedbackList(eventId: string): Promise<EventFeedbackItem[]>;
 }

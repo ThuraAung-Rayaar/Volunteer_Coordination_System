@@ -90,8 +90,11 @@ class PublicEventDetailView(APIView):
         else:
             # Fallback for authorized manager/participant viewing draft or cancelled event
             coord_name = ""
-            if event.current_coordinator and hasattr(event.current_coordinator, "user"):
-                coord_name = getattr(event.current_coordinator.user, "display_name", "")
+            if event.current_coordinator:
+                if hasattr(event.current_coordinator, "display_name"):
+                    coord_name = getattr(event.current_coordinator, "display_name", "")
+                elif hasattr(event.current_coordinator, "user") and event.current_coordinator.user:
+                    coord_name = getattr(event.current_coordinator.user, "display_name", "")
             charity_codes = list(event.charity_fields.values_list("field_code_id", flat=True))
             base_data = {
                 "id": event.id,
@@ -118,11 +121,15 @@ class PublicEventDetailView(APIView):
                 "coordinator_name": coord_name,
                 "charity_fields": charity_codes,
                 "spots_remaining": event.max_participants or 0,
+                "require_onboarding_ack": event.require_onboarding_ack,
+                "qr_registration_enabled": event.qr_registration_enabled,
             }
 
         posts = query_service.get_event_posts(event.id, verified_visible=True)
         data = dict(base_data)
         data["posts"] = posts
+        data["require_onboarding_ack"] = event.require_onboarding_ack
+        data["qr_registration_enabled"] = event.qr_registration_enabled
         has_t2 = can_access_event_t2(request.user, event)
         if has_t2:
             data["onboarding_text"] = event.onboarding_text

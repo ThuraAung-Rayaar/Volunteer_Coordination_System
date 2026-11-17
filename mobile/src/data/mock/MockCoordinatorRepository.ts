@@ -17,6 +17,13 @@ import type {
   CoordinatorOperationResult,
   CoordinatorRepository,
 } from '../contracts/coordinatorRepository';
+import type { EventPost } from '../../domain/models/event';
+import type {
+  CoordinatorHistoryItemDto,
+  EventPostCapacityDto,
+} from '../dto/coordinatorDto';
+import type { GeoAttemptReviewDto } from '../dto/checkinDto';
+import type { UserUuidLookupDto } from '../dto/profileDto';
 import { approvedCoordinatorUser } from './fixtures/demoUsers';
 import {
   Clock,
@@ -285,6 +292,33 @@ export class MockCoordinatorRepository implements CoordinatorRepository {
       success: true,
       message: 'Demo only — not submitted to server',
       data: deepClone(newEvent),
+    };
+  }
+
+  public async updateEvent(
+    eventId: string,
+    data: Partial<CreateEventWizardDraft>,
+  ): Promise<CoordinatorOperationResult<CoordinatorEventDetail>> {
+    const event = this.events.find(e => e.id === eventId);
+    if (!event) {
+      return {
+        success: false,
+        message: 'Event not found',
+      };
+    }
+    if (data.title !== undefined) event.title = data.title.trim();
+    if (data.description !== undefined)
+      event.description = data.description.trim();
+    if (data.locationName !== undefined)
+      event.locationName = data.locationName.trim();
+    if (data.onboardingText !== undefined) {
+      event.onboardingText = data.onboardingText.trim();
+      event.onboardingVersion = (event.onboardingVersion || 1) + 1;
+    }
+    return {
+      success: true,
+      message: 'Demo only — not submitted to server',
+      data: deepClone(event),
     };
   }
 
@@ -771,6 +805,226 @@ export class MockCoordinatorRepository implements CoordinatorRepository {
     return {
       success: true,
       message: 'QR token revoked successfully (Demo only)',
+    };
+  }
+
+  public async createEventPost(
+    eventId: string,
+    post: {
+      title: string;
+      requiredHeadcount: number;
+      physicalLevel?: string;
+      requiredSkills?: string[];
+      leaderNeeded?: boolean;
+      newVolunteersAllowed?: boolean;
+    },
+  ): Promise<CoordinatorOperationResult<EventPost>> {
+    const event = this.events.find(e => e.id === eventId);
+    if (!event) {
+      return {
+        success: false,
+        message: 'Event not found',
+      };
+    }
+    const newPost: EventPost = {
+      id: this.idGenerator('post'),
+      eventId,
+      title: post.title,
+      requiredHeadcount: post.requiredHeadcount,
+      filledHeadcount: 0,
+      remainingCapacity: post.requiredHeadcount,
+      physicalLevel: (post.physicalLevel as any) || 'light',
+      requiredSkills: post.requiredSkills || [],
+      leaderNeeded: post.leaderNeeded ?? false,
+      newVolunteersAllowed: post.newVolunteersAllowed ?? true,
+      status: 'open',
+    };
+    event.posts.push(newPost);
+    return {
+      success: true,
+      message: 'Demo only — not submitted to server',
+      data: deepClone(newPost),
+    };
+  }
+
+  public async updateEventPost(
+    postId: string,
+    updates: {
+      requiredHeadcount?: number;
+      status?: string;
+      physicalLevel?: string;
+      requiredSkills?: string[];
+    },
+  ): Promise<CoordinatorOperationResult<EventPost>> {
+    for (const event of this.events) {
+      const post = event.posts.find(p => p.id === postId);
+      if (post) {
+        if (updates.requiredHeadcount !== undefined) {
+          post.requiredHeadcount = updates.requiredHeadcount;
+          post.remainingCapacity = Math.max(
+            0,
+            post.requiredHeadcount - post.filledHeadcount,
+          );
+        }
+        if (updates.status !== undefined) post.status = updates.status as any;
+        if (updates.physicalLevel !== undefined)
+          post.physicalLevel = updates.physicalLevel as any;
+        if (updates.requiredSkills !== undefined)
+          post.requiredSkills = updates.requiredSkills;
+        return {
+          success: true,
+          message: 'Demo only — not submitted to server',
+          data: deepClone(post),
+        };
+      }
+    }
+    return {
+      success: false,
+      message: 'Post not found',
+    };
+  }
+
+  public async closeEventPost(
+    postId: string,
+  ): Promise<CoordinatorOperationResult<void>> {
+    for (const event of this.events) {
+      const post = event.posts.find(p => p.id === postId);
+      if (post) {
+        post.status = 'closed';
+        return {
+          success: true,
+          message: 'Demo only — not submitted to server',
+        };
+      }
+    }
+    return {
+      success: false,
+      message: 'Post not found',
+    };
+  }
+
+  public async inviteVolunteer(
+    eventId: string,
+    volunteerUserId: string | number,
+    postId?: string | number,
+    note?: string,
+  ): Promise<CoordinatorOperationResult<CoordinatorApplicationItem>> {
+    const event = this.events.find(e => e.id === eventId);
+    if (!event) {
+      return {
+        success: false,
+        message: 'Event not found',
+      };
+    }
+    const appItem: CoordinatorApplicationItem = {
+      id: this.idGenerator('app-inv'),
+      eventId,
+      eventTitle: event.title,
+      userId: String(volunteerUserId),
+      applicantName: 'Invited Volunteer',
+      source: 'invite',
+      postId: postId ? String(postId) : undefined,
+      postTitle: postId ? 'Invited Role' : undefined,
+      status: 'accepted',
+      appliedAt: this.clock().toISOString(),
+    };
+    this.applications.unshift(appItem);
+    return {
+      success: true,
+      message: 'Demo only — not submitted to server',
+      data: deepClone(appItem),
+    };
+  }
+
+  public async getCoordinatorHistory(
+    _eventId: string,
+  ): Promise<CoordinatorHistoryItemDto[]> {
+    return [
+      {
+        id: 1,
+        event_id: 101,
+        change_type: 'coordinator_handover',
+        previous_coordinator_id: 5,
+        previous_coordinator_name: 'Alex Morgan',
+        new_coordinator_id: 6,
+        new_coordinator_name: 'Jordan Lee',
+        changed_by_id: 5,
+        changed_by_name: 'Alex Morgan',
+        reason: 'Shift handover to relief coordinator',
+        changed_at: '2026-11-01T12:00:00Z',
+      },
+    ];
+  }
+
+  public async getPostCapacity(
+    eventId: string,
+  ): Promise<EventPostCapacityDto[]> {
+    const event = this.events.find(e => e.id === eventId);
+    if (!event) return [];
+    return event.posts.map((p, idx) => ({
+      post_id: Number(p.id.replace(/\D/g, '')) || idx + 1,
+      title: p.title,
+      status: p.status,
+      required_headcount: p.requiredHeadcount,
+      assigned_count: p.filledHeadcount,
+      remaining: p.remainingCapacity,
+    }));
+  }
+
+  public async getGeoAttempts(
+    _eventId: string,
+  ): Promise<GeoAttemptReviewDto[]> {
+    return [
+      {
+        attempt_id: 901,
+        event_id: 77,
+        user_id: 88,
+        display_name: 'Ma Hla Hla',
+        attempted_at: '2026-12-20T07:55:00Z',
+        distance_m: 85.5,
+        effective_radius_m: 100,
+        accuracy_m: 10,
+        is_mocked: false,
+        result_code: 'pending_confirmation',
+      },
+    ];
+  }
+
+  public async lookupVolunteerByUuid(
+    uuid: string,
+    _eventId?: string,
+  ): Promise<UserUuidLookupDto> {
+    return {
+      user_id: 88,
+      uuid,
+      display_name: 'Demo Volunteer',
+      verification_status: 'verified',
+      skills: ['first aid', 'logistics'],
+      physical_ok: true,
+      good_eyesight: true,
+      needs_glasses: false,
+      can_lift_heavy: true,
+      can_work_outdoor: true,
+      has_leader_experience: true,
+      new_to_volunteer: false,
+      preferred_language: 'my',
+      home_area: 'Kamayut, Yangon',
+      needs_meal_support: true,
+      needs_travel_support: false,
+      accepts_unpaid: true,
+    };
+  }
+
+  public async submitCoordinatorFeedback(
+    _eventId: string,
+    _volunteerUserId: string | number,
+    score: number,
+    _comment?: string,
+    _tags?: string[],
+  ): Promise<CoordinatorOperationResult> {
+    return {
+      success: true,
+      message: `Feedback (${score}/5 stars) recorded locally (Demo only)`,
     };
   }
 }

@@ -2,9 +2,10 @@ from rest_framework import serializers
 
 from apps.events.models import Events, EventPosts
 from bff.volunteer.serializers import EventSummarySerializer
+from common.permissions import AllowListSerializerMixin
 
 
-class EventCreateSerializer(serializers.Serializer):
+class EventCreateSerializer(AllowListSerializerMixin, serializers.Serializer):
     title = serializers.CharField(max_length=255)
     description = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     purpose_type = serializers.ChoiceField(
@@ -52,7 +53,7 @@ class EventCreateSerializer(serializers.Serializer):
         return attrs
 
 
-class EventUpdateSerializer(serializers.Serializer):
+class EventUpdateSerializer(AllowListSerializerMixin, serializers.Serializer):
     """Allow-list serializer for event edits. Excludes status/owner/coordinator/version."""
     title = serializers.CharField(max_length=255, required=False)
     description = serializers.CharField(required=False, allow_blank=True, allow_null=True)
@@ -96,6 +97,12 @@ class EventUpdateSerializer(serializers.Serializer):
 class EventListSerializer(serializers.Serializer):
     id = serializers.IntegerField(read_only=True)
     title = serializers.CharField(read_only=True)
+    description = serializers.CharField(read_only=True, allow_null=True, required=False)
+    purpose_type = serializers.CharField(read_only=True, allow_null=True, required=False)
+    location_name = serializers.CharField(read_only=True, allow_null=True, required=False)
+    landmark_text = serializers.CharField(read_only=True, allow_null=True, required=False)
+    coordinator_name = serializers.CharField(read_only=True, allow_null=True, required=False)
+    charity_fields = serializers.ListField(child=serializers.CharField(), read_only=True, required=False)
     status = serializers.CharField(read_only=True)
     start_at = serializers.DateTimeField(read_only=True)
     end_at = serializers.DateTimeField(read_only=True)
@@ -107,7 +114,7 @@ class EventListSerializer(serializers.Serializer):
     created_at = serializers.DateTimeField(read_only=True)
 
 
-class EventPostCreateSerializer(serializers.Serializer):
+class EventPostCreateSerializer(AllowListSerializerMixin, serializers.Serializer):
     title = serializers.CharField(max_length=150)
     description = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     required_headcount = serializers.IntegerField(min_value=1)
@@ -122,7 +129,7 @@ class EventPostCreateSerializer(serializers.Serializer):
     priority = serializers.IntegerField(required=False, default=100)
 
 
-class EventPostUpdateSerializer(serializers.Serializer):
+class EventPostUpdateSerializer(AllowListSerializerMixin, serializers.Serializer):
     title = serializers.CharField(max_length=150, required=False)
     description = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     required_headcount = serializers.IntegerField(required=False, min_value=1)
@@ -152,7 +159,7 @@ class EventPostSerializer(serializers.Serializer):
     remaining = serializers.IntegerField(read_only=True)
 
 
-class HandoverSerializer(serializers.Serializer):
+class HandoverSerializer(AllowListSerializerMixin, serializers.Serializer):
     new_coordinator_user_id = serializers.IntegerField()
     reason = serializers.CharField(required=False, allow_blank=True, default="")
 
@@ -160,21 +167,33 @@ class HandoverSerializer(serializers.Serializer):
 CoordinatorHandoverSerializer = HandoverSerializer
 
 
-class RetakeSerializer(serializers.Serializer):
+class RetakeSerializer(AllowListSerializerMixin, serializers.Serializer):
     reason = serializers.CharField(required=False, allow_blank=True, default="Owner retook coordination")
 
 
-class CancelEventSerializer(serializers.Serializer):
+class CancelEventSerializer(AllowListSerializerMixin, serializers.Serializer):
     reason = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
 
-class ManualAssignSerializer(serializers.Serializer):
+class ManualAssignSerializer(AllowListSerializerMixin, serializers.Serializer):
     application_id = serializers.IntegerField()
     post_id = serializers.IntegerField(required=False, allow_null=True)
     group_code = serializers.CharField(
         required=False, allow_null=True, allow_blank=True, max_length=50
     )
     is_group_leader = serializers.BooleanField(required=False, default=False)
+
+
+class CoordinatorInviteSerializer(AllowListSerializerMixin, serializers.Serializer):
+    volunteer_user_id = serializers.IntegerField(required=False)
+    volunteer_uuid = serializers.UUIDField(required=False)
+    post_id = serializers.IntegerField(required=False, allow_null=True)
+    note = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+
+    def validate(self, attrs):
+        if not attrs.get("volunteer_user_id") and not attrs.get("volunteer_uuid"):
+            raise serializers.ValidationError("Either volunteer_user_id or volunteer_uuid must be provided.")
+        return attrs
 
 
 class AutoAssignResultSerializer(serializers.Serializer):
@@ -196,15 +215,30 @@ class CoordinatorApplicationListSerializer(serializers.Serializer):
     applied_at = serializers.DateTimeField(read_only=True)
     decided_at = serializers.DateTimeField(read_only=True, allow_null=True)
     decided_by_id = serializers.IntegerField(read_only=True, allow_null=True)
+    note = serializers.CharField(read_only=True, allow_blank=True, allow_null=True, required=False)
+    # T2 Volunteer Profile (present only for accepted applicants)
+    uuid = serializers.CharField(read_only=True, allow_null=True, required=False)
     skills = serializers.ListField(child=serializers.CharField(), required=False)
-    physical_ok = serializers.BooleanField(required=False)
-    can_lift_heavy = serializers.BooleanField(required=False)
-    has_leader_experience = serializers.BooleanField(required=False)
-    new_to_volunteer = serializers.BooleanField(required=False)
+    physical_ok = serializers.BooleanField(required=False, allow_null=True)
+    good_eyesight = serializers.BooleanField(required=False, allow_null=True)
+    needs_glasses = serializers.BooleanField(required=False, allow_null=True)
+    can_lift_heavy = serializers.BooleanField(required=False, allow_null=True)
+    can_work_outdoor = serializers.BooleanField(required=False, allow_null=True)
+    has_leader_experience = serializers.BooleanField(required=False, allow_null=True)
+    new_to_volunteer = serializers.BooleanField(required=False, allow_null=True)
+    preferred_language = serializers.CharField(read_only=True, allow_null=True, required=False)
+    home_area = serializers.CharField(read_only=True, allow_null=True, required=False)
+    needs_meal_support = serializers.BooleanField(required=False, allow_null=True)
+    needs_travel_support = serializers.BooleanField(required=False, allow_null=True)
+    accepts_unpaid = serializers.BooleanField(required=False, allow_null=True)
+    verification_status = serializers.CharField(read_only=True, allow_null=True, required=False)
 
 
 class CoordinatorAssignmentListSerializer(serializers.Serializer):
     id = serializers.IntegerField(read_only=True)
+    application_id = serializers.IntegerField(read_only=True, allow_null=True, required=False)
+    event_id = serializers.IntegerField(read_only=True, allow_null=True, required=False)
+    event_title = serializers.CharField(read_only=True, allow_null=True, required=False)
     user_id = serializers.IntegerField(read_only=True)
     display_name = serializers.CharField(read_only=True)
     post_id = serializers.IntegerField(read_only=True, allow_null=True)
@@ -213,6 +247,7 @@ class CoordinatorAssignmentListSerializer(serializers.Serializer):
     is_group_leader = serializers.BooleanField(read_only=True)
     status = serializers.CharField(read_only=True)
     assigned_by = serializers.CharField(read_only=True)
+    assigned_at = serializers.DateTimeField(read_only=True, allow_null=True, required=False)
     schedule_start = serializers.DateTimeField(read_only=True)
     schedule_end = serializers.DateTimeField(read_only=True)
     confirmed_at = serializers.DateTimeField(read_only=True, allow_null=True)
@@ -223,6 +258,7 @@ __all__ = [
     "CancelEventSerializer",
     "CoordinatorApplicationListSerializer",
     "CoordinatorAssignmentListSerializer",
+    "CoordinatorInviteSerializer",
     "EventCreateSerializer",
     "EventListSerializer",
     "EventPostCreateSerializer",

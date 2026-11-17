@@ -13,6 +13,13 @@ import type {
   CoordinatorOverviewMetrics,
   CreateEventWizardDraft,
 } from '../../domain/models/coordinator';
+import type { EventPost } from '../../domain/models/event';
+import type {
+  CoordinatorHistoryItemDto,
+  EventPostCapacityDto,
+} from '../dto/coordinatorDto';
+import type { GeoAttemptReviewDto } from '../dto/checkinDto';
+import type { UserUuidLookupDto } from '../dto/profileDto';
 
 export interface CoordinatorOperationResult<T = void> {
   success: boolean;
@@ -45,6 +52,14 @@ export interface CoordinatorRepository {
   ): Promise<CoordinatorOperationResult<CoordinatorEventDetail>>;
 
   /**
+   * Updates an existing event details/onboarding text (C-06, C-07).
+   */
+  updateEvent(
+    eventId: string,
+    data: Partial<CreateEventWizardDraft>,
+  ): Promise<CoordinatorOperationResult<CoordinatorEventDetail>>;
+
+  /**
    * Transitions an event to a valid target status.
    * Rejects writes if the event is in owner-as-monitor mode.
    */
@@ -52,6 +67,63 @@ export interface CoordinatorRepository {
     eventId: string,
     targetStatus: CoordinatorEventStatus,
   ): Promise<CoordinatorOperationResult<CoordinatorEventDetail>>;
+
+  /**
+   * Creates a new post for an event (C-08).
+   */
+  createEventPost(
+    eventId: string,
+    post: {
+      title: string;
+      requiredHeadcount: number;
+      physicalLevel?: string;
+      requiredSkills?: string[];
+      leaderNeeded?: boolean;
+      newVolunteersAllowed?: boolean;
+    },
+  ): Promise<CoordinatorOperationResult<EventPost>>;
+
+  /**
+   * Updates an event post headcount, requirements, or status (C-09).
+   */
+  updateEventPost(
+    postId: string,
+    updates: {
+      requiredHeadcount?: number;
+      status?: string;
+      physicalLevel?: string;
+      requiredSkills?: string[];
+    },
+  ): Promise<CoordinatorOperationResult<EventPost>>;
+
+  /**
+   * Closes an event post to stop accepting new applications (C-10).
+   */
+  closeEventPost(postId: string): Promise<CoordinatorOperationResult<void>>;
+
+  /**
+   * Hands over event coordination to another approved coordinator (C-15).
+   */
+  handoverEvent(
+    eventId: string,
+    newCoordinatorUserId: string,
+    reason?: string,
+  ): Promise<CoordinatorOperationResult>;
+
+  /**
+   * Retakes event coordination as the original event owner (C-16).
+   */
+  retakeEvent(
+    eventId: string,
+    reason?: string,
+  ): Promise<CoordinatorOperationResult>;
+
+  /**
+   * Fetches event coordinator handover audit history (C-18).
+   */
+  getCoordinatorHistory(
+    eventId: string,
+  ): Promise<CoordinatorHistoryItemDto[]>;
 
   /**
    * Fetches applications for coordinator events, optionally filtered by eventId.
@@ -65,6 +137,16 @@ export interface CoordinatorRepository {
   updateApplicationStatus(
     applicationId: string,
     status: CoordinatorApplicationStatus,
+  ): Promise<CoordinatorOperationResult<CoordinatorApplicationItem>>;
+
+  /**
+   * Invites a volunteer to an event (C-23 / V-24).
+   */
+  inviteVolunteer(
+    eventId: string,
+    volunteerUserId: string | number,
+    postId?: string | number,
+    note?: string,
   ): Promise<CoordinatorOperationResult<CoordinatorApplicationItem>>;
 
   /**
@@ -107,6 +189,40 @@ export interface CoordinatorRepository {
   ): Promise<CoordinatorOperationResult<CoordinatorAssignmentItem>>;
 
   /**
+   * Fetches post capacity breakdown for an event (C-28).
+   */
+  getPostCapacity(eventId: string): Promise<EventPostCapacityDto[]>;
+
+  /**
+   * Resolves volunteer identity and capabilities by UUID for check-in / roster (C-29).
+   */
+  lookupVolunteerByUuid(
+    uuid: string,
+    eventId?: string,
+  ): Promise<UserUuidLookupDto>;
+
+  /**
+   * Generates a new coordinator QR token for an event (C-30).
+   */
+  createQrToken(
+    eventId: string,
+    purpose: 'walkin_registration' | 'checkin' | 'join_event',
+    maxUses?: number | null,
+    ttlMinutes?: number,
+  ): Promise<
+    CoordinatorOperationResult<{
+      id: number;
+      rawToken: string;
+      expiresAt: string;
+    }>
+  >;
+
+  /**
+   * Revokes an active coordinator QR token (C-31).
+   */
+  revokeQrToken(qrId: string): Promise<CoordinatorOperationResult>;
+
+  /**
    * Fetches the full attendance roster for an event.
    */
   getAttendanceRoster(eventId?: string): Promise<CoordinatorAttendanceItem[]>;
@@ -117,6 +233,11 @@ export interface CoordinatorRepository {
   getPendingGeoConfirmations(
     eventId?: string,
   ): Promise<CoordinatorAttendanceItem[]>;
+
+  /**
+   * Fetches geo check-in attempts for review matching v_geo_attempts_review (C-35).
+   */
+  getGeoAttempts(eventId: string): Promise<GeoAttemptReviewDto[]>;
 
   /**
    * Confirms a pending geo check-in attempt.
@@ -143,40 +264,13 @@ export interface CoordinatorRepository {
   ): Promise<CoordinatorOperationResult<CoordinatorAttendanceItem>>;
 
   /**
-   * Hands over event coordination to another approved coordinator.
+   * Submits coordinator feedback for a volunteer shift (C-38).
    */
-  handoverEvent?(
+  submitCoordinatorFeedback(
     eventId: string,
-    newCoordinatorUserId: string,
-    reason?: string,
+    volunteerUserId: string | number,
+    score: number,
+    comment?: string,
+    tags?: string[],
   ): Promise<CoordinatorOperationResult>;
-
-  /**
-   * Retakes event coordination as the original event owner.
-   */
-  retakeEvent?(
-    eventId: string,
-    reason?: string,
-  ): Promise<CoordinatorOperationResult>;
-
-  /**
-   * Generates a new coordinator QR token for an event.
-   */
-  createQrToken?(
-    eventId: string,
-    purpose: 'walkin_registration' | 'checkin' | 'join_event',
-    maxUses?: number | null,
-    ttlMinutes?: number,
-  ): Promise<
-    CoordinatorOperationResult<{
-      id: number;
-      rawToken: string;
-      expiresAt: string;
-    }>
-  >;
-
-  /**
-   * Revokes an active coordinator QR token.
-   */
-  revokeQrToken?(qrId: string): Promise<CoordinatorOperationResult>;
 }

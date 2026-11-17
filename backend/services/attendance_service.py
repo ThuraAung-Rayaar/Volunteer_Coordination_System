@@ -220,11 +220,22 @@ def get_user_attendance_history(user) -> list[dict]:
     Return sanitized attendance history for a volunteer.
     Strictly omits raw coordinates, accuracy, and device telemetry (BR-PRIV-T4).
     """
-    rows = Attendance.objects.filter(user=user).order_by("-checkin_at", "-id")
+    rows = (
+        Attendance.objects.filter(user=user)
+        .select_related("event", "assignment", "assignment__post")
+        .order_by("-checkin_at", "-id")
+    )
     return [
         {
             "id": att.id,
             "event_id": att.event_id,
+            "event_title": att.event.title if att.event else None,
+            "location_name": att.event.location_name if att.event else None,
+            "assignment_id": att.assignment_id,
+            "post_id": att.assignment.post_id if att.assignment else None,
+            "post_title": att.assignment.post.title if (att.assignment and att.assignment.post) else None,
+            "schedule_start": att.event.start_at if att.event else None,
+            "schedule_end": att.event.end_at if att.event else None,
             "status": att.status,
             "method": att.method,
             "checkin_at": att.checkin_at,

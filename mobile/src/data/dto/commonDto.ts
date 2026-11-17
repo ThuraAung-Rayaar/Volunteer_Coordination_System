@@ -19,3 +19,29 @@ export interface PaginatedResponseDto<T> {
 export interface ResultsListDto<T> {
   results: T[];
 }
+
+/**
+ * Exact database enum vocabularies (v0.11.0 Parity Plan Section 3.4).
+ */
+export type AttendanceMethodDto =
+  | 'qr_scan'
+  | 'coordinator_manual'
+  | 'geo'
+  | 'system';
+
+export type AttendanceStatusDto =
+  | 'expected'
+  | 'checked_in'
+  | 'absent'
+  | 'completed'
+  | 'cancelled';
+
+export type ConfirmationStatusDto =
+  | 'not_required'
+  | 'pending'
+  | 'confirmed'
+  | 'rejected';
+
+export type LeaderStrategyDto = 'none' | 'first_experienced' | 'manual';
+
+export type CompensationKindDto = 'unpaid' | 'arranged_outside_system';

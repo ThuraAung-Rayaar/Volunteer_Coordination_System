@@ -23,6 +23,11 @@ import type {
   VolunteerProfile,
 } from '../../domain/models/profile';
 import type {
+  AuthoredFeedbackItem,
+  FeedbackRatingSummary,
+  MyFeedbackResponse,
+} from '../../domain/models/feedback';
+import type {
   VerificationCoordinatorData,
   VerificationImageSlot,
   VerificationImageType,
@@ -95,7 +100,8 @@ export function mapUserProfile(
 
   return {
     id: String(userDto.id),
-    email: userDto.phone ? userDto.phone : 'Verified Phone Account',
+    phone: userDto.phone ?? null,
+    email: userDto.phone ? userDto.phone : undefined,
     accountStatus: acctStatus,
     verificationStatus: verifStatus,
     coordinatorStatus: coordStatus,
@@ -130,6 +136,10 @@ export function mapUserProfile(
 
     donationPreferences: {
       bloodType: (userDto.blood_type as BloodType) || 'unknown',
+      isWillingToDonate: Boolean(
+        userDto.is_willing_to_donate ??
+          (userDto.is_willing_to_donate_blood || userDto.is_willing_to_donate_items),
+      ),
       isWillingToDonateBlood: Boolean(userDto.is_willing_to_donate_blood),
       isWillingToDonateItems: Boolean(userDto.is_willing_to_donate_items),
     },
@@ -139,9 +149,11 @@ export function mapUserProfile(
 /**
  * Maps partial VolunteerProfile updates to strict ProfileUpdateSerializer allow-list.
  * CRITICAL: Emits ONLY the 20 approved keys; any extraneous property causes HTTP 400.
+ * Merges with currentProfile?.donationPreferences to avoid partial patches clobbering sub-flags.
  */
 export function mapProfileUpdateRequest(
   updates: Partial<VolunteerProfile>,
+  currentProfile?: VolunteerProfile | null,
 ): ProfileUpdateRequestDto {
   const payload: ProfileUpdateRequestDto = {};
 
@@ -204,21 +216,95 @@ export function mapProfileUpdateRequest(
     if (updates.donationPreferences.bloodType !== undefined) {
       payload.blood_type = updates.donationPreferences.bloodType;
     }
-    if (updates.donationPreferences.isWillingToDonateBlood !== undefined) {
-      payload.is_willing_to_donate_blood =
-        updates.donationPreferences.isWillingToDonateBlood;
+
+    const currentDonateBlood = currentProfile?.donationPreferences?.isWillingToDonateBlood;
+    const currentDonateItems = currentProfile?.donationPreferences?.isWillingToDonateItems;
+
+    const donateBlood =
+      updates.donationPreferences.isWillingToDonateBlood !== undefined
+        ? updates.donationPreferences.isWillingToDonateBlood
+        : currentDonateBlood;
+
+    const donateItems =
+      updates.donationPreferences.isWillingToDonateItems !== undefined
+        ? updates.donationPreferences.isWillingToDonateItems
+        : currentDonateItems;
+
+    if (donateBlood !== undefined) {
+      payload.is_willing_to_donate_blood = donateBlood;
     }
-    if (updates.donationPreferences.isWillingToDonateItems !== undefined) {
-      payload.is_willing_to_donate_items =
-        updates.donationPreferences.isWillingToDonateItems;
+    if (donateItems !== undefined) {
+      payload.is_willing_to_donate_items = donateItems;
     }
-    // Set aggregate is_willing_to_donate if either is true
-    payload.is_willing_to_donate = Boolean(
-      payload.is_willing_to_donate_blood || payload.is_willing_to_donate_items,
-    );
+
+    if (updates.donationPreferences.isWillingToDonate !== undefined) {
+      payload.is_willing_to_donate = updates.donationPreferences.isWillingToDonate;
+    } else if (donateBlood !== undefined || donateItems !== undefined) {
+      payload.is_willing_to_donate = Boolean(donateBlood || donateItems);
+    }
   }
 
   return payload;
+}
+
+/**
+ * Maps FeedbackSummaryResponseDto into domain MyFeedbackResponse with separate authored feedback
+ * and received aggregate metrics (V-41, V-42, P2-02).
+ */
+export function mapMyFeedbackResponse(
+  dto: FeedbackSummaryResponseDto,
+): MyFeedbackResponse {
+  const results = Array.isArray(dto.results) ? dto.results : [];
+  const authoredFeedback: AuthoredFeedbackItem[] = results.map(item => ({
+    id: String(item.id),
+    eventId: String(item.event_id),
+    eventTitle: item.event_title ?? undefined,
+    direction: item.direction,
+    ratingOverall: item.rating_overall,
+    tags: Array.isArray(item.tags) ? item.tags : [],
+    comments: item.comments ?? undefined,
+    createdAt: item.created_at,
+  }));
+
+  const s = dto.summary || {};
+  const asVol = s.as_volunteer || {
+    count: s.volunteer_rating_count ?? 0,
+    avg_overall: s.volunteer_avg_rating ?? null,
+  };
+  const asCoord = s.as_coordinator || {
+    count: s.coordinator_rating_count ?? 0,
+    avg_overall: s.coordinator_avg_rating ?? null,
+  };
+
+  const totalCount =
+    s.total_count ?? (asVol.count + asCoord.count);
+  const overallAvg =
+    s.overall_avg_rating ??
+    (totalCount > 0 ? asVol.avg_overall ?? asCoord.avg_overall : null);
+
+  const receivedSummary: FeedbackRatingSummary = {
+    userId: s.user_id !== undefined ? String(s.user_id) : undefined,
+    overallAvgRating: overallAvg,
+    totalCount,
+    volunteerAvgRating: s.volunteer_avg_rating ?? asVol.avg_overall ?? null,
+    volunteerRatingCount: s.volunteer_rating_count ?? asVol.count ?? 0,
+    coordinatorAvgRating: s.coordinator_avg_rating ?? asCoord.avg_overall ?? null,
+    coordinatorRatingCount: s.coordinator_rating_count ?? asCoord.count ?? 0,
+    asVolunteer: {
+      count: asVol.count,
+      avgOverall: asVol.avg_overall,
+    },
+    asCoordinator: {
+      count: asCoord.count,
+      avgOverall: asCoord.avg_overall,
+    },
+    ratingDistribution: s.rating_distribution || {},
+  };
+
+  return {
+    authoredFeedback,
+    receivedSummary,
+  };
 }
 
 /**

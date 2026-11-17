@@ -8,6 +8,7 @@ class SqlFileTestRunner(DiscoverRunner):
         from django.db import connection
 
         candidates = [
+            Path(settings.BASE_DIR).parent / "postgres_sql" / "updated_volunteer_coordination_system_Database.sql",
             Path(settings.BASE_DIR).parent / "postgres sql" / "updated_volunteer_coordination_system_Database.sql",
             Path(settings.BASE_DIR).parent / "prompt code" / "spec" / "updated_volunteer_coordination_system_Database.sql",
         ]
@@ -19,11 +20,13 @@ class SqlFileTestRunner(DiscoverRunner):
                 break
 
         if not sql_file:
-            sql_dir = Path(settings.BASE_DIR).parent / "postgres sql"
-            if sql_dir.exists():
-                sql_files = [p for p in sorted(sql_dir.glob("*.sql")) if p.name != "self_test.sql"]
-                if sql_files:
-                    sql_file = sql_files[0]
+            for dirname in ["postgres_sql", "postgres sql"]:
+                sql_dir = Path(settings.BASE_DIR).parent / dirname
+                if sql_dir.exists():
+                    sql_files = [p for p in sorted(sql_dir.glob("*.sql")) if p.name != "self_test.sql"]
+                    if sql_files:
+                        sql_file = sql_files[0]
+                        break
 
         if not sql_file or not sql_file.exists():
             raise RuntimeError("SqlFileTestRunner: could not find updated_volunteer_coordination_system_Database.sql")

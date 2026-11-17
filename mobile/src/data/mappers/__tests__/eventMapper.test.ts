@@ -182,31 +182,41 @@ describe('eventMapper', () => {
     expect(item.volunteerNote).toBe('Excited to join');
   });
 
-  it('maps VolunteerAssignmentDto to domain VolunteerAssignmentItem', () => {
+  it('maps VolunteerAssignmentDto to domain VolunteerAssignmentItem truthfully', () => {
     const assignDto: VolunteerAssignmentDto = {
       id: 42,
+      application_id: 88,
       event_id: 101,
       event_title: 'Food Pack Assembly',
       event_status: 'active',
+      location_name: 'Yangon Central Hall',
       post_id: 202,
       post_title: 'Food Packing Leader',
       group_code: 'GRP-A',
       is_group_leader: true,
       status: 'confirmed',
+      assigned_at: '2026-11-28T10:00:00+06:30',
       schedule_start: '2026-12-05T09:00:00+06:30',
       schedule_end: '2026-12-05T13:00:00+06:30',
       confirmed_at: '2026-11-30T10:00:00+06:30',
+      attendance_id: 999,
+      attendance_status: 'checked_in',
     };
 
     const item = mapVolunteerAssignment(assignDto);
     expect(item.id).toBe('42');
+    expect(item.applicationId).toBe('88');
     expect(item.eventId).toBe('101');
     expect(item.eventTitle).toBe('Food Pack Assembly');
+    expect(item.location).toBe('Yangon Central Hall');
+    expect(item.postId).toBe('202');
     expect(item.postTitle).toBe('Food Packing Leader');
     expect(item.status).toBe('confirmed');
     expect(item.startAt).toBe('2026-12-05T09:00:00+06:30');
     expect(item.endAt).toBe('2026-12-05T13:00:00+06:30');
-    expect(item.assignedAt).toBe('2026-11-30T10:00:00+06:30');
+    expect(item.assignedAt).toBe('2026-11-28T10:00:00+06:30');
+    expect(item.attendanceId).toBe('999');
+    expect(item.attendanceStatus).toBe('checked_in');
   });
 
   it('generates allow-listed ApplicationSubmitRequestDto', () => {

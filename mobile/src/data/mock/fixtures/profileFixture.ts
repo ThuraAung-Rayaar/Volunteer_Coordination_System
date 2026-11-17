@@ -8,6 +8,7 @@ import type { VerificationCoordinatorData } from '../../../domain/models/verific
 
 export const mockVolunteerProfile: VolunteerProfile = {
   id: 'usr-volunteer-001',
+  phone: '+959111111111',
   email: 'alex.morgan@volunteer.local',
   accountStatus: 'active',
   verificationStatus: 'verified',
@@ -43,6 +44,7 @@ export const mockVolunteerProfile: VolunteerProfile = {
 
   donationPreferences: {
     bloodType: 'O+',
+    isWillingToDonate: true,
     isWillingToDonateBlood: true,
     isWillingToDonateItems: true,
   },

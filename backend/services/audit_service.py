@@ -16,6 +16,7 @@ import logging
 from apps.audit.models import AuditLogs
 from apps.coordination.models import EventCoordinatorHistory, VEventCoordinatorHistory
 from common.exceptions import PermissionDeniedError, ResourceMaskedNotFound
+from common.permissions import get_event_for_manager_or_404
 
 logger = logging.getLogger(__name__)
 
@@ -90,6 +91,41 @@ def get_event_coordinator_history(actor, event_id: int | None = None) -> list[di
         }
         for h in qs
     ]
+
+
+def get_event_coordinator_history_for_manager(actor, event_id: int) -> list[dict]:
+    """
+    Retrieve coordinator handover history for an event manager (owner, current coordinator, admin).
+    Returns privacy-safe audit trail rows from v_event_coordinator_history.
+    """
+    event = get_event_for_manager_or_404(actor, event_id, require_write=False)
+    qs = VEventCoordinatorHistory.objects.filter(event_id=event_id).order_by("-changed_at")
+
+    results = []
+    for idx, h in enumerate(qs, start=1):
+        is_initial = h.from_coordinator_id is None
+        is_retake = bool(event and h.to_coordinator_id == event.owner_id and not is_initial)
+        change_type = "initial" if is_initial else ("retake" if is_retake else "handover")
+        results.append({
+            "id": idx,
+            "event_id": h.event_id,
+            "event_title": h.event_title,
+            "change_type": change_type,
+            "previous_coordinator_id": h.from_coordinator_id,
+            "previous_coordinator_name": h.from_name,
+            "new_coordinator_id": h.to_coordinator_id,
+            "new_coordinator_name": h.to_name,
+            "changed_by_id": h.changed_by_user_id,
+            "changed_by_name": h.changed_by_name,
+            "from_coordinator_id": h.from_coordinator_id,
+            "from_name": h.from_name,
+            "to_coordinator_id": h.to_coordinator_id,
+            "to_name": h.to_name,
+            "changed_by_user_id": h.changed_by_user_id,
+            "reason": h.reason,
+            "changed_at": h.changed_at,
+        })
+    return results
 
 
 def get_audit_log_detail(actor, log_id: int) -> dict:

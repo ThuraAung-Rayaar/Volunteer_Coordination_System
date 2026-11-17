@@ -174,6 +174,7 @@ describe('MockCoordinatorRepository Identity & Dynamic Draft Ownership', () => {
     const customCoordinatorUser = {
       id: 'usr-coord-test-77',
       displayName: 'Dr. Khin Mar (Disaster Relief)',
+      phone: '+959777777777',
       email: 'khin.mar@volunteer.local',
       coordinatorStatus: 'approved' as const,
       accountStatus: 'active' as const,

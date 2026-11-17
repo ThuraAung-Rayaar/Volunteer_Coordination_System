@@ -4,11 +4,17 @@
 
 /**
  * Event item in coordinator's managed event list (`GET /api/v1/coordinator/events/`).
- * Matches `EventListSerializer`.
+ * Matches `EventListSerializer` (enriched in Phase 2).
  */
 export interface CoordinatorEventListItemDto {
   id: number;
   title: string;
+  description?: string | null;
+  purpose_type?: 'charity_event' | 'help_wanted_event';
+  location_name?: string | null;
+  landmark_text?: string | null;
+  coordinator_name?: string | null;
+  charity_fields?: string[];
   status: string;
   start_at: string;
   end_at: string;
@@ -80,6 +86,106 @@ export interface EventCreateRequestDto {
 }
 
 /**
+ * Payload for creating an event post (`POST /api/v1/coordinator/events/{id}/posts/` - C-08).
+ */
+export interface EventPostCreateRequestDto {
+  title: string;
+  description?: string | null;
+  required_headcount: number;
+  physical_level?: 'none' | 'light' | 'medium' | 'heavy';
+  required_skills?: string[];
+  leader_needed?: boolean;
+  new_volunteers_allowed?: boolean;
+}
+
+/**
+ * Payload for updating an event post (`PATCH /api/v1/posts/{id}/` - C-09).
+ */
+export interface EventPostUpdateRequestDto {
+  title?: string;
+  description?: string | null;
+  required_headcount?: number;
+  physical_level?: 'none' | 'light' | 'medium' | 'heavy';
+  required_skills?: string[];
+  leader_needed?: boolean;
+  new_volunteers_allowed?: boolean;
+  status?: 'open' | 'full' | 'closed';
+}
+
+/**
+ * Audit record from `v_event_coordinator_history` (`GET /api/v1/coordinator/events/{id}/history/` - C-18).
+ */
+export interface CoordinatorHistoryItemDto {
+  id: number;
+  event_id: number;
+  event_title?: string;
+  change_type: string;
+  previous_coordinator_id: number | null;
+  previous_coordinator_name: string | null;
+  new_coordinator_id: number;
+  new_coordinator_name: string | null;
+  changed_by_id: number;
+  changed_by_name: string | null;
+  reason: string | null;
+  changed_at: string;
+}
+
+/**
+ * Payload for inviting a volunteer to an event (`POST /api/v1/coordinator/events/{id}/invite/` - C-23).
+ */
+export interface CoordinatorInviteRequestDto {
+  volunteer_user_id?: number;
+  volunteer_uuid?: string;
+  post_id?: number | null;
+  note?: string | null;
+}
+
+/**
+ * Response for manual assignment (`POST /api/v1/coordinator/events/{id}/manual-assign/` - C-25).
+ */
+export interface ManualAssignResultDto {
+  assignment_id?: number;
+  application_id?: number | null;
+  status?: string;
+  id?: number;
+  user_id?: number;
+  display_name?: string;
+  post_id?: number | null;
+  post_title?: string | null;
+  group_code?: string | null;
+  is_group_leader?: boolean;
+  assigned_by?: string;
+  schedule_start?: string;
+  schedule_end?: string;
+  confirmed_at?: string | null;
+}
+
+/**
+ * Response for running automatic assignment (`POST /api/v1/coordinator/events/{id}/auto-assign/` - C-24).
+ */
+export interface AutoAssignResultDto {
+  event_id?: number;
+  newly_assigned?: number;
+  total_accepted?: number;
+  total_assigned?: number;
+  remaining_unassigned?: number;
+  assigned?: number;
+  message?: string;
+}
+
+/**
+ * Post capacity summary matching `v_event_post_capacity` (`GET /api/v1/coordinator/events/{id}/post-capacity/` - C-28).
+ */
+export interface EventPostCapacityDto {
+  post_id: number;
+  title: string;
+  status: string;
+  required_headcount: number;
+  assigned_count: number;
+  remaining: number;
+}
+
+/**
  * Coordinator applicant review DTO matching `CoordinatorApplicationListSerializer`.
  * Returned by `GET /api/v1/coordinator/events/{id}/applications/`.
  */
@@ -94,11 +200,23 @@ export interface CoordinatorApplicationDto {
   applied_at: string;
   decided_at: string | null;
   decided_by_id: number | null;
+  note?: string | null;
+  // T2 Volunteer Profile (present only for accepted applicants)
+  uuid?: string | null;
   skills?: string[];
   physical_ok?: boolean;
+  good_eyesight?: boolean;
+  needs_glasses?: boolean;
   can_lift_heavy?: boolean;
+  can_work_outdoor?: boolean;
   has_leader_experience?: boolean;
   new_to_volunteer?: boolean;
+  preferred_language?: string;
+  home_area?: string | null;
+  needs_meal_support?: boolean;
+  needs_travel_support?: boolean;
+  accepts_unpaid?: boolean;
+  verification_status?: string;
 }
 
 /**
@@ -107,6 +225,9 @@ export interface CoordinatorApplicationDto {
  */
 export interface CoordinatorAssignmentDto {
   id: number;
+  application_id?: number | null;
+  event_id?: number | null;
+  event_title?: string | null;
   user_id: number;
   display_name: string;
   post_id: number | null;
@@ -115,6 +236,7 @@ export interface CoordinatorAssignmentDto {
   is_group_leader: boolean;
   status: string;
   assigned_by: string;
+  assigned_at?: string | null;
   schedule_start: string;
   schedule_end: string;
   confirmed_at: string | null;

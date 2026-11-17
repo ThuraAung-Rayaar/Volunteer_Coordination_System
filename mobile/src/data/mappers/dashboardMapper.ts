@@ -15,14 +15,14 @@ import type {
 
 /**
  * Computes verified hours from check-in and check-out timestamps.
- * Falls back to 3.0 hours if exact duration cannot be computed.
+ * Returns 0 if exact duration cannot be measured (never fabricates 3.0).
  */
-function calculateVerifiedHours(
+export function calculateVerifiedHours(
   checkinIso?: string | null,
   checkoutIso?: string | null,
   providedHours?: number | null,
 ): number {
-  if (typeof providedHours === 'number' && providedHours > 0) {
+  if (typeof providedHours === 'number' && providedHours >= 0) {
     return Math.round(providedHours * 10) / 10;
   }
   if (checkinIso && checkoutIso) {
@@ -32,18 +32,31 @@ function calculateVerifiedHours(
       return Math.round(hours * 10) / 10;
     }
   }
-  return 3.0; // Standard shift default
+  return 0; // Unmeasured duration returns 0, never a fake constant
 }
 
 /**
  * Maps assignments, attendance records, and feedback metrics into DashboardSummary.
  * Strictly enforces that completed activities are attendance-backed (`status === 'completed'`).
+ * Joins attendance records with assignments as a fallback for title/post/location.
  */
 export function mapDashboardSummary(
   assignments: VolunteerAssignmentDto[] = [],
   attendanceRecords: AttendanceHistoryItemDto[] = [],
   feedbackSummary?: FeedbackSummaryResponseDto | null,
 ): DashboardSummary {
+  // Build lookup index for joining attendance with assignments
+  const assignmentById = new Map<number, VolunteerAssignmentDto>();
+  const assignmentByEventId = new Map<number, VolunteerAssignmentDto>();
+  assignments.forEach(a => {
+    if (a.id != null) {
+      assignmentById.set(Number(a.id), a);
+    }
+    if (a.event_id != null) {
+      assignmentByEventId.set(Number(a.event_id), a);
+    }
+  });
+
   // Filter active upcoming shifts: 'assigned' or 'confirmed'
   const upcomingCommitments: UpcomingCommitment[] = assignments
     .filter(a => a.status === 'assigned' || a.status === 'confirmed')
@@ -54,7 +67,7 @@ export function mapDashboardSummary(
       roleName: a.post_title || 'Assigned Volunteer',
       startAt: a.schedule_start,
       endAt: a.schedule_end,
-      location: 'Event Location',
+      location: a.location_name || 'Event Location',
       status: a.status === 'confirmed' ? 'confirmed' : 'assigned',
     }));
 
@@ -65,6 +78,10 @@ export function mapDashboardSummary(
 
   const recentCompletedActivities: CompletedActivity[] = completedAttendance.map(
     att => {
+      const matchedAssignment =
+        (att.assignment_id != null ? assignmentById.get(Number(att.assignment_id)) : undefined) ??
+        (att.event_id != null ? assignmentByEventId.get(Number(att.event_id)) : undefined);
+
       const verifiedAt =
         att.checkout_at || att.checkin_at || new Date().toISOString();
       const hours = calculateVerifiedHours(
@@ -73,15 +90,22 @@ export function mapDashboardSummary(
         att.verified_hours,
       );
 
+      const resolvedTitle =
+        att.event_title || matchedAssignment?.event_title || 'Community Service Activity';
+      const resolvedRole =
+        att.post_title || matchedAssignment?.post_title || 'Volunteer Contributor';
+      const resolvedLocation =
+        att.location_name || matchedAssignment?.location_name || 'Designated Location';
+
       return {
         id: String(att.id),
         eventId: String(att.event_id),
-        eventTitle: att.event_title || 'Community Service Activity',
-        roleName: att.post_title || 'Volunteer Contributor',
+        eventTitle: resolvedTitle,
+        roleName: resolvedRole,
         completedAt: verifiedAt,
         attendanceStatus: 'completed',
         verifiedHours: hours,
-        location: att.location_name || 'Designated Location',
+        location: resolvedLocation,
         attendanceVerifiedAt: verifiedAt,
       };
     },

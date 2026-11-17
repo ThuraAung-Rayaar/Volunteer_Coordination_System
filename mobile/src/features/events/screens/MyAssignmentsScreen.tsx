@@ -15,6 +15,7 @@ import {
   View,
 } from 'react-native';
 import type { EventRepository } from '../../../data/contracts/eventRepository';
+import { defaultLocationProvider } from '../../../core';
 import {
   defaultEventRepository,
   MockEventRepository,
@@ -326,19 +327,32 @@ export function MyAssignmentsScreen({
     }
     setIsCheckingIn(true);
     try {
+      const permission = await defaultLocationProvider.requestPermission();
+      if (permission === 'denied') {
+        setFeedbackBanner('Location permission denied. Please allow location access to check in.');
+        return;
+      }
+      if (permission === 'unavailable') {
+        setFeedbackBanner('Location services are unavailable on this device.');
+        return;
+      }
+
+      const fix = await defaultLocationProvider.getCurrentPosition();
       const res = await repository.submitGeoCheckIn(
         checkInItem.eventId,
-        16.805,
-        96.155,
-        15,
+        fix.latitude,
+        fix.longitude,
+        fix.accuracyM ?? undefined,
       );
       setFeedbackBanner(res.message);
       if (res.success) {
         setCheckInItem(null);
         await fetchAssignments();
       }
-    } catch {
-      setFeedbackBanner('Geo check-in request failed.');
+    } catch (err) {
+      setFeedbackBanner(
+        err instanceof Error ? err.message : 'Geo check-in request failed.',
+      );
     } finally {
       setIsCheckingIn(false);
     }
@@ -589,7 +603,7 @@ export function MyAssignmentsScreen({
 
                 {/* Action footer */}
                 <View style={styles.cardActions}>
-                  {item.status === 'assigned' && repository.confirmAssignment ? (
+                  {item.status === 'assigned' ? (
                     <AppButton
                       label="Confirm Shift"
                       variant="primary"
@@ -600,19 +614,16 @@ export function MyAssignmentsScreen({
                     />
                   ) : null}
 
-                  {repository.getEventOnboarding ? (
-                    <AppButton
-                      label="Onboarding"
-                      variant="secondary"
-                      onPress={() => handleOpenOnboarding(item)}
-                      accessibilityLabel={`View onboarding for ${item.eventTitle}`}
-                      style={{ marginRight: 8, marginBottom: 8 }}
-                    />
-                  ) : null}
+                  <AppButton
+                    label="Onboarding"
+                    variant="secondary"
+                    onPress={() => handleOpenOnboarding(item)}
+                    accessibilityLabel={`View onboarding for ${item.eventTitle}`}
+                    style={{ marginRight: 8, marginBottom: 8 }}
+                  />
 
                   {(item.status === 'confirmed' || item.status === 'assigned') &&
-                  item.attendanceStatus !== 'checked_in' &&
-                  repository.submitGeoCheckIn ? (
+                  item.attendanceStatus !== 'checked_in' ? (
                     <AppButton
                       label="Check-In"
                       variant="primary"
@@ -622,7 +633,7 @@ export function MyAssignmentsScreen({
                     />
                   ) : null}
 
-                  {item.attendanceStatus === 'checked_in' && repository.checkOutAttendance ? (
+                  {item.attendanceStatus === 'checked_in' ? (
                     <AppButton
                       label="Check-Out"
                       variant="primary"
@@ -632,7 +643,7 @@ export function MyAssignmentsScreen({
                     />
                   ) : null}
 
-                  {isCompleted && repository.submitEventFeedback ? (
+                  {isCompleted ? (
                     <AppButton
                       label="Feedback"
                       variant="secondary"

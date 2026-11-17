@@ -29,6 +29,7 @@ import {
 } from './configuration/dataMode';
 import { sessionManager } from '../core/auth/sessionManager';
 import { authApi } from '../data/endpoints/authApi';
+import type { OtpDeliveryDto } from '../data/dto/authDto';
 import { profileApi } from '../data/endpoints/profileApi';
 import { resetDiscoveryCache } from '../features/events/screens/EventDiscoveryScreen';
 import { resetApplicationsCache } from '../features/events/screens/MyApplicationsScreen';
@@ -38,6 +39,8 @@ export type UserPreset = 'volunteer' | 'coordinator' | 'pending';
 
 export interface RequestOtpResult {
   success: boolean;
+  status?: string;
+  delivery?: OtpDeliveryDto;
   devCode?: string;
   error?: string;
 }
@@ -170,6 +173,7 @@ export function UserProvider({
     const snapshot: UserProfileSnapshot = {
       id: String(meRes.data.id),
       displayName: meRes.data.display_name,
+      phone: meRes.data.phone ?? null,
       email: meRes.data.phone || 'volunteer@example.com',
       coordinatorStatus: coordStatus,
       accountStatus: acctStatus,
@@ -232,6 +236,8 @@ export function UserProvider({
       }
       return {
         success: true,
+        status: res.data.status,
+        delivery: res.data.delivery,
         devCode: res.data.dev_code,
       };
     },
@@ -267,6 +273,7 @@ export function UserProvider({
         const snapshot: UserProfileSnapshot = {
           id: String(res.data.user.id),
           displayName: res.data.user.display_name,
+          phone: phone,
           email: phone,
           coordinatorStatus: 'none',
           accountStatus: 'active',

@@ -18,10 +18,15 @@ import {
   validateEmergencyContact,
 } from '../../shared/utils/profileValidation';
 import type {
+  AttendanceHistoryItem,
+  AvailabilityCheckResult,
   CoordinatorEligibilityData,
   ProfileOperationResult,
   ProfileRepository,
+  UserUuidLookupResult,
+  VerificationImageUploadResult,
 } from '../contracts/profileRepository';
+import type { MyFeedbackResponse } from '../../domain/models/feedback';
 import {
   Clock,
   createAvailabilityFixture,
@@ -321,6 +326,148 @@ export class MockProfileRepository implements ProfileRepository {
     return {
       success: true,
       message: 'Demo only — not submitted to server',
+    };
+  }
+
+  public async checkAvailabilityForEvent(
+    eventId: string | number,
+  ): Promise<AvailabilityCheckResult> {
+    return {
+      isAvailable: true,
+      scheduleConflict: false,
+      eventId: String(eventId),
+      startAt: '2026-12-15T08:00:00+06:30',
+      endAt: '2026-12-15T12:00:00+06:30',
+    };
+  }
+
+  public async checkAvailabilityForWindow(
+    startAt: string,
+    endAt: string,
+  ): Promise<AvailabilityCheckResult> {
+    return {
+      isAvailable: true,
+      scheduleConflict: false,
+      startAt,
+      endAt,
+    };
+  }
+
+  public async uploadVerificationImage(
+    imageType: string,
+    fileUri: string,
+    _mimeType?: string,
+    _fileName?: string,
+  ): Promise<VerificationImageUploadResult> {
+    const slot = this.verification.imageSlots.find(
+      s => s.imageType === imageType,
+    );
+    if (slot) {
+      slot.status = 'pending';
+      slot.uploadedAt = this.clock().toISOString();
+    }
+    return {
+      id: this.idGenerator('vimg'),
+      imageType,
+      status: 'pending',
+      comparisonStatus: 'pending',
+      isCurrent: true,
+      createdAt: this.clock().toISOString(),
+    };
+  }
+
+  public async updateCoordinatorApplicationNotes(
+    notes: string,
+  ): Promise<ProfileOperationResult> {
+    this.verification.coordinatorApplicationNote = notes;
+    return {
+      success: true,
+      message: 'Demo only — not submitted to server',
+    };
+  }
+
+  public async lookupUserByUuid(
+    uuid: string,
+    _eventId?: string | number,
+  ): Promise<UserUuidLookupResult> {
+    return {
+      userId: 88,
+      uuid,
+      displayName: 'Demo Volunteer',
+      verificationStatus: 'verified',
+      skills: ['teaching', 'first_aid'],
+      physicalOk: true,
+      goodEyesight: true,
+      needsGlasses: false,
+      canLiftHeavy: true,
+      canWorkOutdoor: true,
+      hasLeaderExperience: true,
+      newToVolunteer: false,
+      preferredLanguage: 'en',
+      homeArea: 'Kamayut, Yangon',
+      needsMealSupport: true,
+      needsTravelSupport: false,
+      acceptsUnpaid: true,
+    };
+  }
+
+  public async getAttendanceHistory(): Promise<AttendanceHistoryItem[]> {
+    return [
+      {
+        id: 'att-hist-001',
+        assignmentId: 'asgn-303',
+        eventId: 'evt-104',
+        eventTitle: 'Animal Shelter Wellness & Adoption Fair',
+        locationName: 'Bahan Community Animal Sanctuary',
+        postId: 'post-104-1',
+        postTitle: 'Kennel Grooming & Exercise Assistant',
+        scheduleStart: '2026-11-01T10:00:00Z',
+        scheduleEnd: '2026-11-01T16:00:00Z',
+        status: 'completed',
+        method: 'geo',
+        checkinAt: '2026-11-01T09:55:00Z',
+        checkoutAt: '2026-11-01T16:05:00Z',
+        confirmationStatus: 'confirmed',
+        walkInFlag: false,
+        verifiedHours: 4.5,
+      },
+    ];
+  }
+
+  public async getOwnFeedback(): Promise<MyFeedbackResponse> {
+    return {
+      authoredFeedback: [
+        {
+          id: 'fb-001',
+          eventId: 'evt-104',
+          eventTitle: 'Animal Shelter Wellness & Adoption Fair',
+          direction: 'volunteer_to_event',
+          ratingOverall: 5,
+          tags: ['supportive', 'organized'],
+          comments: 'Rewarding experience helping the animals.',
+          createdAt: '2026-11-02T10:00:00Z',
+        },
+      ],
+      receivedSummary: {
+        overallAvgRating: this.profile.ratingAverage ?? 4.88,
+        totalCount: this.profile.ratingCount ?? 26,
+        volunteerAvgRating: this.profile.ratingAverage ?? 4.88,
+        volunteerRatingCount: this.profile.ratingCount ?? 26,
+        coordinatorAvgRating: null,
+        coordinatorRatingCount: 0,
+        asVolunteer: {
+          count: this.profile.ratingCount ?? 26,
+          avgOverall: this.profile.ratingAverage ?? 4.88,
+        },
+        asCoordinator: {
+          count: 0,
+          avgOverall: null,
+        },
+        ratingDistribution: {
+          '5': 20,
+          '4': 6,
+        },
+      },
     };
   }
 }

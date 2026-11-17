@@ -210,6 +210,7 @@ export function ProfileEditScreen({
         },
         donationPreferences: {
           bloodType,
+          isWillingToDonate: isWillingToDonateBlood || isWillingToDonateItems,
           isWillingToDonateBlood,
           isWillingToDonateItems,
         },
@@ -323,7 +324,7 @@ export function ProfileEditScreen({
             color={theme.colors.textSecondary}
             style={styles.emailSpacing}
           >
-            {profile.email}
+            {profile.phone ?? profile.email ?? 'No phone on file'}
           </AppText>
 
           <View

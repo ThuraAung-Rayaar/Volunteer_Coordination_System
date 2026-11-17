@@ -2,17 +2,24 @@
  * @format
  */
 
-import type {
-  EventApplicationState,
-  EventDetail,
-  EventFilters,
-  EventSummary,
-  VolunteerApplicationItem,
-  VolunteerAssignmentItem,
+import {
+  CHARITY_CATEGORIES,
+  type EventApplicationState,
+  type EventDetail,
+  type EventFilters,
+  type EventSummary,
+  type VolunteerApplicationItem,
+  type VolunteerAssignmentItem,
 } from '../../domain/models/event';
 import type {
   EventApplyResult,
+  EventFeedbackItem,
   EventRepository,
+  GeoCheckInResult,
+  OnboardingStatusResult,
+  PaginatedEventsResult,
+  QrRedeemResult,
+  QrResolveResult,
 } from '../contracts/eventRepository';
 import {
   Clock,
@@ -210,6 +217,32 @@ export class MockEventRepository implements EventRepository {
     }
 
     return result.map(toSummary);
+  }
+
+  public async getEventsPage(
+    filters?: EventFilters,
+    page: number = 1,
+    pageSize: number = 20,
+  ): Promise<PaginatedEventsResult> {
+    const all = await this.getEvents(filters);
+    const start = (page - 1) * pageSize;
+    const paginated = all.slice(start, start + pageSize);
+    return {
+      count: all.length,
+      next: start + pageSize < all.length ? `page=${page + 1}` : null,
+      previous: page > 1 ? `page=${page - 1}` : null,
+      results: paginated,
+    };
+  }
+
+  public async getCharityFields(): Promise<
+    Array<{ code: string; label: string; sort_order?: number }>
+  > {
+    return CHARITY_CATEGORIES.map(c => ({
+      code: c.code,
+      label: c.label,
+      sort_order: c.sortOrder,
+    }));
   }
 
   public async getEventById(id: string): Promise<EventDetail | null> {
@@ -502,6 +535,41 @@ export class MockEventRepository implements EventRepository {
       message: `Thank you for rating your shift (${score}/5 stars)! Feedback recorded.`,
       feedbackId: this.idGenerator('fb'),
     };
+  }
+
+  public async resolveQrToken(token: string): Promise<QrResolveResult> {
+    if (!token || !token.trim()) {
+      return {
+        eventId: '',
+        purpose: '',
+        isValid: false,
+        reason: 'Invalid or empty QR token provided.',
+      };
+    }
+    return {
+      eventId: 'evt-101',
+      purpose: 'checkin',
+      isValid: true,
+      reason: null,
+    };
+  }
+
+  public async qrCheckIn(token: string): Promise<QrRedeemResult> {
+    return this.redeemQrToken(token);
+  }
+
+  public async getEventFeedbackList(
+    _eventId: string,
+  ): Promise<EventFeedbackItem[]> {
+    return [
+      {
+        id: 'fb-101',
+        score: 5,
+        comment: 'Great community project and well organized!',
+        tags: ['supportive', 'organized'],
+        createdAt: this.clock().toISOString(),
+      },
+    ];
   }
 }
 
