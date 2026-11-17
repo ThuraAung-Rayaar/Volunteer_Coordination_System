@@ -73,6 +73,9 @@ This directory (`docs/`) contains comprehensive deep-dive analyses and verificat
 - [docs/database_deep_dive.md](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/docs/database_deep_dive.md)  
   *Exhaustive catalog of the PostgreSQL database schema: entity-relationship diagrams, all 22 tables, stored procedures, triggers, state machines, view models, maintenance routines, and seed data.*
 
+- [docs/mobile_bff_database_connectivity_audit.md](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/docs/mobile_bff_database_connectivity_audit.md)  
+  *Detailed audit and gap analysis of Mobile Client ↔ Django BFF ↔ PostgreSQL connectivity: event loading, event declaration, event creation, updates, volunteer acceptance, synchronization, full 38-capability scan, and map/geolocation preparation.*
+
 ### Baseline & Integration Audits (`docs/baseline/`)
 - [docs/baseline/v0_10_0_phase_0_discovery_and_baseline_report.md](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/docs/baseline/v0_10_0_phase_0_discovery_and_baseline_report.md)  
   *Phase 0 baseline discovery and freeze report documenting test baseline, pre-existing type errors, and non-invasive enforcement rules.*

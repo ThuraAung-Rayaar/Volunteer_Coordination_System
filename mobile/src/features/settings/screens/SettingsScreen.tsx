@@ -12,7 +12,12 @@ import {
   isHttpMode,
   setDataMode,
 } from '../../../app/configuration/dataMode';
-import { getApiConfig } from '../../../core/api/apiConfig';
+import {
+  addApiConfigListener,
+  API_HOST_PRESETS,
+  getApiConfig,
+  setApiHostPreset,
+} from '../../../core/api/apiConfig';
 import { eventApi } from '../../../data/endpoints/eventApi';
 import {
   AppButton,
@@ -44,13 +49,19 @@ export function SettingsScreen({
     message: string;
   } | null>(null);
 
-  const apiConfig = getApiConfig();
+  const [apiConfig, setApiConfigState] = useState(() => getApiConfig());
 
   useEffect(() => {
-    const unsubscribe = addDataModeListener(mode => {
+    const unsubData = addDataModeListener(mode => {
       setCurrentMode(mode);
     });
-    return unsubscribe;
+    const unsubConfig = addApiConfigListener(cfg => {
+      setApiConfigState(cfg);
+    });
+    return () => {
+      unsubData();
+      unsubConfig();
+    };
   }, []);
 
   const handleSetDataMode = (mode: DataMode) => {
@@ -237,6 +248,39 @@ export function SettingsScreen({
               >
                 {`Endpoint Prefix: ${apiConfig.apiPrefix}`}
               </AppText>
+
+              <AppText
+                variant="caption"
+                color={theme.colors.textSecondary}
+                style={styles.marginTop}
+              >
+                Target Host Preset (USB adb reverse vs Emulator):
+              </AppText>
+
+              <View style={[styles.rowGap, styles.marginTop]}>
+                <AppButton
+                  label="USB (localhost:8000)"
+                  variant={
+                    apiConfig.baseUrl === API_HOST_PRESETS.USB_DEVICE
+                      ? 'primary'
+                      : 'secondary'
+                  }
+                  onPress={() => setApiHostPreset('usb')}
+                  style={styles.flexOne}
+                  accessibilityLabel="Switch to USB Host"
+                />
+                <AppButton
+                  label="Emulator (10.0.2.2)"
+                  variant={
+                    apiConfig.baseUrl === API_HOST_PRESETS.ANDROID_EMULATOR
+                      ? 'primary'
+                      : 'secondary'
+                  }
+                  onPress={() => setApiHostPreset('emulator')}
+                  style={styles.flexOne}
+                  accessibilityLabel="Switch to Emulator Host"
+                />
+              </View>
 
               <View style={[styles.rowGap, styles.marginTop]}>
                 <AppButton

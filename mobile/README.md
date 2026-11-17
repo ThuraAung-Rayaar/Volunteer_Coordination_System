@@ -23,14 +23,33 @@ yarn start
 With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
 
 ### Android
-
+ 
 ```sh
 # Using npm
 npm run android
 
-# OR using Yarn
-yarn android
+# OR running directly on a physical device connected via USB:
+npm run android:device
 ```
+
+#### Running on Actual Physical Device via USB (No Wi-Fi needed)
+
+1. Connect your Android phone to your PC via USB cable.
+2. Enable **Developer Options** and turn on **USB Debugging** on your phone.
+3. Verify your device is connected:
+   ```sh
+   adb devices
+   ```
+4. Reverse Metro (8081) and Backend (8000) ports:
+   ```sh
+   npm run reverse
+   ```
+   *(This routes `localhost:8000` and `localhost:8081` from your phone through the USB cable directly to your PC).*
+5. Run the app:
+   ```sh
+   npm run android
+   ```
+   *(Or run `npm run android:device` which executes both in one command).*
 
 ### iOS
 

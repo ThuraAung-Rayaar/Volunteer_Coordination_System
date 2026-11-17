@@ -3,10 +3,13 @@
  */
 
 import {
+  API_HOST_PRESETS,
+  addApiConfigListener,
   buildApiUrl,
   getApiConfig,
   resetApiConfig,
   setApiConfig,
+  setApiHostPreset,
 } from '../src/core/api/apiConfig';
 
 describe('apiConfig and buildApiUrl', () => {
@@ -22,7 +25,36 @@ describe('apiConfig and buildApiUrl', () => {
     const config = getApiConfig();
     expect(config.apiPrefix).toBe('/api/v1');
     expect(config.defaultTimeoutMs).toBe(15000);
-    expect(config.baseUrl).toBeTruthy();
+    expect(config.baseUrl).toBe(API_HOST_PRESETS.USB_DEVICE);
+    expect(config.baseUrl).toBe('http://localhost:8000');
+  });
+
+  it('switches host presets between USB device (localhost) and Android emulator (10.0.2.2)', () => {
+    setApiHostPreset('emulator');
+    expect(getApiConfig().baseUrl).toBe('http://10.0.2.2:8000');
+
+    setApiHostPreset('usb');
+    expect(getApiConfig().baseUrl).toBe('http://localhost:8000');
+  });
+
+  it('notifies listeners when configuration is updated or reset', () => {
+    const listener = jest.fn();
+    const unsubscribe = addApiConfigListener(listener);
+
+    setApiConfig({ defaultTimeoutMs: 5000 });
+    expect(listener).toHaveBeenCalledWith(
+      expect.objectContaining({ defaultTimeoutMs: 5000 }),
+    );
+
+    resetApiConfig();
+    expect(listener).toHaveBeenCalledWith(
+      expect.objectContaining({ defaultTimeoutMs: 15000 }),
+    );
+
+    unsubscribe();
+    listener.mockClear();
+    setApiConfig({ defaultTimeoutMs: 3000 });
+    expect(listener).not.toHaveBeenCalled();
   });
 
   it('constructs absolute URL joining baseUrl and prefix cleanly without double slashes', () => {

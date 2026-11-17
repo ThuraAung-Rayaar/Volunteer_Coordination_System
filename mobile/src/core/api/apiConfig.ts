@@ -2,8 +2,6 @@
  * @format
  */
 
-import { Platform } from 'react-native';
-
 export interface ApiConfig {
   baseUrl: string;
   apiPrefix: string;
@@ -11,15 +9,29 @@ export interface ApiConfig {
 }
 
 /**
- * Resolves the default base host depending on platform.
- * Android emulator routes host machine loopback to 10.0.2.2.
- * iOS simulators and web default to localhost.
+ * Host presets for development workflows:
+ * - USB_DEVICE: For actual physical devices connected via USB cable.
+ *   Using `adb reverse tcp:8000 tcp:8000`, the phone can route directly to the host PC's
+ *   port 8000 over USB without needing Wi-Fi or changing local IP addresses.
+ * - ANDROID_EMULATOR: For Android Studio QEMU Virtual Devices (AVD).
+ * - IOS_SIMULATOR: For iOS simulators running on macOS host.
+ */
+export const API_HOST_PRESETS = {
+  USB_DEVICE: 'http://localhost:8000',
+  ANDROID_EMULATOR: 'http://10.0.2.2:8000',
+  IOS_SIMULATOR: 'http://localhost:8000',
+} as const;
+
+export type ApiHostPreset = 'usb' | 'emulator';
+
+/**
+ * Resolves the default base host depending on platform and workflow.
+ * Defaults to 'http://localhost:8000' so physical Android devices over USB
+ * (with `adb reverse tcp:8000 tcp:8000`), iOS simulators, and web work immediately
+ * without requiring Wi-Fi LAN setup.
  */
 function getDefaultBaseHost(): string {
-  if (Platform.OS === 'android') {
-    return 'http://10.0.2.2:8000';
-  }
-  return 'http://localhost:8000';
+  return API_HOST_PRESETS.USB_DEVICE;
 }
 
 const DEFAULT_CONFIG: ApiConfig = {
@@ -29,6 +41,20 @@ const DEFAULT_CONFIG: ApiConfig = {
 };
 
 let currentConfig: ApiConfig = { ...DEFAULT_CONFIG };
+const apiConfigListeners = new Set<(config: ApiConfig) => void>();
+
+/**
+ * Subscribes to API configuration updates.
+ * Returns an unsubscribe callback.
+ */
+export function addApiConfigListener(
+  listener: (config: ApiConfig) => void,
+): () => void {
+  apiConfigListeners.add(listener);
+  return () => {
+    apiConfigListeners.delete(listener);
+  };
+}
 
 /**
  * Returns current API configuration.
@@ -38,20 +64,46 @@ export function getApiConfig(): ApiConfig {
 }
 
 /**
- * Updates partial or full API configuration.
+ * Updates partial or full API configuration and notifies subscribers.
  */
 export function setApiConfig(overrides: Partial<ApiConfig>): void {
   currentConfig = {
     ...currentConfig,
     ...overrides,
   };
+  apiConfigListeners.forEach(listener => {
+    try {
+      listener({ ...currentConfig });
+    } catch {
+      // Listener error must not crash
+    }
+  });
 }
 
 /**
- * Resets API configuration to platform defaults.
+ * Convenience helper to switch between USB device and emulator host presets.
+ */
+export function setApiHostPreset(preset: ApiHostPreset): void {
+  setApiConfig({
+    baseUrl:
+      preset === 'usb'
+        ? API_HOST_PRESETS.USB_DEVICE
+        : API_HOST_PRESETS.ANDROID_EMULATOR,
+  });
+}
+
+/**
+ * Resets API configuration to platform defaults and notifies subscribers.
  */
 export function resetApiConfig(): void {
   currentConfig = { ...DEFAULT_CONFIG };
+  apiConfigListeners.forEach(listener => {
+    try {
+      listener({ ...currentConfig });
+    } catch {
+      // Listener error must not crash
+    }
+  });
 }
 
 /**
