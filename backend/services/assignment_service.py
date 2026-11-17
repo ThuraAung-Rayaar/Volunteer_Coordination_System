@@ -18,6 +18,7 @@ from typing import Optional
 
 from django.db import connection, transaction
 
+from apps.attendance.models import Attendance
 from apps.coordination.models import Assignments
 from apps.events.models import EventApplications, VEventPostCapacity
 from common.db_context import set_db_session_context
@@ -291,7 +292,7 @@ def get_event_assignments(actor, event_id: int) -> list[dict]:
     Retrieve all active assignments for an event (coordinator view).
     Includes volunteer name, post, group, and status.
     """
-    get_event_for_manager_or_404(actor, event_id, require_write=False)
+    event = get_event_for_manager_or_404(actor, event_id, require_write=False)
 
     assignments = (
         Assignments.objects.filter(event_id=event_id)
@@ -304,6 +305,9 @@ def get_event_assignments(actor, event_id: int) -> list[dict]:
     for a in assignments:
         results.append({
             "id": a.id,
+            "application_id": a.application_id,
+            "event_id": a.event_id,
+            "event_title": event.title,
             "user_id": a.user_id,
             "display_name": a.user.display_name,
             "post_id": a.post_id,
@@ -312,6 +316,7 @@ def get_event_assignments(actor, event_id: int) -> list[dict]:
             "is_group_leader": a.is_group_leader,
             "status": a.status,
             "assigned_by": a.assigned_by,
+            "assigned_at": getattr(a, "assigned_at", getattr(a, "created_at", None)),
             "schedule_start": a.schedule_start,
             "schedule_end": a.schedule_end,
             "confirmed_at": a.confirmed_at,
@@ -334,21 +339,34 @@ def get_own_assignments(user, event_id: Optional[int] = None) -> list[dict]:
     if event_id is not None:
         qs = qs.filter(event_id=event_id)
 
+    assignments_list = list(qs)
+    assignment_ids = [a.id for a in assignments_list]
+    attendance_map = {}
+    if assignment_ids:
+        for att in Attendance.objects.filter(assignment_id__in=assignment_ids):
+            attendance_map[att.assignment_id] = att
+
     results = []
-    for a in qs:
+    for a in assignments_list:
+        att = attendance_map.get(a.id)
         results.append({
             "id": a.id,
+            "application_id": a.application_id,
             "event_id": a.event_id,
             "event_title": a.event.title,
             "event_status": a.event.status,
+            "location_name": a.event.location_name,
             "post_id": a.post_id,
             "post_title": a.post.title if a.post else None,
             "group_code": a.group_code,
             "is_group_leader": a.is_group_leader,
             "status": a.status,
+            "assigned_at": getattr(a, "assigned_at", getattr(a, "created_at", None)),
             "schedule_start": a.schedule_start,
             "schedule_end": a.schedule_end,
             "confirmed_at": a.confirmed_at,
+            "attendance_id": att.id if att else None,
+            "attendance_status": att.status if att else None,
         })
     return results
 
@@ -375,26 +393,40 @@ def get_post_capacity_summary(event_id: int) -> list[dict]:
 def get_unassigned_accepted(actor, event_id: int) -> list[dict]:
     """
     Retrieve accepted applications that don't have an assignment yet.
-    Uses the v_accepted_unassigned view.
+    Uses the v_accepted_unassigned view and enriches with T2 profile data.
     """
     get_event_for_manager_or_404(actor, event_id, require_write=False)
 
     with connection.cursor() as cursor:
         cursor.execute(
             """
-            SELECT application_id, event_id, user_id, display_name,
-                   skills, physical_ok, can_lift_heavy,
-                   has_leader_experience, new_to_volunteer
-            FROM v_accepted_unassigned
-            WHERE event_id = %s
-            ORDER BY user_id
+            SELECT v.application_id, v.event_id, v.user_id, v.display_name,
+                   v.skills, v.physical_ok, v.can_lift_heavy,
+                   v.has_leader_experience, v.new_to_volunteer,
+                   u.uuid, u.good_eyesight, u.needs_glasses,
+                   u.can_work_outdoor, u.preferred_language,
+                   u.home_area, u.needs_meal_support,
+                   u.needs_travel_support, u.accepts_unpaid,
+                   u.verification_status
+            FROM v_accepted_unassigned v
+            JOIN users u ON u.id = v.user_id
+            WHERE v.event_id = %s
+            ORDER BY v.user_id
             """,
             [event_id],
         )
         columns = [col[0] for col in cursor.description]
         rows = cursor.fetchall()
 
-    return [dict(zip(columns, row)) for row in rows]
+    results = []
+    for row in rows:
+        item = dict(zip(columns, row))
+        if item.get("uuid"):
+            item["uuid"] = str(item["uuid"])
+        if item.get("skills") is not None:
+            item["skills"] = list(item["skills"])
+        results.append(item)
+    return results
 
 
 get_user_assignments = get_own_assignments

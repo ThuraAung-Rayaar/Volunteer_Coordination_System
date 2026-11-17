@@ -107,22 +107,32 @@ def apply_to_event(
 def invite_volunteer_to_event(
     actor,
     event_id: int,
-    volunteer_user_id: int,
+    volunteer_user_id: Optional[int] = None,
     post_id: Optional[int] = None,
     note: str = "",
+    volunteer_uuid: Optional[str] = None,
 ) -> EventApplications:
     """
     Coordinator invites a volunteer to an event.
 
     - Verifies actor is an event manager with write permissions.
-    - Resolves the target volunteer account.
+    - Resolves the target volunteer account by user ID or UUID.
     - Submits the application with source='invite'.
     """
     get_event_for_manager_or_404(actor, event_id, require_write=True)
 
     try:
-        volunteer = Users.objects.get(id=volunteer_user_id)
-    except Users.DoesNotExist:
+        if volunteer_user_id is not None:
+            volunteer = Users.objects.get(id=volunteer_user_id)
+        elif volunteer_uuid is not None:
+            volunteer = Users.objects.get(uuid=volunteer_uuid)
+        else:
+            raise DomainError(
+                code="invalid_request",
+                message="Either volunteer_user_id or volunteer_uuid must be provided.",
+                status_code=400,
+            )
+    except (Users.DoesNotExist, ValueError):
         raise ResourceMaskedNotFound(message="Volunteer not found.")
 
     app = EventApplications(
@@ -130,7 +140,7 @@ def invite_volunteer_to_event(
         post_id=post_id,
         user=volunteer,
         source="invite",
-        note=note,
+        note=note or "",
         conditions_acknowledged_at=timezone.now(),
     )
     app.save()
@@ -211,16 +221,26 @@ def get_event_applications(
             "applied_at": app.applied_at,
             "decided_at": app.decided_at,
             "decided_by_id": app.decided_by_id,
+            "note": app.note,
         }
         # T2 data only for accepted applicants
         if app.status == "accepted":
-            entry["skills"] = list(app.user.skills or [])
-            entry["physical_ok"] = app.user.physical_ok
-            entry["can_lift_heavy"] = app.user.can_lift_heavy
-            entry["has_leader_experience"] = app.user.has_leader_experience
-            entry["new_to_volunteer"] = app.user.new_to_volunteer
-            entry["needs_meal_support"] = app.user.needs_meal_support
-            entry["needs_travel_support"] = app.user.needs_travel_support
+            u = app.user
+            entry["uuid"] = str(u.uuid) if u.uuid else None
+            entry["skills"] = list(u.skills or [])
+            entry["physical_ok"] = u.physical_ok
+            entry["good_eyesight"] = u.good_eyesight
+            entry["needs_glasses"] = u.needs_glasses
+            entry["can_lift_heavy"] = u.can_lift_heavy
+            entry["can_work_outdoor"] = u.can_work_outdoor
+            entry["has_leader_experience"] = u.has_leader_experience
+            entry["new_to_volunteer"] = u.new_to_volunteer
+            entry["preferred_language"] = u.preferred_language
+            entry["home_area"] = u.home_area
+            entry["needs_meal_support"] = u.needs_meal_support
+            entry["needs_travel_support"] = u.needs_travel_support
+            entry["accepts_unpaid"] = u.accepts_unpaid
+            entry["verification_status"] = u.verification_status
         results.append(entry)
 
     return results

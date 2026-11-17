@@ -155,7 +155,7 @@ export function MainDrawerContent({
           color={theme.colors.textSecondary}
           style={styles.emailMargin}
         >
-          {currentUser.email}
+          {currentUser.phone ?? currentUser.email ?? 'No phone on file'}
         </AppText>
 
         <View style={styles.badgeRow}>

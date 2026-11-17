@@ -7,3 +7,4 @@ export * from './authDto';
 export * from './eventDto';
 export * from './profileDto';
 export * from './coordinatorDto';
+export * from './checkinDto';

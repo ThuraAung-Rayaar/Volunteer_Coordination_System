@@ -87,6 +87,8 @@ class PublicEventDetailSerializer(serializers.Serializer):
     coordinator_name = serializers.CharField(read_only=True, allow_null=True)
     charity_fields = serializers.ListField(child=serializers.CharField(), read_only=True)
     spots_remaining = serializers.IntegerField(read_only=True)
+    require_onboarding_ack = serializers.BooleanField(read_only=True, required=False)
+    qr_registration_enabled = serializers.BooleanField(read_only=True, required=False)
     posts = PublicEventPostSerializer(many=True, read_only=True, required=False)
 
     onboarding_text = serializers.CharField(read_only=True, allow_null=True, required=False)
@@ -200,14 +202,14 @@ class ProfileUpdateSerializer(AllowListSerializerMixin, serializers.Serializer):
     accepts_unpaid = serializers.BooleanField(required=False)
 
 
-class CharityInterestsSerializer(serializers.Serializer):
+class CharityInterestsSerializer(AllowListSerializerMixin, serializers.Serializer):
     field_codes = serializers.ListField(
         child=serializers.CharField(max_length=50),
         allow_empty=True,
     )
 
 
-class AvailabilityRuleSerializer(serializers.Serializer):
+class AvailabilityRuleSerializer(AllowListSerializerMixin, serializers.Serializer):
     weekday = serializers.IntegerField(min_value=1, max_value=7)
     start_time = serializers.TimeField()
     end_time = serializers.TimeField()
@@ -215,11 +217,11 @@ class AvailabilityRuleSerializer(serializers.Serializer):
     valid_to = serializers.DateField(required=False, allow_null=True)
 
 
-class AvailabilityRulesReplaceSerializer(serializers.Serializer):
+class AvailabilityRulesReplaceSerializer(AllowListSerializerMixin, serializers.Serializer):
     rules = serializers.ListField(child=AvailabilityRuleSerializer(), allow_empty=True)
 
 
-class AvailabilityExceptionSerializer(serializers.Serializer):
+class AvailabilityExceptionSerializer(AllowListSerializerMixin, serializers.Serializer):
     date = serializers.DateField()
     is_available = serializers.BooleanField(default=False)
     start_time = serializers.TimeField(required=False, allow_null=True)
@@ -227,7 +229,7 @@ class AvailabilityExceptionSerializer(serializers.Serializer):
     note = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
 
-class AvailabilityCheckSerializer(serializers.Serializer):
+class AvailabilityCheckSerializer(AllowListSerializerMixin, serializers.Serializer):
     start_at = serializers.DateTimeField()
     end_at = serializers.DateTimeField()
 
@@ -277,7 +279,7 @@ UserByUuidSerializer = UserPublicCardSerializer
 # Phase 4 Identity Verification & Coordinator Serializers
 # ---------------------------------------------------------------------------
 
-class VerificationImageUploadSerializer(serializers.Serializer):
+class VerificationImageUploadSerializer(AllowListSerializerMixin, serializers.Serializer):
     image_type = serializers.ChoiceField(
         choices=["mock_selfie", "id_license", "driver_license"]
     )
@@ -305,7 +307,7 @@ class CoordinatorProfileSerializer(serializers.Serializer):
     updated_at = serializers.DateTimeField(read_only=True)
 
 
-class CoordinatorApplySerializer(serializers.Serializer):
+class CoordinatorApplySerializer(AllowListSerializerMixin, serializers.Serializer):
     notes = serializers.CharField(required=False, allow_blank=True, default="")
 
 
@@ -314,7 +316,7 @@ class CoordinatorApplySerializer(serializers.Serializer):
 # Phase 6 Application & Assignment Serializers
 # ---------------------------------------------------------------------------
 
-class ApplicationSubmitSerializer(serializers.Serializer):
+class ApplicationSubmitSerializer(AllowListSerializerMixin, serializers.Serializer):
     event_id = serializers.IntegerField(required=False)
     post_id = serializers.IntegerField(required=False, allow_null=True)
     source = serializers.ChoiceField(
@@ -356,32 +358,37 @@ class ApplicationStatusSerializer(serializers.Serializer):
         return obj.post.title if getattr(obj, "post", None) else None
 
 
-class ApplicationDecisionSerializer(serializers.Serializer):
+class ApplicationDecisionSerializer(AllowListSerializerMixin, serializers.Serializer):
     post_id = serializers.IntegerField(required=False, allow_null=True)
     note = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
 
-class AssignmentConfirmSerializer(serializers.Serializer):
+class AssignmentConfirmSerializer(AllowListSerializerMixin, serializers.Serializer):
     pass  # No body needed
 
 
-class AssignmentCancelSerializer(serializers.Serializer):
+class AssignmentCancelSerializer(AllowListSerializerMixin, serializers.Serializer):
     reason = serializers.CharField(required=False, allow_blank=True, default="")
 
 
 class VolunteerAssignmentListSerializer(serializers.Serializer):
     id = serializers.IntegerField(read_only=True)
+    application_id = serializers.IntegerField(read_only=True, allow_null=True, required=False)
     event_id = serializers.IntegerField(read_only=True)
     event_title = serializers.CharField(read_only=True)
     event_status = serializers.CharField(read_only=True)
+    location_name = serializers.CharField(read_only=True, allow_null=True, required=False)
     post_id = serializers.IntegerField(read_only=True, allow_null=True)
     post_title = serializers.CharField(read_only=True, allow_null=True)
     group_code = serializers.CharField(read_only=True, allow_null=True)
     is_group_leader = serializers.BooleanField(read_only=True)
     status = serializers.CharField(read_only=True)
+    assigned_at = serializers.DateTimeField(read_only=True, allow_null=True, required=False)
     schedule_start = serializers.DateTimeField(read_only=True)
     schedule_end = serializers.DateTimeField(read_only=True)
     confirmed_at = serializers.DateTimeField(read_only=True, allow_null=True)
+    attendance_id = serializers.IntegerField(read_only=True, allow_null=True, required=False)
+    attendance_status = serializers.CharField(read_only=True, allow_null=True, required=False)
 
 
 ApplicationCancelSerializer = AssignmentCancelSerializer

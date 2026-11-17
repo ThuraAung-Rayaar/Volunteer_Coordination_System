@@ -105,6 +105,11 @@ describe('coordinatorMapper', () => {
       const itemDto: CoordinatorEventListItemDto = {
         id: 77,
         title: 'Disaster Relief Logistics',
+        description: 'Coordinating emergency food and supply delivery',
+        purpose_type: 'help_wanted_event',
+        location_name: 'Yangon Relief Depot',
+        landmark_text: 'Warehouse 4 Gate B',
+        charity_fields: ['disaster_support', 'logistics'],
         status: 'published',
         start_at: '2026-12-20T08:00:00Z',
         end_at: '2026-12-20T17:00:00Z',
@@ -139,6 +144,11 @@ describe('coordinatorMapper', () => {
 
       expect(summary.id).toBe('77');
       expect(summary.title).toBe('Disaster Relief Logistics');
+      expect(summary.description).toBe('Coordinating emergency food and supply delivery');
+      expect(summary.purposeType).toBe('help_wanted_event');
+      expect(summary.locationName).toBe('Yangon Relief Depot');
+      expect(summary.landmarkText).toBe('Warehouse 4 Gate B');
+      expect(summary.charityFields).toEqual(['disaster_support', 'logistics']);
       expect(summary.isOwnerAsMonitor).toBe(false);
       expect(summary.pendingApplicationCount).toBe(12);
       expect(summary.acceptedApplicantCount).toBe(20);
@@ -148,7 +158,7 @@ describe('coordinatorMapper', () => {
   });
 
   describe('mapCoordinatorApplication & mapCoordinatorAssignment', () => {
-    it('maps CoordinatorApplicationDto and sets t2Capabilities when accepted', () => {
+    it('maps CoordinatorApplicationDto and sets all 14 t2Capabilities when accepted, undefined when not accepted', () => {
       const appDto: CoordinatorApplicationDto = {
         id: 401,
         user_id: 88,
@@ -163,6 +173,17 @@ describe('coordinatorMapper', () => {
         skills: ['English', 'Burmese'],
         has_leader_experience: true,
         physical_ok: true,
+        good_eyesight: true,
+        needs_glasses: false,
+        can_lift_heavy: true,
+        can_work_outdoor: false,
+        new_to_volunteer: false,
+        preferred_language: 'my',
+        home_area: 'Kamayut, Yangon',
+        needs_meal_support: true,
+        needs_travel_support: false,
+        accepts_unpaid: true,
+        verification_status: 'verified',
       };
 
       const item = mapCoordinatorApplication(appDto, '77', 'Relief Event');
@@ -174,12 +195,33 @@ describe('coordinatorMapper', () => {
       expect(item.status).toBe('accepted');
       expect(item.t2Capabilities).toBeDefined();
       expect(item.t2Capabilities?.hasLeaderExperience).toBe(true);
+      expect(item.t2Capabilities?.physicalOk).toBe(true);
+      expect(item.t2Capabilities?.goodEyesight).toBe(true);
+      expect(item.t2Capabilities?.needsGlasses).toBe(false);
+      expect(item.t2Capabilities?.canLiftHeavy).toBe(true);
+      expect(item.t2Capabilities?.canWorkOutdoor).toBe(false);
+      expect(item.t2Capabilities?.newToVolunteer).toBe(false);
+      expect(item.t2Capabilities?.preferredLanguage).toBe('my');
+      expect(item.t2Capabilities?.homeArea).toBe('Kamayut, Yangon');
+      expect(item.t2Capabilities?.needsMealSupport).toBe(true);
+      expect(item.t2Capabilities?.needsTravelSupport).toBe(false);
+      expect(item.t2Capabilities?.acceptsUnpaid).toBe(true);
+      expect(item.t2Capabilities?.verificationStatus).toBe('verified');
       expect(item.t2Capabilities?.skills).toEqual(['English', 'Burmese']);
+
+      // When pending, t2Capabilities must be undefined
+      const pendingDto: CoordinatorApplicationDto = {
+        ...appDto,
+        status: 'pending',
+      };
+      const pendingItem = mapCoordinatorApplication(pendingDto, '77', 'Relief Event');
+      expect(pendingItem.t2Capabilities).toBeUndefined();
     });
 
-    it('maps CoordinatorAssignmentDto to domain model', () => {
+    it('maps CoordinatorAssignmentDto truthfully with distinct applicationId and assignedAt', () => {
       const assignDto: CoordinatorAssignmentDto = {
         id: 601,
+        application_id: 301,
         user_id: 88,
         display_name: 'Ma Hla Hla',
         post_id: 10,
@@ -188,6 +230,7 @@ describe('coordinatorMapper', () => {
         is_group_leader: true,
         status: 'confirmed',
         assigned_by: 'system_auto',
+        assigned_at: '2026-11-14T08:00:00Z',
         schedule_start: '2026-12-20T08:00:00Z',
         schedule_end: '2026-12-20T17:00:00Z',
         confirmed_at: '2026-11-15T10:00:00Z',
@@ -195,12 +238,14 @@ describe('coordinatorMapper', () => {
 
       const item = mapCoordinatorAssignment(assignDto, '77', 'Relief Event');
       expect(item.id).toBe('601');
+      expect(item.applicationId).toBe('301'); // Distinct from id (601)
       expect(item.eventId).toBe('77');
       expect(item.eventTitle).toBe('Relief Event');
       expect(item.volunteerName).toBe('Ma Hla Hla');
       expect(item.isGroupLeader).toBe(true);
       expect(item.groupCode).toBe('GRP-LANG');
       expect(item.status).toBe('confirmed');
+      expect(item.assignedAt).toBe('2026-11-14T08:00:00Z'); // Truthful assigned_at, NOT confirmed_at
     });
   });
 
@@ -258,6 +303,44 @@ describe('coordinatorMapper', () => {
       expect(item.id).toBe('502'); // falls back to assignment_id
       expect(item.status).toBe('scheduled');
       expect(item.isPendingGeoConfirmation).toBe(false);
+    });
+
+    it('maps qr_scan to qr and coordinator_manual to manual checkInMethod with distinct statuses', () => {
+      const qrDto: AttendanceRosterDto = {
+        assignment_id: 503,
+        event_id: 77,
+        user_id: 90,
+        display_name: 'Aung Aung',
+        post_id: 12,
+        post_title: 'Packer',
+        group_code: 'GRP-1',
+        is_group_leader: false,
+        assignment_status: 'confirmed',
+        attendance_id: 903,
+        attendance_status: 'checked_in',
+        method: 'qr_scan',
+        walk_in_flag: false,
+        checkin_at: '2026-12-20T08:00:00Z',
+        checkin_distance_m: null,
+        confirmation_status: 'not_required',
+      };
+
+      const qrItem = mapAttendanceRosterItem(qrDto);
+      expect(qrItem.checkInMethod).toBe('qr');
+      expect(qrItem.status).toBe('checked_in');
+      expect(qrItem.attendanceStatus).toBe('checked_in');
+      expect(qrItem.confirmationStatus).toBe('not_required');
+
+      const manualDto: AttendanceRosterDto = {
+        ...qrDto,
+        attendance_id: 904,
+        method: 'coordinator_manual',
+        confirmation_status: 'confirmed',
+      };
+
+      const manualItem = mapAttendanceRosterItem(manualDto);
+      expect(manualItem.checkInMethod).toBe('manual');
+      expect(manualItem.confirmationStatus).toBe('confirmed');
     });
   });
 });

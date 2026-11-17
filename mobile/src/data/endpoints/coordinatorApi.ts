@@ -7,11 +7,18 @@ import type { ApiResult } from '../../core/api/apiResult';
 import type { ResultsListDto } from '../dto/commonDto';
 import type {
   AttendanceRosterDto,
+  AutoAssignResultDto,
   CoordinatorApplicationDto,
   CoordinatorAssignmentDto,
   CoordinatorEventListItemDto,
+  CoordinatorHistoryItemDto,
+  CoordinatorInviteRequestDto,
   EventCreateRequestDto,
+  EventPostCapacityDto,
+  EventPostCreateRequestDto,
+  EventPostUpdateRequestDto,
   EventSummaryViewDto,
+  ManualAssignResultDto,
 } from '../dto/coordinatorDto';
 import type { PublicEventPostDto } from '../dto/eventDto';
 
@@ -192,6 +199,78 @@ export const coordinatorApi = {
   },
 
   /**
+   * Creates a new post for an event (C-08).
+   * Authenticated endpoint.
+   */
+  createEventPost(
+    eventId: number | string,
+    data: EventPostCreateRequestDto,
+    client: ApiClient = defaultApiClient,
+  ): Promise<ApiResult<{ id: number; status: string }>> {
+    return client.post<{ id: number; status: string }>(
+      `coordinator/events/${eventId}/posts/`,
+      data,
+    );
+  },
+
+  /**
+   * Updates an event post headcount, requirements, or status (C-09).
+   * Authenticated endpoint.
+   */
+  updateEventPost(
+    postId: number | string,
+    data: EventPostUpdateRequestDto,
+    client: ApiClient = defaultApiClient,
+  ): Promise<ApiResult<{ id: number; status: string }>> {
+    return client.patch<{ id: number; status: string }>(
+      `posts/${postId}/`,
+      data,
+    );
+  },
+
+  /**
+   * Closes an event post to stop accepting new applications (C-10).
+   * Authenticated endpoint.
+   */
+  closeEventPost(
+    postId: number | string,
+    client: ApiClient = defaultApiClient,
+  ): Promise<ApiResult<{ id: number; status: string }>> {
+    return client.post<{ id: number; status: string }>(
+      `posts/${postId}/close/`,
+      {},
+    );
+  },
+
+  /**
+   * Fetches event coordinator handover audit history (C-18).
+   * Authenticated endpoint.
+   */
+  getCoordinatorHistory(
+    eventId: number | string,
+    client: ApiClient = defaultApiClient,
+  ): Promise<ApiResult<ResultsListDto<CoordinatorHistoryItemDto>>> {
+    return client.get<ResultsListDto<CoordinatorHistoryItemDto>>(
+      `coordinator/events/${eventId}/history/`,
+    );
+  },
+
+  /**
+   * Invites a volunteer to an event by user_id or uuid (C-23 / V-24).
+   * Authenticated endpoint.
+   */
+  inviteVolunteer(
+    eventId: number | string,
+    data: CoordinatorInviteRequestDto,
+    client: ApiClient = defaultApiClient,
+  ): Promise<ApiResult<CoordinatorApplicationDto>> {
+    return client.post<CoordinatorApplicationDto>(
+      `coordinator/events/${eventId}/invite/`,
+      data,
+    );
+  },
+
+  /**
    * Fetches applications for a coordinator event.
    * Authenticated endpoint.
    */
@@ -223,21 +302,21 @@ export const coordinatorApi = {
   },
 
   /**
-   * Runs auto-assignment on an event.
+   * Runs auto-assignment on an event (C-24).
    * Authenticated endpoint.
    */
   runAutoAssignment(
     eventId: number | string,
     client: ApiClient = defaultApiClient,
-  ): Promise<ApiResult<{ assigned?: number; message?: string }>> {
-    return client.post<{ assigned?: number; message?: string }>(
+  ): Promise<ApiResult<AutoAssignResultDto>> {
+    return client.post<AutoAssignResultDto>(
       `coordinator/events/${eventId}/auto-assign/`,
       {},
     );
   },
 
   /**
-   * Manually assigns a volunteer application to an event post.
+   * Manually assigns a volunteer application to an event post (C-25).
    * Authenticated endpoint.
    */
   manualAssign(
@@ -249,10 +328,23 @@ export const coordinatorApi = {
       is_group_leader?: boolean;
     },
     client: ApiClient = defaultApiClient,
-  ): Promise<ApiResult<CoordinatorAssignmentDto>> {
-    return client.post<CoordinatorAssignmentDto>(
+  ): Promise<ApiResult<ManualAssignResultDto>> {
+    return client.post<ManualAssignResultDto>(
       `coordinator/events/${eventId}/manual-assign/`,
       data,
+    );
+  },
+
+  /**
+   * Fetches post capacity breakdown for an event (C-28).
+   * Authenticated endpoint.
+   */
+  getPostCapacity(
+    eventId: number | string,
+    client: ApiClient = defaultApiClient,
+  ): Promise<ApiResult<ResultsListDto<EventPostCapacityDto>>> {
+    return client.get<ResultsListDto<EventPostCapacityDto>>(
+      `coordinator/events/${eventId}/post-capacity/`,
     );
   },
 

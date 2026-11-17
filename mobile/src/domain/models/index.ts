@@ -8,6 +8,7 @@ export * from './profile';
 export * from './availability';
 export * from './verification';
 export * from './coordinator';
+export * from './feedback';
 
 export type CoordinatorStatus =
   | 'none'
@@ -21,7 +22,8 @@ export type UserAccountStatus = 'active' | 'blocked' | 'closed';
 export interface UserProfileSnapshot {
   readonly id: string;
   readonly displayName: string;
-  readonly email: string;
+  readonly phone: string | null;
+  readonly email?: string;
   readonly coordinatorStatus: CoordinatorStatus;
   readonly accountStatus: UserAccountStatus;
 }

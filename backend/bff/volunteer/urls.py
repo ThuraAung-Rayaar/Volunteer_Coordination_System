@@ -21,6 +21,7 @@ from .views import (
     PublicEventListView,
     PublicEventPostsView,
     UserByUuidView,
+    VolunteerFeedbackView,
 )
 
 urlpatterns = [
@@ -71,4 +72,8 @@ urlpatterns = [
     path("assignments/<int:assignment_id>/confirm/", AssignmentConfirmView.as_view(), name="assignment-confirm"),
     path("assignments/<int:assignment_id>/cancel/", AssignmentCancelView.as_view(), name="assignment-cancel"),
     path("events/<int:event_id>/check-availability/", EventCheckAvailabilityView.as_view(), name="event-check-availability"),
+
+    # Volunteer Feedback (Parity V-41 / V-42)
+    path("me/feedback/summary/", VolunteerFeedbackView.as_view(), name="volunteer-feedback-summary"),
+    path("feedback/", VolunteerFeedbackView.as_view(), name="volunteer-feedback"),
 ]

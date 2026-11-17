@@ -183,13 +183,22 @@ export function mapVolunteerAssignment(
     id: String(dto.id),
     eventId: String(dto.event_id),
     eventTitle: dto.event_title ?? 'Volunteer Assignment',
+    applicationId:
+      dto.application_id !== null && dto.application_id !== undefined
+        ? String(dto.application_id)
+        : undefined,
     postId: String(dto.post_id ?? ''),
     postTitle: dto.post_title ?? 'Assigned Shift',
     status: dto.status as VolunteerAssignmentStatus,
     startAt: dto.schedule_start,
     endAt: dto.schedule_end,
-    location: 'Event Location',
-    assignedAt: dto.confirmed_at ?? dto.schedule_start,
+    location: dto.location_name || 'Event Location',
+    assignedAt: dto.assigned_at ?? dto.schedule_start,
+    attendanceId:
+      dto.attendance_id !== null && dto.attendance_id !== undefined
+        ? String(dto.attendance_id)
+        : undefined,
+    attendanceStatus: (dto.attendance_status as any) ?? undefined,
   };
 }
 

@@ -117,10 +117,11 @@ describe('Phase 9: Full End-to-End Mobile Lifecycle & Parity Verification', () =
       const authHeader = headers.Authorization || headers.authorization;
       const isPublicRoute =
         path === '/api/v1/charity-fields/' ||
-        (path.startsWith('/api/v1/events/') &&
+        ((path.startsWith('/api/v1/events/') || path.startsWith('/api/v1/checkin/')) &&
           !path.includes('/apply/') &&
           !path.includes('/feedback/') &&
-          !path.includes('/onboarding/')) ||
+          !path.includes('/onboarding/') &&
+          !path.includes('/attendance/')) ||
         path.startsWith('/api/v1/auth/');
 
       if (!isPublicRoute && (!authHeader || !authHeader.includes('e2e-valid-jwt-token-xyz'))) {
@@ -424,7 +425,11 @@ describe('Phase 9: Full End-to-End Mobile Lifecycle & Parity Verification', () =
       }
 
       // 15. Onboarding: Status
-      if (path === '/api/v1/events/101/onboarding/' && method === 'GET') {
+      if (
+        (path === '/api/v1/checkin/events/101/onboarding/' ||
+          path === '/api/v1/events/101/onboarding/') &&
+        method === 'GET'
+      ) {
         return jsonResponse({
           event_id: 101,
           onboarding_text: 'Bring boots and sun protection.',
@@ -435,7 +440,12 @@ describe('Phase 9: Full End-to-End Mobile Lifecycle & Parity Verification', () =
       }
 
       // 16. Onboarding: Acknowledge
-      if (path === '/api/v1/events/101/onboarding/acknowledge/' && method === 'POST') {
+      if (
+        (path === '/api/v1/checkin/events/101/onboarding/ack/' ||
+          path === '/api/v1/checkin/events/101/onboarding/acknowledge/' ||
+          path === '/api/v1/events/101/onboarding/acknowledge/') &&
+        method === 'POST'
+      ) {
         onboardingAcknowledged = true;
         return jsonResponse({
           event_id: 101,
@@ -445,7 +455,11 @@ describe('Phase 9: Full End-to-End Mobile Lifecycle & Parity Verification', () =
       }
 
       // 17. Geo Check-In
-      if (path === '/api/v1/attendance/geo-checkin/' && method === 'POST') {
+      if (
+        (path === '/api/v1/checkin/attendance/geo-checkin/' ||
+          path === '/api/v1/attendance/geo-checkin/') &&
+        method === 'POST'
+      ) {
         const attendanceRecord = {
           assignment_id: 801,
           event_id: 101,
@@ -475,12 +489,20 @@ describe('Phase 9: Full End-to-End Mobile Lifecycle & Parity Verification', () =
       }
 
       // 18. Coordinator: Attendance Roster
-      if (path === '/api/v1/coordinator/events/101/attendance/' && method === 'GET') {
+      if (
+        (path === '/api/v1/checkin/coordinator/events/101/attendance/' ||
+          path === '/api/v1/coordinator/events/101/attendance/') &&
+        method === 'GET'
+      ) {
         return jsonResponse({ count: serverAttendance.length, results: serverAttendance });
       }
 
       // 19. Coordinator: Confirm Geo Attendance
-      if (path === '/api/v1/coordinator/attendance/701/confirm/' && method === 'POST') {
+      if (
+        (path === '/api/v1/checkin/coordinator/attendance/701/confirm/' ||
+          path === '/api/v1/coordinator/attendance/701/confirm/') &&
+        method === 'POST'
+      ) {
         const att = serverAttendance.find(a => a.attendance_id === 701);
         if (att) {
           att.confirmation_status = 'confirmed';
@@ -490,7 +512,11 @@ describe('Phase 9: Full End-to-End Mobile Lifecycle & Parity Verification', () =
       }
 
       // 20. Attendance Checkout (Constraint 1)
-      if (path === '/api/v1/attendance/701/checkout/' && method === 'POST') {
+      if (
+        (path === '/api/v1/checkin/attendance/701/checkout/' ||
+          path === '/api/v1/attendance/701/checkout/') &&
+        method === 'POST'
+      ) {
         const att = serverAttendance.find(a => a.attendance_id === 701);
         if (att) {
           att.attendance_status = 'completed';
@@ -503,7 +529,11 @@ describe('Phase 9: Full End-to-End Mobile Lifecycle & Parity Verification', () =
       }
 
       // 21. Event Feedback
-      if (path === '/api/v1/events/101/feedback/' && method === 'POST') {
+      if (
+        (path === '/api/v1/checkin/events/101/feedback/' ||
+          path === '/api/v1/events/101/feedback/') &&
+        method === 'POST'
+      ) {
         feedbackReceived = body;
         return jsonResponse({
           id: 301,

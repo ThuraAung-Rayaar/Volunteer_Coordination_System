@@ -4,10 +4,13 @@
 
 import { ApiClient, defaultApiClient } from '../../core/api/apiClient';
 import type { ApiResult } from '../../core/api/apiResult';
+import type { ResultsListDto } from '../dto/commonDto';
 import type {
   CheckoutResponseDto,
+  EventFeedbackItemDto,
   FeedbackSubmitRequestDto,
   FeedbackSubmitResponseDto,
+  GeoAttemptReviewDto,
   GeoCheckinRequestDto,
   GeoCheckinResponseDto,
   ManualCheckinRequestDto,
@@ -23,19 +26,19 @@ import type {
 
 export const checkinApi = {
   /**
-   * Fetches the onboarding briefing status for an event.
-   * Authenticated endpoint.
+   * Fetches the onboarding briefing status for an event (V-31).
+   * Authenticated endpoint. Canonical route: checkin/events/${eventId}/onboarding/
    */
   getOnboarding(
     eventId: number | string,
     client: ApiClient = defaultApiClient,
   ): Promise<ApiResult<OnboardingStatusDto>> {
-    return client.get<OnboardingStatusDto>(`events/${eventId}/onboarding/`);
+    return client.get<OnboardingStatusDto>(`checkin/events/${eventId}/onboarding/`);
   },
 
   /**
-   * Acknowledges the onboarding briefing for an event.
-   * Authenticated endpoint.
+   * Acknowledges the onboarding briefing for an event (V-32).
+   * Authenticated endpoint. Canonical route: checkin/events/${eventId}/onboarding/acknowledge/
    */
   acknowledgeOnboarding(
     eventId: number | string,
@@ -43,53 +46,53 @@ export const checkinApi = {
     client: ApiClient = defaultApiClient,
   ): Promise<ApiResult<OnboardingAcknowledgeResponseDto>> {
     return client.post<OnboardingAcknowledgeResponseDto>(
-      `events/${eventId}/onboarding/acknowledge/`,
+      `checkin/events/${eventId}/onboarding/acknowledge/`,
       data,
     );
   },
 
   /**
-   * Previews / resolves a QR token without consuming it.
-   * Public endpoint.
+   * Previews / resolves a QR token without consuming it (V-33).
+   * Public endpoint. Canonical route: checkin/qr/resolve/
    */
   resolveQrToken(
     token: string,
     client: ApiClient = defaultApiClient,
   ): Promise<ApiResult<QrResolveResponseDto>> {
     return client.post<QrResolveResponseDto>(
-      'qr/resolve/',
+      'checkin/qr/resolve/',
       { token },
       { authRequired: false },
     );
   },
 
   /**
-   * Redeems a QR token (walkin, checkin, join_event).
-   * Authenticated endpoint.
+   * Redeems a QR token (walkin, checkin, join_event) (V-34).
+   * Authenticated endpoint. Canonical route: checkin/qr/redeem/
    */
   redeemQrToken(
     token: string,
     client: ApiClient = defaultApiClient,
   ): Promise<ApiResult<QrRedeemResponseDto>> {
-    return client.post<QrRedeemResponseDto>('qr/redeem/', { token });
+    return client.post<QrRedeemResponseDto>('checkin/qr/redeem/', { token });
   },
 
   /**
-   * Performs check-in-only QR token redemption.
-   * Authenticated endpoint.
+   * Performs check-in-only QR token redemption (V-35).
+   * Authenticated endpoint. Canonical route: checkin/attendance/qr-checkin/
    */
   qrCheckIn(
     token: string,
     client: ApiClient = defaultApiClient,
   ): Promise<ApiResult<QrRedeemResponseDto>> {
-    return client.post<QrRedeemResponseDto>('attendance/qr-checkin/', {
+    return client.post<QrRedeemResponseDto>('checkin/attendance/qr-checkin/', {
       token,
     });
   },
 
   /**
-   * Creates a new QR token for an event (coordinator action).
-   * Authenticated endpoint.
+   * Creates a new QR token for an event (coordinator action, C-30).
+   * Authenticated endpoint. Canonical route: checkin/coordinator/events/${eventId}/qr-tokens/
    */
   createCoordinatorQrToken(
     eventId: number | string,
@@ -97,69 +100,67 @@ export const checkinApi = {
     client: ApiClient = defaultApiClient,
   ): Promise<ApiResult<QrTokenDto>> {
     return client.post<QrTokenDto>(
-      `coordinator/events/${eventId}/qr-tokens/`,
+      `checkin/coordinator/events/${eventId}/qr-tokens/`,
       data,
     );
   },
 
   /**
-   * Revokes an existing coordinator QR token.
-   * Authenticated endpoint.
+   * Revokes an existing coordinator QR token (coordinator action, C-31).
+   * Authenticated endpoint. Canonical route: checkin/coordinator/qr-tokens/${qrId}/revoke/
    */
   revokeCoordinatorQrToken(
     qrId: number | string,
     client: ApiClient = defaultApiClient,
   ): Promise<ApiResult<{ id: number; revoked_at: string }>> {
     return client.post<{ id: number; revoked_at: string }>(
-      `coordinator/qr-tokens/${qrId}/revoke/`,
+      `checkin/coordinator/qr-tokens/${qrId}/revoke/`,
       {},
     );
   },
 
   /**
-   * Submits volunteer geo check-in telemetry for an event.
-   * Note: Server returns HTTP 200 on success and HTTP 400 with response payload on rejection.
-   * Authenticated endpoint.
+   * Submits volunteer geo check-in telemetry for an event (V-36).
+   * Authenticated endpoint. Canonical route: checkin/attendance/geo-checkin/
    */
   submitGeoCheckIn(
     data: GeoCheckinRequestDto,
     client: ApiClient = defaultApiClient,
   ): Promise<ApiResult<GeoCheckinResponseDto>> {
-    return client.post<GeoCheckinResponseDto>('attendance/geo-checkin/', data);
+    return client.post<GeoCheckinResponseDto>('checkin/attendance/geo-checkin/', data);
   },
 
   /**
-   * Checks out of an active attendance shift.
-   * Note: Always POST attendance/{attendance_id}/checkout/.
-   * Authenticated endpoint.
+   * Checks out of an active attendance shift (V-37).
+   * Authenticated endpoint. Canonical route: checkin/attendance/${attendanceId}/checkout/
    */
   checkoutAttendance(
     attendanceId: number | string,
     client: ApiClient = defaultApiClient,
   ): Promise<ApiResult<CheckoutResponseDto>> {
     return client.post<CheckoutResponseDto>(
-      `attendance/${attendanceId}/checkout/`,
+      `checkin/attendance/${attendanceId}/checkout/`,
       {},
     );
   },
 
   /**
-   * Performs manual on-site check-in (coordinator action).
-   * Authenticated endpoint.
+   * Performs manual on-site check-in (coordinator action, C-34).
+   * Authenticated endpoint. Canonical route: checkin/attendance/manual-checkin/
    */
   manualCheckIn(
     data: ManualCheckinRequestDto,
     client: ApiClient = defaultApiClient,
   ): Promise<ApiResult<ManualCheckinResponseDto>> {
     return client.post<ManualCheckinResponseDto>(
-      'attendance/manual-checkin/',
+      'checkin/attendance/manual-checkin/',
       data,
     );
   },
 
   /**
-   * Submits event feedback.
-   * Authenticated endpoint.
+   * Submits event feedback (V-40).
+   * Authenticated endpoint. Canonical route: checkin/events/${eventId}/feedback/
    */
   submitEventFeedback(
     eventId: number | string,
@@ -167,8 +168,34 @@ export const checkinApi = {
     client: ApiClient = defaultApiClient,
   ): Promise<ApiResult<FeedbackSubmitResponseDto>> {
     return client.post<FeedbackSubmitResponseDto>(
-      `events/${eventId}/feedback/`,
+      `checkin/events/${eventId}/feedback/`,
       data,
+    );
+  },
+
+  /**
+   * Fetches geo check-in attempts for review matching v_geo_attempts_review (C-35).
+   * Authenticated endpoint. Canonical route: checkin/coordinator/events/${eventId}/geo-attempts/
+   */
+  getGeoAttempts(
+    eventId: number | string,
+    client: ApiClient = defaultApiClient,
+  ): Promise<ApiResult<ResultsListDto<GeoAttemptReviewDto>>> {
+    return client.get<ResultsListDto<GeoAttemptReviewDto>>(
+      `checkin/coordinator/events/${eventId}/geo-attempts/`,
+    );
+  },
+
+  /**
+   * Fetches public/event feedback list (P1-12).
+   * Authenticated endpoint. Canonical route: checkin/events/${eventId}/feedback/list/
+   */
+  getEventFeedbackList(
+    eventId: number | string,
+    client: ApiClient = defaultApiClient,
+  ): Promise<ApiResult<ResultsListDto<EventFeedbackItemDto>>> {
+    return client.get<ResultsListDto<EventFeedbackItemDto>>(
+      `checkin/events/${eventId}/feedback/list/`,
     );
   },
 };

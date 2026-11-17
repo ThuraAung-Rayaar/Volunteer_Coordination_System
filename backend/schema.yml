@@ -789,7 +789,7 @@ paths:
   /api/v1/attendance/{attendance_id}/checkout/:
     post:
       operationId: attendance_checkout_create
-      description: POST /api/v1/attendance/{attendance_id}/checkout/
+      description: POST /api/v1/attendance/{attendance_id}/checkout/ or /events/{event_id}/checkout/
       parameters:
       - in: path
         name: attendance_id
@@ -1213,7 +1213,7 @@ paths:
   /api/v1/checkin/attendance/{attendance_id}/checkout/:
     post:
       operationId: checkin_attendance_checkout_create
-      description: POST /api/v1/attendance/{attendance_id}/checkout/
+      description: POST /api/v1/attendance/{attendance_id}/checkout/ or /events/{event_id}/checkout/
       parameters:
       - in: path
         name: attendance_id
@@ -1582,7 +1582,7 @@ paths:
   /api/v1/checkin/events/{event_id}/check-out/:
     post:
       operationId: checkin_events_check_out_create
-      description: POST /api/v1/attendance/{attendance_id}/checkout/
+      description: POST /api/v1/attendance/{attendance_id}/checkout/ or /events/{event_id}/checkout/
       parameters:
       - in: path
         name: event_id
@@ -1649,7 +1649,7 @@ paths:
   /api/v1/checkin/events/{event_id}/checkout/:
     post:
       operationId: checkin_events_checkout_create
-      description: POST /api/v1/attendance/{attendance_id}/checkout/
+      description: POST /api/v1/attendance/{attendance_id}/checkout/ or /events/{event_id}/checkout/
       parameters:
       - in: path
         name: event_id
@@ -2619,6 +2619,61 @@ paths:
               schema:
                 $ref: '#/components/schemas/EmptyResponse'
           description: ''
+  /api/v1/coordinator/coordinator/events/{event_id}/history/:
+    get:
+      operationId: coordinator_coordinator_events_history_retrieve
+      description: GET /api/v1/coordinator/events/{event_id}/history/
+      parameters:
+      - in: path
+        name: event_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - coordinator
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmptyResponse'
+          description: ''
+  /api/v1/coordinator/coordinator/events/{event_id}/invite/:
+    post:
+      operationId: coordinator_coordinator_events_invite_create
+      description: POST /api/v1/coordinator/events/{event_id}/invite/
+      parameters:
+      - in: path
+        name: event_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - coordinator
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmptyResponse'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/EmptyResponse'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/EmptyResponse'
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmptyResponse'
+          description: ''
   /api/v1/coordinator/coordinator/events/{event_id}/manual-assign/:
     post:
       operationId: coordinator_coordinator_events_manual_assign_create
@@ -2764,6 +2819,23 @@ paths:
         schema:
           type: integer
         required: true
+      tags:
+      - coordinator
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmptyResponse'
+          description: ''
+  /api/v1/coordinator/coordinator/feedback/:
+    get:
+      operationId: coordinator_coordinator_feedback_retrieve
+      description: GET /api/v1/coordinator/feedback/ — coordinator aggregate feedback
+        summary.
       tags:
       - coordinator
       security:
@@ -3218,6 +3290,61 @@ paths:
               schema:
                 $ref: '#/components/schemas/EmptyResponse'
           description: ''
+  /api/v1/coordinator/events/{event_id}/history/:
+    get:
+      operationId: coordinator_events_history_retrieve
+      description: GET /api/v1/coordinator/events/{event_id}/history/
+      parameters:
+      - in: path
+        name: event_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - coordinator
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmptyResponse'
+          description: ''
+  /api/v1/coordinator/events/{event_id}/invite/:
+    post:
+      operationId: coordinator_events_invite_create
+      description: POST /api/v1/coordinator/events/{event_id}/invite/
+      parameters:
+      - in: path
+        name: event_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - coordinator
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmptyResponse'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/EmptyResponse'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/EmptyResponse'
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmptyResponse'
+          description: ''
   /api/v1/coordinator/events/{event_id}/manual-assign/:
     post:
       operationId: coordinator_events_manual_assign_create
@@ -3462,6 +3589,23 @@ paths:
         schema:
           type: integer
         required: true
+      tags:
+      - coordinator
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmptyResponse'
+          description: ''
+  /api/v1/coordinator/feedback/:
+    get:
+      operationId: coordinator_feedback_retrieve
+      description: GET /api/v1/coordinator/feedback/ — coordinator aggregate feedback
+        summary.
       tags:
       - coordinator
       security:
@@ -4009,7 +4153,7 @@ paths:
   /api/v1/events/{event_id}/check-out/:
     post:
       operationId: events_check_out_create
-      description: POST /api/v1/attendance/{attendance_id}/checkout/
+      description: POST /api/v1/attendance/{attendance_id}/checkout/ or /events/{event_id}/checkout/
       parameters:
       - in: path
         name: event_id
@@ -4076,7 +4220,7 @@ paths:
   /api/v1/events/{event_id}/checkout/:
     post:
       operationId: events_checkout_create
-      description: POST /api/v1/attendance/{attendance_id}/checkout/
+      description: POST /api/v1/attendance/{attendance_id}/checkout/ or /events/{event_id}/checkout/
       parameters:
       - in: path
         name: event_id
@@ -4287,6 +4431,61 @@ paths:
     post:
       operationId: events_handover_create
       description: POST /api/v1/events/{event_id}/handover/.
+      parameters:
+      - in: path
+        name: event_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - events
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmptyResponse'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/EmptyResponse'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/EmptyResponse'
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmptyResponse'
+          description: ''
+  /api/v1/events/{event_id}/history/:
+    get:
+      operationId: events_history_retrieve
+      description: GET /api/v1/coordinator/events/{event_id}/history/
+      parameters:
+      - in: path
+        name: event_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - events
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmptyResponse'
+          description: ''
+  /api/v1/events/{event_id}/invite/:
+    post:
+      operationId: events_invite_create
+      description: POST /api/v1/coordinator/events/{event_id}/invite/
       parameters:
       - in: path
         name: event_id
@@ -4608,6 +4807,23 @@ paths:
         required: true
       tags:
       - events
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmptyResponse'
+          description: ''
+  /api/v1/feedback/:
+    get:
+      operationId: feedback_retrieve
+      description: GET /api/v1/volunteer/feedback/ — volunteer aggregate feedback
+        summary.
+      tags:
+      - feedback
       security:
       - tokenAuth: []
       - cookieAuth: []
@@ -4980,6 +5196,23 @@ paths:
     get:
       operationId: me_feedback_retrieve
       description: GET /api/v1/me/feedback/
+      tags:
+      - me
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmptyResponse'
+          description: ''
+  /api/v1/me/feedback/summary/:
+    get:
+      operationId: me_feedback_summary_retrieve
+      description: GET /api/v1/volunteer/feedback/ — volunteer aggregate feedback
+        summary.
       tags:
       - me
       security:
@@ -5606,6 +5839,23 @@ paths:
               schema:
                 $ref: '#/components/schemas/EmptyResponse'
           description: ''
+  /api/v1/volunteer/feedback/:
+    get:
+      operationId: volunteer_feedback_retrieve
+      description: GET /api/v1/volunteer/feedback/ — volunteer aggregate feedback
+        summary.
+      tags:
+      - volunteer
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmptyResponse'
+          description: ''
   /api/v1/volunteer/me/:
     get:
       operationId: volunteer_me_retrieve
@@ -5938,6 +6188,23 @@ paths:
           multipart/form-data:
             schema:
               $ref: '#/components/schemas/PatchedEmptyResponse'
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmptyResponse'
+          description: ''
+  /api/v1/volunteer/me/feedback/summary/:
+    get:
+      operationId: volunteer_me_feedback_summary_retrieve
+      description: GET /api/v1/volunteer/feedback/ — volunteer aggregate feedback
+        summary.
+      tags:
+      - volunteer
       security:
       - tokenAuth: []
       - cookieAuth: []

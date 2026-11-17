@@ -337,13 +337,28 @@ def list_coordinator_events(user) -> list[dict]:
             Q(owner_id=user.id) | Q(current_coordinator_id=user.id),
             deleted_at__isnull=True,
         )
+        .select_related("current_coordinator__user")
+        .prefetch_related("charity_fields")
         .order_by("-created_at")
     )
     results = []
     for event in events:
+        coord_name = ""
+        if event.current_coordinator:
+            if hasattr(event.current_coordinator, "user") and event.current_coordinator.user:
+                coord_name = getattr(event.current_coordinator.user, "display_name", "")
+            else:
+                coord_name = getattr(event.current_coordinator, "display_name", "")
+
         results.append({
             "id": event.id,
             "title": event.title,
+            "description": event.description,
+            "purpose_type": event.purpose_type,
+            "location_name": event.location_name,
+            "landmark_text": event.landmark_text,
+            "coordinator_name": coord_name,
+            "charity_fields": [cf.field_code_id for cf in event.charity_fields.all()],
             "status": event.status,
             "start_at": event.start_at,
             "end_at": event.end_at,

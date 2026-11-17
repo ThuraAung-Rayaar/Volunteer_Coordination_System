@@ -21,7 +21,10 @@ import {
   defaultDashboardRepository,
   defaultEventRepository,
   defaultProfileRepository,
+  MockCoordinatorRepository,
   MockDashboardRepository,
+  MockEventRepository,
+  MockProfileRepository,
 } from '../src/data/mock';
 import {
   HttpCoordinatorRepository,
@@ -32,11 +35,15 @@ import {
 
 describe('RepositoryProvider & Dependency-Injection Bridge', () => {
   beforeEach(() => {
-    resetDataMode();
+    act(() => {
+      resetDataMode();
+    });
   });
 
   afterEach(() => {
-    resetDataMode();
+    act(() => {
+      resetDataMode();
+    });
   });
 
   function ConsumerComponent({
@@ -108,7 +115,9 @@ describe('RepositoryProvider & Dependency-Injection Bridge', () => {
   });
 
   it('switches to Http repositories when setDataMode("http") is set globally', () => {
-    setDataMode('http');
+    act(() => {
+      setDataMode('http');
+    });
     let capturedContext: ReturnType<typeof useRepositories> | null = null;
 
     act(() => {
@@ -127,6 +136,39 @@ describe('RepositoryProvider & Dependency-Injection Bridge', () => {
     expect(capturedContext!.dashboardRepository).toBeInstanceOf(
       HttpDashboardRepository,
     );
+  });
+
+  it('reactively updates provided repositories when global dataMode changes after mount', () => {
+    let capturedContext: ReturnType<typeof useRepositories> | null = null;
+
+    act(() => {
+      ReactTestRenderer.create(
+        <RepositoryProvider>
+          <ConsumerComponent
+            onRender={ctx => {
+              capturedContext = ctx;
+            }}
+          />
+        </RepositoryProvider>,
+      );
+    });
+
+    expect(capturedContext!.dataMode).toBe('mock');
+    expect(capturedContext!.eventRepository).toBe(defaultEventRepository);
+
+    act(() => {
+      setDataMode('http');
+    });
+
+    expect(capturedContext!.dataMode).toBe('http');
+    expect(capturedContext!.eventRepository).toBeInstanceOf(HttpEventRepository);
+
+    act(() => {
+      setDataMode('mock');
+    });
+
+    expect(capturedContext!.dataMode).toBe('mock');
+    expect(capturedContext!.eventRepository).toBe(defaultEventRepository);
   });
 
   it('allows overriding specific repositories via repositories prop', () => {
@@ -464,5 +506,332 @@ describe('Http Repositories Non-Invasive & Error Handling Guarantees', () => {
     const result = await repo.transitionEventStatus('5', 'published');
     expect(result.success).toBe(true);
     expect(calledUrls.some(u => u.includes('/events/5/publish/'))).toBe(true);
+  });
+});
+
+describe('Phase 5 Repository Contract Completeness & HTTP/Mock Parity', () => {
+  let client: ApiClient;
+
+  beforeEach(() => {
+    const tokenStore = new MemoryTokenStore();
+    const sessionMgr = new SessionManager(tokenStore);
+    const dummyTransport: TransportAdapter = async () =>
+      new Response(JSON.stringify({ results: [] }), { status: 200 });
+    client = new ApiClient(dummyTransport, tokenStore, sessionMgr);
+  });
+
+  it('ProfileRepository: every required method is implemented on both Mock and Http repositories', () => {
+    const mockRepo = new MockProfileRepository();
+    const httpRepo = new HttpProfileRepository(client);
+
+    const requiredProfileMethods = [
+      'getProfile',
+      'updateProfile',
+      'getAvailability',
+      'saveWeeklyRule',
+      'deleteWeeklyRule',
+      'saveException',
+      'deleteException',
+      'checkAvailabilityForEvent',
+      'checkAvailabilityForWindow',
+      'uploadVerificationImage',
+      'updateCoordinatorApplicationNotes',
+      'lookupUserByUuid',
+      'getAttendanceHistory',
+      'getOwnFeedback',
+      'getVerificationStatus',
+      'getCoordinatorEligibility',
+      'submitCoordinatorApplication',
+    ] as const;
+
+    for (const method of requiredProfileMethods) {
+      expect(typeof (mockRepo as any)[method]).toBe('function');
+      expect(typeof (httpRepo as any)[method]).toBe('function');
+    }
+  });
+
+  it('EventRepository: every required method is implemented on both Mock and Http repositories', () => {
+    const mockRepo = new MockEventRepository();
+    const httpRepo = new HttpEventRepository(client);
+
+    const requiredEventMethods = [
+      'getEvents',
+      'getEventsPage',
+      'getEventById',
+      'getCharityFields',
+      'applyToPost',
+      'getUserApplications',
+      'withdrawApplication',
+      'getUserAssignments',
+      'confirmAssignment',
+      'cancelAssignment',
+      'getEventOnboarding',
+      'acknowledgeOnboarding',
+      'resolveQrToken',
+      'redeemQrToken',
+      'qrCheckIn',
+      'submitGeoCheckIn',
+      'checkOutAttendance',
+      'submitEventFeedback',
+      'getEventFeedbackList',
+    ] as const;
+
+    for (const method of requiredEventMethods) {
+      expect(typeof (mockRepo as any)[method]).toBe('function');
+      expect(typeof (httpRepo as any)[method]).toBe('function');
+    }
+  });
+
+  it('CoordinatorRepository: every required method is implemented on both Mock and Http repositories', () => {
+    const mockRepo = new MockCoordinatorRepository();
+    const httpRepo = new HttpCoordinatorRepository(client);
+
+    const requiredCoordinatorMethods = [
+      'getOverviewMetrics',
+      'getMyEvents',
+      'getEventDetail',
+      'createDraftEvent',
+      'updateEvent',
+      'transitionEventStatus',
+      'createEventPost',
+      'updateEventPost',
+      'closeEventPost',
+      'handoverEvent',
+      'retakeEvent',
+      'getCoordinatorHistory',
+      'getApplications',
+      'updateApplicationStatus',
+      'inviteVolunteer',
+      'getAssignments',
+      'getUnassignedApplications',
+      'runAutoAssignment',
+      'assignVolunteerManually',
+      'cancelAssignment',
+      'getPostCapacity',
+      'lookupVolunteerByUuid',
+      'createQrToken',
+      'revokeQrToken',
+      'getAttendanceRoster',
+      'getPendingGeoConfirmations',
+      'getGeoAttempts',
+      'confirmGeoAttendance',
+      'rejectGeoAttendance',
+      'manualCheckIn',
+      'submitCoordinatorFeedback',
+    ] as const;
+
+    for (const method of requiredCoordinatorMethods) {
+      expect(typeof (mockRepo as any)[method]).toBe('function');
+      expect(typeof (httpRepo as any)[method]).toBe('function');
+    }
+  });
+});
+
+describe('Phase 5 Live-BFF Bug Fix Verifications', () => {
+  let tokenStore: MemoryTokenStore;
+  let sessionMgr: SessionManager;
+
+  beforeEach(() => {
+    tokenStore = new MemoryTokenStore();
+    sessionMgr = new SessionManager(tokenStore);
+  });
+
+  it('P1-13: MockEventRepository slices page window and preserves pagination metadata', async () => {
+    const mockRepo = new MockEventRepository();
+    const page1 = await mockRepo.getEventsPage(undefined, 1, 2);
+
+    expect(page1.results).toHaveLength(2);
+    expect(page1.count).toBeGreaterThan(2);
+    expect(page1.next).not.toBeNull();
+    expect(page1.previous).toBeNull();
+
+    const page2 = await mockRepo.getEventsPage(undefined, 2, 2);
+    expect(page2.results).toHaveLength(2);
+    expect(page2.previous).not.toBeNull();
+    expect(page2.results[0].id).not.toBe(page1.results[0].id);
+  });
+
+  it('P1-13: HttpEventRepository maps page results and exposes pagination metadata', async () => {
+    const mockTransport: TransportAdapter = async input => {
+      expect(input).toContain('/events/?page=2&page_size=3');
+      return new Response(
+        JSON.stringify({
+          count: 5,
+          next: null,
+          previous: 'http://localhost/api/v1/events/?page=1',
+          results: [
+            {
+              id: 104,
+              title: 'Paged Event 4',
+              status: 'published',
+              purpose_type: 'charity_event',
+              start_at: '2026-12-01T08:00:00Z',
+              end_at: '2026-12-01T12:00:00Z',
+              location_name: 'Downtown',
+              total_headcount_needed: 10,
+              total_headcount_filled: 2,
+              charity_fields: ['health_wellness'],
+              posts: [],
+            },
+          ],
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      );
+    };
+
+    const client = new ApiClient(mockTransport, tokenStore, sessionMgr);
+    const repo = new HttpEventRepository(client);
+
+    const pageResult = await repo.getEventsPage(undefined, 2, 3);
+    expect(pageResult.count).toBe(5);
+    expect(pageResult.next).toBeNull();
+    expect(pageResult.previous).toBe('http://localhost/api/v1/events/?page=1');
+    expect(pageResult.results).toHaveLength(1);
+    expect(pageResult.results[0].title).toBe('Paged Event 4');
+  });
+
+  it('P0-02: HttpCoordinatorRepository.updateApplicationStatus returns updated data item', async () => {
+    const mockTransport: TransportAdapter = async (input, init) => {
+      if (input.includes('/coordinator/events/10/applications/')) {
+        return new Response(
+          JSON.stringify({
+            results: [
+              {
+                id: 55,
+                event_id: 10,
+                user_id: 101,
+                display_name: 'Volunteer A',
+                status: 'pending',
+                source: 'browse',
+                applied_at: '2026-11-10T00:00:00Z',
+              },
+            ],
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      if (input.includes('/coordinator/applications/55/decide/')) {
+        const body = JSON.parse(init?.body as string);
+        expect(body.decision).toBe('accepted');
+        return new Response(
+          JSON.stringify({
+            id: 55,
+            event_id: 10,
+            status: 'accepted',
+            decided_at: '2026-11-12T00:00:00Z',
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      return new Response('{}', { status: 200 });
+    };
+
+    const client = new ApiClient(mockTransport, tokenStore, sessionMgr);
+    const repo = new HttpCoordinatorRepository(client);
+
+    // Warm up cache
+    await repo.getApplications('10');
+
+    const result = await repo.updateApplicationStatus('55', 'accepted');
+    expect(result.success).toBe(true);
+    expect(result.data).toBeDefined();
+    expect(result.data?.id).toBe('55');
+    expect(result.data?.status).toBe('accepted');
+  });
+
+  it('P0-03: HttpCoordinatorRepository.assignVolunteerManually returns created item with valid ID', async () => {
+    const mockTransport: TransportAdapter = async input => {
+      if (input.includes('/coordinator/events/10/applications/')) {
+        return new Response(
+          JSON.stringify({
+            results: [
+              {
+                id: 55,
+                event_id: 10,
+                user_id: 101,
+                display_name: 'Volunteer A',
+                status: 'accepted',
+                source: 'browse',
+                applied_at: '2026-11-10T00:00:00Z',
+              },
+            ],
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      if (input.includes('/manual-assign/')) {
+        return new Response(
+          JSON.stringify({
+            assignment_id: 777,
+            application_id: 55,
+            status: 'assigned',
+          }),
+          { status: 201, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      if (input.includes('/coordinator/events/10/assignments/')) {
+        return new Response(
+          JSON.stringify({
+            results: [
+              {
+                id: 777,
+                event_id: 10,
+                user_id: 101,
+                display_name: 'Volunteer A',
+                post_id: 2,
+                post_title: 'First Aider',
+                status: 'assigned',
+                is_group_leader: false,
+                schedule_start: '2026-11-20T08:00:00Z',
+                schedule_end: '2026-11-20T12:00:00Z',
+              },
+            ],
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      return new Response('{}', { status: 200 });
+    };
+
+    const client = new ApiClient(mockTransport, tokenStore, sessionMgr);
+    const repo = new HttpCoordinatorRepository(client);
+
+    // Warm up applications to map applicationId 55 -> eventId 10
+    await repo.getApplications('10');
+
+    const result = await repo.assignVolunteerManually('55', '2');
+    expect(result.success).toBe(true);
+    expect(result.data).toBeDefined();
+    expect(result.data?.id).toBe('777');
+    expect(result.data?.postTitle).toBe('First Aider');
+  });
+
+  it('deduplicates concurrent in-flight requests in HttpCoordinatorRepository', async () => {
+    let callCount = 0;
+    const mockTransport: TransportAdapter = async () => {
+      callCount += 1;
+      await new Promise<void>(resolve => setTimeout(resolve, 50));
+      return new Response(
+        JSON.stringify({
+          results: [],
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      );
+    };
+
+    const client = new ApiClient(mockTransport, tokenStore, sessionMgr);
+    const repo = new HttpCoordinatorRepository(client);
+
+    // Call getMyEvents concurrently 3 times
+    const [res1, res2, res3] = await Promise.all([
+      repo.getMyEvents(),
+      repo.getMyEvents(),
+      repo.getMyEvents(),
+    ]);
+
+    expect(callCount).toBe(1);
+    expect(res1).toEqual([]);
+    expect(res2).toEqual([]);
+    expect(res3).toEqual([]);
   });
 });

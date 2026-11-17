@@ -7,6 +7,7 @@ import type { ApiResult } from '../../core/api/apiResult';
 import type { ResultsListDto } from '../dto/commonDto';
 import type {
   AttendanceHistoryItemDto,
+  AvailabilityCheckResultDto,
   AvailabilityExceptionDto,
   AvailabilityResponseDto,
   AvailabilityRuleDto,
@@ -16,6 +17,8 @@ import type {
   FeedbackSummaryResponseDto,
   ProfileUpdateRequestDto,
   UserProfileDto,
+  UserUuidLookupDto,
+  VerificationImageUploadResponseDto,
   VerificationStatusResponseDto,
 } from '../dto/profileDto';
 
@@ -75,14 +78,38 @@ export const profileApi = {
   },
 
   /**
-   * Replaces all weekly availability rules.
+   * Replaces all weekly availability rules (V-08).
    * Authenticated endpoint.
    */
   replaceAvailabilityRules(
     data: AvailabilityRulesReplaceDto,
     client: ApiClient = defaultApiClient,
   ): Promise<ApiResult<{ rules: AvailabilityRuleDto[] }>> {
-    return client.put<{ rules: AvailabilityRuleDto[] }>('me/availability/', data);
+    return client.post<{ rules: AvailabilityRuleDto[] }>('me/availability/rules/', data);
+  },
+
+  /**
+   * Checks event availability against schedule and rules (V-11).
+   * Authenticated endpoint.
+   */
+  checkEventAvailability(
+    eventId: number | string,
+    client: ApiClient = defaultApiClient,
+  ): Promise<ApiResult<AvailabilityCheckResultDto>> {
+    return client.get<AvailabilityCheckResultDto>('me/availability/check/', {
+      params: { event_id: eventId },
+    });
+  },
+
+  /**
+   * Checks specific time window availability (V-12).
+   * Authenticated endpoint.
+   */
+  checkWindowAvailability(
+    window: { start_at: string; end_at: string },
+    client: ApiClient = defaultApiClient,
+  ): Promise<ApiResult<AvailabilityCheckResultDto>> {
+    return client.post<AvailabilityCheckResultDto>('me/availability/check/', window);
   },
 
   /**
@@ -109,6 +136,20 @@ export const profileApi = {
   ): Promise<ApiResult<{ status?: string }>> {
     return client.delete<{ status?: string }>(
       `me/availability/exceptions/${exceptionId}/`,
+    );
+  },
+
+  /**
+   * Uploads verification document image via multipart/form-data (V-13).
+   * Authenticated endpoint.
+   */
+  uploadVerificationImage(
+    formData: FormData,
+    client: ApiClient = defaultApiClient,
+  ): Promise<ApiResult<VerificationImageUploadResponseDto>> {
+    return client.postMultipart<VerificationImageUploadResponseDto>(
+      'me/verification-images/',
+      formData,
     );
   },
 
@@ -146,22 +187,53 @@ export const profileApi = {
   },
 
   /**
-   * Fetches user's attendance history records.
+   * Updates coordinator application statement / notes (V-17 / C-03).
+   * Authenticated endpoint.
+   */
+  updateCoordinatorApplicationNotes(
+    notes: string,
+    client: ApiClient = defaultApiClient,
+  ): Promise<ApiResult<CoordinatorProfileEnvelopeDto>> {
+    return client.patch<CoordinatorProfileEnvelopeDto>('me/coordinator/', {
+      notes,
+    });
+  },
+
+  /**
+   * Looks up user by public UUID (V-18 / C-29).
+   * Optionally takes event_id to reveal T2 profile hints when caller is event coordinator.
+   * Authenticated endpoint.
+   */
+  lookupUserByUuid(
+    uuid: string,
+    eventId?: number | string,
+    client: ApiClient = defaultApiClient,
+  ): Promise<ApiResult<UserUuidLookupDto>> {
+    return client.get<UserUuidLookupDto>(
+      `users/by-uuid/${uuid}/`,
+      eventId !== undefined ? { params: { event_id: eventId } } : undefined,
+    );
+  },
+
+  /**
+   * Fetches user's attendance history records (V-38).
+   * Canonical route: checkin/me/attendance/
    * Authenticated endpoint.
    */
   getAttendanceHistory(
     client: ApiClient = defaultApiClient,
   ): Promise<ApiResult<ResultsListDto<AttendanceHistoryItemDto>>> {
-    return client.get<ResultsListDto<AttendanceHistoryItemDto>>('me/attendance/');
+    return client.get<ResultsListDto<AttendanceHistoryItemDto>>('checkin/me/attendance/');
   },
 
   /**
-   * Fetches feedback summary and ratings.
+   * Fetches feedback summary and ratings (V-41 & V-42).
+   * Canonical route: checkin/me/feedback/
    * Authenticated endpoint.
    */
   getFeedbackSummary(
     client: ApiClient = defaultApiClient,
   ): Promise<ApiResult<FeedbackSummaryResponseDto>> {
-    return client.get<FeedbackSummaryResponseDto>('me/feedback/');
+    return client.get<FeedbackSummaryResponseDto>('checkin/me/feedback/');
   },
 };

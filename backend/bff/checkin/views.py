@@ -154,10 +154,29 @@ class AttendanceGeoCheckinView(APIView):
 
 
 class AttendanceCheckoutView(APIView):
-    """POST /api/v1/attendance/{attendance_id}/checkout/"""
+    """POST /api/v1/attendance/{attendance_id}/checkout/ or /events/{event_id}/checkout/"""
     permission_classes = [IsAuthenticated]
 
-    def post(self, request, attendance_id):
+    def post(self, request, attendance_id=None, event_id=None):
+        if attendance_id is None and event_id is not None:
+            from apps.attendance.models import Attendance
+            from common.exceptions import ResourceMaskedNotFound
+
+            att_record = (
+                Attendance.objects.filter(
+                    event_id=event_id,
+                    user=request.user,
+                    status=Attendance.Status.CHECKED_IN,
+                )
+                .order_by("-checkin_at")
+                .first()
+            )
+            if not att_record:
+                raise ResourceMaskedNotFound(message="Active checked-in attendance record not found.")
+            attendance_id = att_record.id
+        elif attendance_id is None:
+            return Response({"detail": "attendance_id or event_id is required."}, status=status.HTTP_400_BAD_REQUEST)
+
         att = attendance_service.check_out(request.user, attendance_id)
         return Response({"id": att.id, "status": att.status, "checkout_at": att.checkout_at})
 

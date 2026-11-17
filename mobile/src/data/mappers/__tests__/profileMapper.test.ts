@@ -6,6 +6,7 @@ import {
   formatToTimeWithSeconds,
   mapAvailability,
   mapAvailabilityRulesReplaceRequest,
+  mapMyFeedbackResponse,
   mapProfileUpdateRequest,
   mapUserProfile,
   mapVerificationCoordinatorData,
@@ -21,6 +22,36 @@ import type {
 import type { VolunteerProfile } from '../../../domain/models/profile';
 
 describe('profileMapper', () => {
+  const sampleUserDto: UserProfileDto = {
+    id: 201,
+    uuid: 'usr-uuid-201',
+    display_name: 'Ko Thura',
+    phone: '+95912345678',
+    preferred_language: 'my',
+    home_area: 'Kamayut, Yangon',
+    emergency_contact_name: 'Daw Nu Nu',
+    emergency_contact_phone: '+95987654321',
+    blood_type: 'O+',
+    is_willing_to_donate: true,
+    is_willing_to_donate_blood: true,
+    is_willing_to_donate_items: false,
+    physical_ok: true,
+    good_eyesight: true,
+    needs_glasses: false,
+    can_lift_heavy: true,
+    can_work_outdoor: true,
+    has_leader_experience: true,
+    new_to_volunteer: false,
+    skills: ['first aid', 'logistics'],
+    needs_meal_support: false,
+    needs_travel_support: true,
+    accepts_unpaid: true,
+    verification_status: 'verified',
+    account_status: 'active',
+    charity_interests: ['disaster_support', 'health'],
+    created_at: '2026-01-10T08:00:00Z',
+  };
+
   describe('Time normalization helpers', () => {
     it('normalizes HH:mm:ss to HH:mm correctly', () => {
       expect(normalizeTimeString('08:30:00')).toBe('08:30');
@@ -36,36 +67,6 @@ describe('profileMapper', () => {
   });
 
   describe('mapUserProfile', () => {
-    const sampleUserDto: UserProfileDto = {
-      id: 201,
-      uuid: 'usr-uuid-201',
-      display_name: 'Ko Thura',
-      phone: '+95912345678',
-      preferred_language: 'my',
-      home_area: 'Kamayut, Yangon',
-      emergency_contact_name: 'Daw Nu Nu',
-      emergency_contact_phone: '+95987654321',
-      blood_type: 'O+',
-      is_willing_to_donate: true,
-      is_willing_to_donate_blood: true,
-      is_willing_to_donate_items: false,
-      physical_ok: true,
-      good_eyesight: true,
-      needs_glasses: false,
-      can_lift_heavy: true,
-      can_work_outdoor: true,
-      has_leader_experience: true,
-      new_to_volunteer: false,
-      skills: ['first aid', 'logistics'],
-      needs_meal_support: false,
-      needs_travel_support: true,
-      accepts_unpaid: true,
-      verification_status: 'verified',
-      account_status: 'active',
-      charity_interests: ['disaster_support', 'health'],
-      created_at: '2026-01-10T08:00:00Z',
-    };
-
     const sampleCoordEnvelope: CoordinatorProfileEnvelopeDto = {
       coordinator: {
         user_id: 201,
@@ -118,7 +119,8 @@ describe('profileMapper', () => {
       };
 
       const profile = mapUserProfile(userWithoutPhone, null, null);
-      expect(profile.email).toBe('Verified Phone Account');
+      expect(profile.phone).toBeNull();
+      expect(profile.email).toBeUndefined();
       expect(profile.coordinatorStatus).toBe('none');
       expect(profile.ratingAverage).toBeNull();
       expect(profile.ratingCount).toBe(0);
@@ -150,6 +152,7 @@ describe('profileMapper', () => {
         },
         donationPreferences: {
           bloodType: 'B+',
+          isWillingToDonate: true,
           isWillingToDonateBlood: true,
           isWillingToDonateItems: true,
         },
@@ -179,6 +182,31 @@ describe('profileMapper', () => {
       expect(payloadKeys).not.toContain('verification_status');
       expect(payloadKeys).not.toContain('coordinator_status');
       expect(payloadKeys).not.toContain('charity_interests'); // handled via separate PUT endpoint
+    });
+
+    it('coherently merges donation sub-flags with currentProfile to preserve is_willing_to_donate', () => {
+      const currentProfile: VolunteerProfile = {
+        ...(sampleUserDto as any),
+        donationPreferences: {
+          bloodType: 'A+',
+          isWillingToDonate: true,
+          isWillingToDonateBlood: false,
+          isWillingToDonateItems: true,
+        },
+      };
+
+      const partialUpdates: Partial<VolunteerProfile> = {
+        donationPreferences: {
+          bloodType: 'A+',
+          isWillingToDonate: true,
+          isWillingToDonateBlood: false,
+        } as any,
+      };
+
+      const partialPayload = mapProfileUpdateRequest(partialUpdates, currentProfile);
+      expect(partialPayload.is_willing_to_donate).toBe(true);
+      expect(partialPayload.is_willing_to_donate_blood).toBe(false);
+      expect(partialPayload.is_willing_to_donate_items).toBe(true);
     });
   });
 
@@ -282,6 +310,49 @@ describe('profileMapper', () => {
 
       const driverSlot = data.imageSlots.find(s => s.imageType === 'driver_license');
       expect(driverSlot?.status).toBe('none'); // not uploaded
+    });
+  });
+
+  describe('mapMyFeedbackResponse', () => {
+    it('separates authored feedback list from received summary metrics', () => {
+      const dto: FeedbackSummaryResponseDto = {
+        results: [
+          {
+            id: 101,
+            event_id: 50,
+            event_title: 'Health Fair',
+            direction: 'volunteer_to_coordinator',
+            rating_overall: 5,
+            tags: ['organized', 'supportive'],
+            comments: 'Great coordinator!',
+            created_at: '2026-11-15T12:00:00Z',
+          },
+        ],
+        summary: {
+          user_id: 10,
+          overall_avg_rating: 4.8,
+          total_count: 12,
+          volunteer_avg_rating: 4.9,
+          volunteer_rating_count: 10,
+          coordinator_avg_rating: 4.5,
+          coordinator_rating_count: 2,
+          as_volunteer: { count: 10, avg_overall: 4.9 },
+          as_coordinator: { count: 2, avg_overall: 4.5 },
+        },
+      };
+
+      const mapped = mapMyFeedbackResponse(dto);
+      expect(mapped.authoredFeedback).toHaveLength(1);
+      expect(mapped.authoredFeedback[0].id).toBe('101');
+      expect(mapped.authoredFeedback[0].eventId).toBe('50');
+      expect(mapped.authoredFeedback[0].eventTitle).toBe('Health Fair');
+      expect(mapped.authoredFeedback[0].ratingOverall).toBe(5);
+      expect(mapped.authoredFeedback[0].tags).toEqual(['organized', 'supportive']);
+
+      expect(mapped.receivedSummary.overallAvgRating).toBe(4.8);
+      expect(mapped.receivedSummary.totalCount).toBe(12);
+      expect(mapped.receivedSummary.asVolunteer.avgOverall).toBe(4.9);
+      expect(mapped.receivedSummary.asCoordinator.avgOverall).toBe(4.5);
     });
   });
 });

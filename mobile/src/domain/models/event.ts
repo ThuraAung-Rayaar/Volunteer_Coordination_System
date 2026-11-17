@@ -144,6 +144,7 @@ export interface VolunteerAssignmentItem {
   id: string;
   eventId: string;
   eventTitle: string;
+  applicationId?: string;
   postId: string;
   postTitle: string;
   status: VolunteerAssignmentStatus;
@@ -151,12 +152,15 @@ export interface VolunteerAssignmentItem {
   endAt: string;
   location: string;
   assignedAt: string;
+  attendanceId?: string;
   attendanceStatus?:
     | 'scheduled'
     | 'checked_in'
     | 'pending_confirmation'
     | 'completed'
     | 'absent'
-    | 'excused';
+    | 'excused'
+    | 'expected'
+    | 'cancelled';
   verifiedHours?: number;
 }

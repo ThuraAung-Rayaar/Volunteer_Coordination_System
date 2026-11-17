@@ -2,21 +2,34 @@
  * @format
  */
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { StatusBar, StyleSheet, View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { MainDrawerNavigator } from '../navigation/MainDrawerNavigator';
 import { useAppTheme } from '../theme';
 import { AppProviders } from './AppProviders';
 import { useCurrentUser } from './UserContext';
-import { isHttpMode } from './configuration/dataMode';
+import {
+  addDataModeListener,
+  DataMode,
+  getDataMode,
+} from './configuration/dataMode';
 import { OtpLoginScreen } from '../features/auth';
 import { LoadingState } from '../shared';
 
 export function AppNavigationRoot(): React.JSX.Element {
   const { theme, isDark } = useAppTheme();
   const { isAuthenticated, isBootstrapping } = useCurrentUser();
-  const httpMode = isHttpMode();
+  const [dataMode, setDataMode] = useState<DataMode>(() => getDataMode());
+
+  useEffect(() => {
+    const unsubscribe = addDataModeListener(newMode => {
+      setDataMode(newMode);
+    });
+    return unsubscribe;
+  }, []);
+
+  const httpMode = dataMode === 'http';
 
   if (httpMode && isBootstrapping) {
     return (

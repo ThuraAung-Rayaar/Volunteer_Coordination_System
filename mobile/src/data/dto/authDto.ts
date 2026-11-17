@@ -11,11 +11,21 @@ export interface OtpRequestDto {
 }
 
 /**
+ * Details of OTP delivery channel and status (P0-09).
+ */
+export interface OtpDeliveryDto {
+  delivered: boolean;
+  channel: string;
+  method?: string;
+  provider_configured?: boolean;
+}
+
+/**
  * Success response for `POST /api/v1/auth/otp/request/`.
  */
 export interface OtpRequestResponseDto {
   status: string;
-  delivery?: Record<string, unknown>;
+  delivery?: OtpDeliveryDto;
   dev_code?: string;
 }
 

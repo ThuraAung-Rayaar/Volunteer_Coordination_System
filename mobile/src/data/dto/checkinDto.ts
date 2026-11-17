@@ -166,3 +166,35 @@ export interface FeedbackSubmitResponseDto {
   id: number;
   status: string;
 }
+
+/**
+ * Geo check-in attempt for coordinator review matching `v_geo_attempts_review` (C-35).
+ * Returned by `GET /api/v1/checkin/coordinator/events/{id}/geo-attempts/`.
+ */
+export interface GeoAttemptReviewDto {
+  attempt_id: number;
+  event_id: number;
+  user_id: number;
+  display_name: string;
+  attempted_at: string;
+  distance_m: number | null;
+  effective_radius_m: number | null;
+  accuracy_m: number | null;
+  is_mocked: boolean;
+  result_code: string;
+}
+
+/**
+ * Single feedback item in event feedback list (P1-12).
+ * Returned by `GET /api/v1/checkin/events/{id}/feedback/list/`.
+ */
+export interface EventFeedbackItemDto {
+  id: number;
+  event_id: number;
+  user_id?: number | null;
+  direction: string;
+  rating_overall: number;
+  tags: string[];
+  comments: string | null;
+  created_at: string;
+}

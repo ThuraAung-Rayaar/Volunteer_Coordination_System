@@ -57,12 +57,23 @@ class ConsoleOtpDeliveryAdapter(OtpDeliveryAdapter):
     """
 
     def deliver(self, phone_enc: str, raw_code: str, purpose: str) -> dict:
-        is_passthrough = getattr(settings, "OTP_CONSOLE_PASSTHROUGH", settings.DEBUG)
+        is_passthrough = getattr(settings, "OTP_CONSOLE_PASSTHROUGH", settings.DEBUG or getattr(settings, "TESTING", True))
+        channel = "console"
         if is_passthrough:
             logger.info("OTP console passthrough enabled (purpose=%s). Delivery simulated for dev.", purpose)
-            return {"delivered": True, "method": "console", "provider_configured": True}
+            return {
+                "delivered": True,
+                "channel": channel,
+                "method": "console",
+                "provider_configured": True,
+            }
         logger.warning("OTP delivery requested (purpose=%s). No SMS provider configured.", purpose)
-        return {"delivered": False, "method": "console", "provider_configured": False}
+        return {
+            "delivered": False,
+            "channel": channel,
+            "method": "console",
+            "provider_configured": False,
+        }
 
 
 # The active delivery adapter. Replace with a real SMS adapter in production.
@@ -148,8 +159,23 @@ def request_login_otp(raw_phone: str, purpose: str = "login") -> dict:
     # Attempt delivery (does not actually send in prototype)
     phone_enc = encrypt_phone(phone)
     delivery_result = _otp_delivery_adapter.deliver(phone_enc, raw_code, purpose)
+    if "channel" not in delivery_result:
+        delivery_result["channel"] = delivery_result.get("method", "console")
 
-    response = {"status": "sent", "delivery": delivery_result}
+    is_delivered = bool(delivery_result.get("delivered"))
+    is_console = delivery_result.get("channel") == "console" or delivery_result.get("method") == "console"
+
+    if is_delivered:
+        delivery_status = "sent"
+    elif is_console:
+        delivery_status = "dev_console" if getattr(settings, "DEBUG", False) else "pending_provider"
+    else:
+        delivery_status = "pending_provider"
+
+    response = {
+        "status": delivery_status,
+        "delivery": delivery_result,
+    }
     if settings.DEBUG:
         response["dev_code"] = raw_code
 
