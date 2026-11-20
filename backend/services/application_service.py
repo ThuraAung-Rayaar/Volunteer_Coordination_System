@@ -19,12 +19,23 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-from django.db import connection, transaction
+from django.db import (
+    IntegrityError,
+    InternalError,
+    ProgrammingError,
+    connection,
+    transaction,
+)
 from django.utils import timezone
 
 from apps.accounts.models import Users
 from apps.events.models import EventApplications, Events
-from common.exceptions import DomainError, ResourceMaskedNotFound
+from common.db_context import get_db_session_context, set_db_session_context
+from common.exceptions import (
+    DomainError,
+    ResourceMaskedNotFound,
+    translate_db_exception,
+)
 from common.permissions import get_event_for_manager_or_404, get_visible_event_or_404
 
 logger = logging.getLogger(__name__)
@@ -143,8 +154,16 @@ def invite_volunteer_to_event(
         note=note or "",
         conditions_acknowledged_at=timezone.now(),
     )
-    app.save()
-    app.refresh_from_db()
+
+    prev_user_id, prev_ip = get_db_session_context()
+    set_db_session_context(actor.id)
+    try:
+        app.save()
+        app.refresh_from_db()
+    except (ProgrammingError, IntegrityError, InternalError) as exc:
+        raise translate_db_exception(exc) from exc
+    else:
+        set_db_session_context(prev_user_id, prev_ip)
 
     logger.info(
         "Volunteer invited to event",
@@ -156,6 +175,106 @@ def invite_volunteer_to_event(
         },
     )
     return app
+
+
+@transaction.atomic
+def respond_to_invite(
+    user,
+    application_id: int,
+    accept: bool,
+    note: str = "",
+) -> EventApplications:
+    """
+    Volunteer accepts or rejects an event invitation (P1-06).
+    Operates transactionally on the existing invite application row.
+    - If accept=True: transitions status to 'accepted'. Satisfies DB triggers
+      by recording event manager decision and triggers auto-assignment if enabled.
+    - If accept=False: transitions status to 'withdrawn'.
+    """
+    try:
+        app = EventApplications.objects.select_for_update().get(id=application_id)
+    except EventApplications.DoesNotExist:
+        raise ResourceMaskedNotFound(message="Application not found.")
+
+    if user.id != app.user_id:
+        raise ResourceMaskedNotFound(message="Application not found.")
+
+    if app.source != "invite":
+        raise DomainError(
+            code="invalid_application_source",
+            message="This application was not created from an invitation.",
+            status_code=400,
+        )
+
+    if app.status != "pending":
+        raise DomainError(
+            code="invalid_state",
+            message=f"Cannot respond to invite with status '{app.status}'.",
+            status_code=400,
+        )
+
+    if accept:
+        event = app.event
+        manager_id = event.current_coordinator_id or event.owner_id
+        if not manager_id:
+            from apps.coordination.models import CoordinatorProfiles
+            coord = CoordinatorProfiles.objects.filter(status="approved").first()
+            manager_id = coord.user_id if coord else None
+
+        prev_user_id, prev_ip = get_db_session_context()
+        if manager_id:
+            set_db_session_context(manager_id)
+
+        app.status = "accepted"
+        app.decided_by_id = manager_id
+        app.decided_at = timezone.now()
+        if note:
+            app.note = note
+
+        try:
+            app.save()
+            app.refresh_from_db()
+        except (ProgrammingError, IntegrityError, InternalError) as exc:
+            raise translate_db_exception(exc) from exc
+        else:
+            set_db_session_context(prev_user_id, prev_ip)
+
+        logger.info(
+            "Volunteer accepted invitation",
+            extra={"application_id": app.id, "user_id": user.id, "event_id": app.event_id},
+        )
+    else:
+        app.status = "withdrawn"
+        app.decided_at = timezone.now()
+        if note:
+            app.note = note
+
+        prev_user_id, prev_ip = get_db_session_context()
+        set_db_session_context(user.id)
+        try:
+            app.save()
+            app.refresh_from_db()
+        except (ProgrammingError, IntegrityError, InternalError) as exc:
+            raise translate_db_exception(exc) from exc
+        else:
+            set_db_session_context(prev_user_id, prev_ip)
+
+        logger.info(
+            "Volunteer declined invitation",
+            extra={"application_id": app.id, "user_id": user.id, "event_id": app.event_id},
+        )
+
+    return app
+
+
+def accept_invite(user, application_id: int, note: str = "") -> EventApplications:
+    """Convenience alias for volunteer accepting an invitation."""
+    return respond_to_invite(user, application_id, accept=True, note=note)
+
+
+def reject_invite(user, application_id: int, note: str = "") -> EventApplications:
+    """Convenience alias for volunteer declining an invitation."""
+    return respond_to_invite(user, application_id, accept=False, note=note)
 
 
 def get_own_applications(user, event_id: Optional[int] = None) -> list[dict]:

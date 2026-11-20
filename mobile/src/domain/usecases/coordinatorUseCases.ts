@@ -16,16 +16,14 @@ import type {
   CoordinatorAttendanceItem,
   CoordinatorEventDetail,
   CoordinatorEventSummary,
+  CoordinatorHistoryItem,
   CoordinatorOverviewMetrics,
   CreateEventWizardDraft,
   EventPost,
+  EventPostCapacity,
+  GeoAttemptReview,
+  VolunteerUuidLookup,
 } from '../models';
-import type {
-  CoordinatorHistoryItemDto,
-  EventPostCapacityDto,
-} from '../../data/dto/coordinatorDto';
-import type { GeoAttemptReviewDto } from '../../data/dto/checkinDto';
-import type { UserUuidLookupDto } from '../../data/dto/profileDto';
 
 export interface CoordinatorUseCasesDeps {
   coordinatorRepository: CoordinatorRepository;
@@ -323,11 +321,11 @@ export class CoordinatorUseCases {
   }
 
   /**
-   * C-28: Fetches post capacity breakdown for an event.
+   * C-28: Fetches post capacity breakdown for an event (P1-05).
    */
   public async getPostCapacity(
     eventId: string,
-  ): Promise<EventPostCapacityDto[]> {
+  ): Promise<EventPostCapacity[]> {
     return this.coordinatorRepo.getPostCapacity(eventId);
   }
 
@@ -375,11 +373,11 @@ export class CoordinatorUseCases {
   }
 
   /**
-   * C-18: Reads event coordinator handover audit history.
+   * C-18: Reads event coordinator handover audit history (P1-05).
    */
   public async getCoordinatorHistory(
     eventId: string,
-  ): Promise<CoordinatorHistoryItemDto[]> {
+  ): Promise<CoordinatorHistoryItem[]> {
     return this.coordinatorRepo.getCoordinatorHistory(eventId);
   }
 
@@ -561,12 +559,12 @@ export class CoordinatorUseCases {
   // =========================================================================
 
   /**
-   * C-29: Resolves volunteer identity and capabilities by UUID for check-in / roster.
+   * C-29: Resolves volunteer identity and capabilities by UUID for check-in / roster (P1-05).
    */
   public async lookupVolunteerByUuid(
     uuid: string,
     eventId?: string,
-  ): Promise<UserUuidLookupDto> {
+  ): Promise<VolunteerUuidLookup> {
     return this.coordinatorRepo.lookupVolunteerByUuid(uuid, eventId);
   }
 
@@ -580,15 +578,43 @@ export class CoordinatorUseCases {
   }
 
   /**
-   * C-31: Manually marks an eligible volunteer as checked-in on-site.
+   * C-31: Manually marks an eligible volunteer as checked-in on-site (C-34 / ATT-02).
+   * Supports explicit { eventId, volunteerUserId, note? }, (eventId, volunteerUserId, note?),
+   * or legacy attendanceId lookup.
    */
+  public async manualCheckIn(
+    params: { eventId: string | number; volunteerUserId: string | number; note?: string },
+  ): Promise<CoordinatorOperationResult<CoordinatorAttendanceItem>>;
+  public async manualCheckIn(
+    eventId: string | number,
+    volunteerUserId: string | number,
+    note?: string,
+  ): Promise<CoordinatorOperationResult<CoordinatorAttendanceItem>>;
   public async manualCheckIn(
     attendanceId: string,
     eventId?: string,
+  ): Promise<CoordinatorOperationResult<CoordinatorAttendanceItem>>;
+  public async manualCheckIn(
+    arg1: string | number | { eventId: string | number; volunteerUserId: string | number; note?: string },
+    arg2?: string | number,
+    arg3?: string,
   ): Promise<CoordinatorOperationResult<CoordinatorAttendanceItem>> {
-    const result = await this.coordinatorRepo.manualCheckIn(attendanceId);
-    if (result.success) {
-      await this.coordinatorRepo.getAttendanceRoster(eventId);
+    let result: CoordinatorOperationResult<CoordinatorAttendanceItem>;
+    let targetEventId: string | undefined;
+
+    if (typeof arg1 === 'object' && arg1 !== null && 'eventId' in arg1) {
+      targetEventId = String(arg1.eventId);
+      result = await this.coordinatorRepo.manualCheckIn(arg1);
+    } else if (arg2 !== undefined && typeof arg2 === 'number') {
+      targetEventId = String(arg1);
+      result = await this.coordinatorRepo.manualCheckIn(arg1, arg2, arg3);
+    } else {
+      targetEventId = arg2 !== undefined ? String(arg2) : undefined;
+      result = await this.coordinatorRepo.manualCheckIn(String(arg1));
+    }
+
+    if (result.success && (targetEventId || result.data?.eventId)) {
+      await this.coordinatorRepo.getAttendanceRoster(targetEventId || result.data?.eventId);
     }
     return result;
   }
@@ -635,9 +661,9 @@ export class CoordinatorUseCases {
   }
 
   /**
-   * C-35: Reads geo check-in attempt history for coordinator review.
+   * C-35: Reads geo check-in attempt history for coordinator review (P1-05).
    */
-  public async getGeoAttempts(eventId: string): Promise<GeoAttemptReviewDto[]> {
+  public async getGeoAttempts(eventId: string): Promise<GeoAttemptReview[]> {
     return this.coordinatorRepo.getGeoAttempts(eventId);
   }
 
@@ -696,7 +722,8 @@ export class CoordinatorUseCases {
   }
 
   /**
-   * C-39: Reads received coordinator feedback metrics.
+   * C-39: Reads received coordinator feedback metrics (P1-04).
+   * Removes hard-coded 4.9 invented metrics; returns source-backed data or empty/unavailable state.
    */
   public async getCoordinatorFeedbackSummary(
     _userId?: string,
@@ -709,8 +736,8 @@ export class CoordinatorUseCases {
       };
     }
     return {
-      avgRating: 4.9,
-      totalRatings: 10,
+      avgRating: null,
+      totalRatings: 0,
     };
   }
 }

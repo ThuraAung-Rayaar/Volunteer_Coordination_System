@@ -14,6 +14,8 @@ CSRF_COOKIE_SECURE = os.environ.get('CSRF_COOKIE_SECURE', 'True').lower() in ('t
 # Fail-fast validation of critical secrets against insecure base.py fallbacks
 _INSECURE_SECRET_KEY = 'django-insecure-f7(wutn^($y(7%in-uwbzw6auh6vnuc(zr7yc@vdt70xx(a8nd'
 _INSECURE_PHONE_HASH_HMAC = 'dev-hmac-secret-at-least-32-chars-long-abcdef'
+_INSECURE_OTP_CODE_HMAC = 'dev-otp-code-hmac-secret-at-least-32-chars-long-distinct'
+_INSECURE_AUTH_SESSION_SECRET = 'dev-auth-session-token-secret-at-least-32-chars-distinct'
 _INSECURE_PHONE_ENCRYPTION = 'IcY3lXCl1k0P1NawgjDSeCYOqcNRWJStRaqbWN21nGs='
 
 if not SECRET_KEY or SECRET_KEY == _INSECURE_SECRET_KEY:
@@ -26,7 +28,26 @@ if not PHONE_HASH_HMAC_SECRET or PHONE_HASH_HMAC_SECRET == _INSECURE_PHONE_HASH_
         "Production PHONE_HASH_HMAC_SECRET must be set to a secure value and cannot use the development fallback."
     )
 
+if not OTP_CODE_HMAC_SECRET or OTP_CODE_HMAC_SECRET == _INSECURE_OTP_CODE_HMAC:
+    raise ImproperlyConfigured(
+        "Production OTP_CODE_HMAC_SECRET must be set to a secure value and cannot use the development fallback."
+    )
+
+if not AUTH_SESSION_TOKEN_SECRET or AUTH_SESSION_TOKEN_SECRET == _INSECURE_AUTH_SESSION_SECRET:
+    raise ImproperlyConfigured(
+        "Production AUTH_SESSION_TOKEN_SECRET must be set to a secure value and cannot use the development fallback."
+    )
+
 if not PHONE_ENCRYPTION_KEY or PHONE_ENCRYPTION_KEY == _INSECURE_PHONE_ENCRYPTION:
     raise ImproperlyConfigured(
         "Production PHONE_ENCRYPTION_KEY must be set to a secure value and cannot use the development fallback."
     )
+
+# Enforce cryptographic key separation: secrets must be pairwise distinct
+if len({PHONE_HASH_HMAC_SECRET, OTP_CODE_HMAC_SECRET, AUTH_SESSION_TOKEN_SECRET}) < 3:
+    raise ImproperlyConfigured(
+        "PHONE_HASH_HMAC_SECRET, OTP_CODE_HMAC_SECRET, and AUTH_SESSION_TOKEN_SECRET must all be pairwise distinct."
+    )
+
+# Strictly forbid dev_code exposure in production
+ALLOW_DEV_CODE_IN_AUTH_RESPONSE = False

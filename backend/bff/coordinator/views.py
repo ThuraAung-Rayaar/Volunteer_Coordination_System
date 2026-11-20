@@ -5,6 +5,7 @@ from rest_framework.views import APIView
 
 from common.exceptions import DomainError
 from common.permissions import IsApprovedCoordinator, get_event_for_manager_or_404
+from apps.events.models import EventApplications
 from services import (
     application_service,
     assignment_service,
@@ -218,13 +219,26 @@ class ApplicationDecisionView(APIView):
         data = serializer.validated_data
 
         if action == "accept":
-            app = application_service.accept_application(
-                request.user, application_id, post_id=data.get("post_id")
-            )
+            # If the applicant is responding to their own invitation (P1-06 / INV-01)
+            app_obj = EventApplications.objects.filter(id=application_id).first()
+            if app_obj and app_obj.source == "invite" and app_obj.user_id == request.user.id:
+                app = application_service.accept_invite(
+                    request.user, application_id, note=data.get("note") or ""
+                )
+            else:
+                app = application_service.accept_application(
+                    request.user, application_id, post_id=data.get("post_id")
+                )
         elif action == "reject":
-            app = application_service.reject_application(
-                request.user, application_id, note=data.get("note")
-            )
+            app_obj = EventApplications.objects.filter(id=application_id).first()
+            if app_obj and app_obj.source == "invite" and app_obj.user_id == request.user.id:
+                app = application_service.reject_invite(
+                    request.user, application_id, note=data.get("note") or ""
+                )
+            else:
+                app = application_service.reject_application(
+                    request.user, application_id, note=data.get("note")
+                )
         elif action == "waitlist":
             app = application_service.waitlist_application(request.user, application_id)
         else:
@@ -305,9 +319,15 @@ class CoordinatorApplicationAcceptView(APIView):
     def post(self, request, application_id):
         serializer = ApplicationDecisionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        app = application_service.accept_application(
-            request.user, application_id, post_id=serializer.validated_data.get("post_id")
-        )
+        app_obj = EventApplications.objects.filter(id=application_id).first()
+        if app_obj and app_obj.source == "invite" and app_obj.user_id == request.user.id:
+            app = application_service.accept_invite(
+                request.user, application_id, note=serializer.validated_data.get("note") or ""
+            )
+        else:
+            app = application_service.accept_application(
+                request.user, application_id, post_id=serializer.validated_data.get("post_id")
+            )
         return Response({"id": app.id, "status": app.status})
 
 
@@ -318,9 +338,15 @@ class CoordinatorApplicationRejectView(APIView):
     def post(self, request, application_id):
         serializer = ApplicationDecisionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        app = application_service.reject_application(
-            request.user, application_id, note=serializer.validated_data.get("note")
-        )
+        app_obj = EventApplications.objects.filter(id=application_id).first()
+        if app_obj and app_obj.source == "invite" and app_obj.user_id == request.user.id:
+            app = application_service.reject_invite(
+                request.user, application_id, note=serializer.validated_data.get("note") or ""
+            )
+        else:
+            app = application_service.reject_application(
+                request.user, application_id, note=serializer.validated_data.get("note")
+            )
         return Response({"id": app.id, "status": app.status})
 
 

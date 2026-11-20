@@ -4,6 +4,7 @@
 
 import { ApiClient, defaultApiClient } from '../../core/api/apiClient';
 import type {
+  CharityCategory,
   EventApplicationState,
   EventApplicationStatus,
   EventDetail,
@@ -25,6 +26,7 @@ import type {
 import { eventApi, type EventQueryParams } from '../endpoints/eventApi';
 import { checkinApi } from '../endpoints/checkinApi';
 import {
+  mapCharityField,
   mapPublicEventDetail,
   mapPublicEventSummary,
   mapVolunteerApplication,
@@ -278,6 +280,52 @@ export class HttpEventRepository implements EventRepository {
     };
   }
 
+  public async acceptInvite(
+    applicationId: string,
+    note?: string,
+  ): Promise<{ success: boolean; message: string; applicationId: string }> {
+    const res = await eventApi.acceptInvite(
+      applicationId,
+      { note },
+      this.client,
+    );
+    if (!res.ok) {
+      return {
+        success: false,
+        message: res.error.message,
+        applicationId,
+      };
+    }
+    return {
+      success: true,
+      message: 'Invitation accepted successfully',
+      applicationId: String(res.data.id),
+    };
+  }
+
+  public async rejectInvite(
+    applicationId: string,
+    note?: string,
+  ): Promise<{ success: boolean; message: string; applicationId: string }> {
+    const res = await eventApi.rejectInvite(
+      applicationId,
+      { note },
+      this.client,
+    );
+    if (!res.ok) {
+      return {
+        success: false,
+        message: res.error.message,
+        applicationId,
+      };
+    }
+    return {
+      success: true,
+      message: 'Invitation declined successfully',
+      applicationId: String(res.data.id),
+    };
+  }
+
   public async getUserAssignments(): Promise<VolunteerAssignmentItem[]> {
     const res = await eventApi.getMyAssignments(undefined, this.client);
     if (!res.ok) {
@@ -331,17 +379,18 @@ export class HttpEventRepository implements EventRepository {
     };
   }
 
-  public async getCharityFields(): Promise<CharityFieldDto[]> {
+  public async getCharityFields(): Promise<CharityCategory[]> {
     const res = await eventApi.getCharityFields(this.client);
     if (!res.ok) {
       throw new Error(`Failed to load charity fields: ${res.error.message}`);
     }
 
-    return Array.isArray(res.data)
+    const list: CharityFieldDto[] = Array.isArray(res.data)
       ? res.data
       : 'results' in res.data
       ? res.data.results
       : [];
+    return list.map(mapCharityField);
   }
 
   public async getEventOnboarding(eventId: string): Promise<{

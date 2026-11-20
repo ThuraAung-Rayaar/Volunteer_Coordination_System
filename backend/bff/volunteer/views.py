@@ -1,12 +1,15 @@
+from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.coordination.models import CoordinatorProfiles
 from apps.events.models import VPublicEvents
 from common.permissions import get_visible_event_or_404
 from common.privacy import can_access_event_t2
+from common.utils import decrypt_phone
 from services import (
     application_service,
     assignment_service,
@@ -35,6 +38,7 @@ from .serializers import (
     PublicEventDetailSerializer,
     PublicEventPostSerializer,
     PublicEventSerializer,
+    UserBootstrapResponseSerializer,
     UserProfileSerializer,
     UserPublicCardSerializer,
     UserT2CoordinatorCardSerializer,
@@ -465,6 +469,58 @@ class VolunteerFeedbackView(APIView):
 
 
 VolunteerFeedbackSummaryView = VolunteerFeedbackView
+
+
+# ---------------------------------------------------------------------------
+# v0.12.0 Compact Session Bootstrap View (Section 8.7, API-01)
+# ---------------------------------------------------------------------------
+
+class MeBootstrapView(APIView):
+    """
+    GET /api/v1/me/bootstrap/
+    Compact authenticated startup endpoint returning initial session identity,
+    workspace routing indicators, and capabilities in a single round-trip.
+    """
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        responses={200: UserBootstrapResponseSerializer},
+        summary="Compact session bootstrap",
+        description="Single authenticated startup endpoint returning minimal user identity (with email: null and decrypted phone), coordinator workspace status, and server-derived capabilities.",
+    )
+    def get(self, request):
+        user = request.user
+        coord_row = CoordinatorProfiles.objects.filter(user_id=user.id).values("status").first()
+        coord_status = coord_row["status"] if coord_row else "none"
+        can_access = (
+            coord_status == "approved"
+            and getattr(user, "account_status", "active") == "active"
+            and getattr(user, "is_active", True)
+        )
+        data = {
+            "user": {
+                "id": user.id,
+                "uuid": user.uuid,
+                "display_name": user.display_name,
+                "phone": decrypt_phone(user.phone_enc) if user.phone_enc else None,
+                "email": None,
+                "account_status": user.account_status,
+                "verification_status": user.verification_status,
+            },
+            "coordinator": {
+                "status": coord_status,
+                "can_access_workspace": can_access,
+            },
+            "capabilities": {
+                "volunteer": bool(
+                    getattr(user, "account_status", "active") == "active"
+                    and getattr(user, "is_active", True)
+                ),
+                "coordinator": can_access,
+            },
+        }
+        return Response(UserBootstrapResponseSerializer(data).data, status=status.HTTP_200_OK)
+
 
 
 

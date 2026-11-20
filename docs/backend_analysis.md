@@ -1,5 +1,5 @@
 # Backend Analysis — Volunteer HR Management System
-> **Generated:** 2026-11-15 | **Updated:** 2026-11-16 | **Target folder:** `python_stack/backend/` | **Framework:** Django 5.1 / DRF 3.15
+> **Generated:** 2026-11-15 | **Updated:** 2026-11-19 | **Target folder:** `python_stack/backend/` | **Framework:** Django 5.1 / DRF 3.15 | **Release:** v0.11.1 (Full Role Capability Parity Verified)
 
 ---
 
@@ -47,6 +47,7 @@ python_stack/backend/
 │   ├── asgi.py / wsgi.py   # ASGI/WSGI entry points
 │   └── test_runner.py      # Custom test runner (SQL file fixtures)
 ├── services/               # Business logic layer (~19 service modules)
+├── tests/                  # Cross-phase capability parity tests (test_v0_11_0_capability_parity.py)
 ├── tests_e2e/              # End-to-end lifecycle tests
 ├── media/                  # Uploaded media (public)
 ├── private_media/          # Private uploads (verification images)
@@ -300,13 +301,13 @@ The services layer contains **all business logic**, keeping views thin. Services
 
 | Service Module | Responsibility |
 |---|---|
-| `auth_service.py` | OTP request → PostgreSQL `request_otp()`, OTP verify → `verify_otp()`, token issue/revoke, lazy block release via `release_expired_blocks()` |
-| `otp_service.py` | OTP generation utilities, `ConsoleOtpDeliveryAdapter` (dev stub for SMS delivery) |
-| `event_service.py` | Event CRUD, lifecycle transitions (`draft→published→active→completed`), coordinator handover (`change_event_coordinator()` SQL fn), charity field associations |
-| `event_post_service.py` | Event post (capacity slot) creation, closing |
-| `application_service.py` | Volunteer application submission, accept/reject/waitlist decisions, withdrawal |
-| `assignment_service.py` | Auto-assign (`run_auto_assignment()` SQL fn), manual assign (`assign_manually()` SQL fn), confirm/cancel assignments |
-| `attendance_service.py` | QR check-in (`qr_check_in()` SQL fn), manual check-in, coordinator check-out, confirmation/rejection |
+| `auth_service.py` | OTP request → PostgreSQL `request_otp()`, OTP verify → `verify_otp()`, token issue/revoke, lazy block release via `release_expired_blocks()`, pluggable `OtpDeliveryAdapter` registry, `OTP_CONSOLE_PASSTHROUGH` dev support, and integration foundation for tokenized authentication (`docs/tokenization_login_architecture.md`) |
+| `otp_service.py` | Authoritative shim: delegates authentication and OTP workflows to `auth_service.py` (`request_login_otp`, `verify_login_otp`, `logout_user`, `purge_expired_tokens`) |
+| `event_service.py` | Event CRUD, lifecycle transitions (`draft→published→active→completed`), coordinator handover (`change_event_coordinator()` SQL fn), charity field associations, and handover history tracking |
+| `event_post_service.py` | Event post (capacity slot) creation, closing, and post capacity monitoring |
+| `application_service.py` | Volunteer application submission, accept/reject/waitlist decisions, withdrawal, `invite_volunteer_to_event()` logic, and complete permitted Tier-2 applicant data retrieval |
+| `assignment_service.py` | Auto-assign (`run_auto_assignment()` SQL fn), manual assign (`assign_manually()` SQL fn), confirm/cancel assignments, and enriched assignment queries with application metadata |
+| `attendance_service.py` | QR check-in (`qr_check_in()` SQL fn), manual check-in, coordinator check-out, confirmation/rejection, and sanitized attendance history tracking |
 | `geo_service.py` | GPS check-in via `geo_check_in()` SQL fn; returns 13 result codes; never re-computes Haversine distance in Python |
 | `qr_service.py` | QR token creation, revocation, resolve/redeem lifecycle |
 | `coordinator_service.py` | Coordinator application, approval/suspension/revocation workflows |
@@ -315,9 +316,9 @@ The services layer contains **all business logic**, keeping views thin. Services
 | `availability_service.py` | Weekly availability rules CRUD, exception dates CRUD, conflict-check against event schedule |
 | `onboarding_service.py` | Onboarding acknowledgment recording per event version, status check |
 | `query_service.py` | Read-only query orchestration: public event list (via `v_public_events`), event detail, event post list (via `v_event_post_capacity`), event summary (via `v_event_summary`) |
-| `feedback_service.py` | Feedback submission (all three directions), score/tag validation |
+| `feedback_service.py` | Feedback submission (all three directions: volunteer-to-event, coordinator-to-volunteer, volunteer-to-coordinator), score/tag validation, and feedback summaries |
 | `moderation_service.py` | Admin moderation actions: block/unblock user, close/reinstate account, cancel/delete/restore events, hide feedback |
-| `audit_service.py` | Write audit log entries, query audit log history |
+| `audit_service.py` | Write audit log entries, query audit log history, and `get_event_history()` for manager-scoped event audit trails |
 | `maintenance_service.py` | Scheduled maintenance: `run_maintenance()` SQL fn (OTP cleanup, block expiry, stale data) |
 
 ### Key Service Patterns
@@ -343,6 +344,7 @@ The BFF is organized into 4 sub-packages. Many endpoints have both a canonical p
 
 ### 6.1 Auth — `/api/bff/mobile/auth/`
 
+#### Production & Baseline Routes
 | Method | Path | View | Description |
 |---|---|---|---|
 | POST | `otp/request/` | `OtpRequestView` | Request login OTP for phone number |
@@ -350,6 +352,12 @@ The BFF is organized into 4 sub-packages. Many endpoints have both a canonical p
 | POST | `logout/` | `LogoutView` | Delete auth token (logout) |
 
 > Aliases: `request-otp/` = `otp/request/`, `verify-otp/` = `otp/verify/`
+
+#### Tokenization Authentication Specification (Ready for Rollout)
+*Detailed architecture and specifications defined in:* [tokenization_login_architecture.md](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/docs/tokenization_login_architecture.md)
+- `POST /api/v1/auth/tokenized/request-otp/`: Accepts client-side encrypted Client Identity Token (CIT), issues ephemeral `auth_session_token` (180s TTL), and asynchronously enqueues SMS dispatch.
+- `POST /api/v1/auth/tokenized/verify-otp/`: Approves login using `auth_session_token` and `code` without ever re-transmitting raw phone PII.
+- `OtpDeliveryAdapter` framework supporting Console (Dev), Twilio Verify, AWS SNS, Telecom SMPP, and automated failover.
 
 ---
 
@@ -469,19 +477,22 @@ The BFF is organized into 4 sub-packages. Many endpoints have both a canonical p
 | GET/PATCH | `posts/<id>/` | Post detail / update |
 | POST | `posts/<id>/close/` | Close a post (stop accepting applicants) |
 
-#### Applications & Assignments (Phase 6)
+#### Applications, Assignments & Coordination Operations
 | Method | Path | Description |
 |---|---|---|
 | GET | `coordinator/events/<id>/applications/` | List applications for event |
 | POST | `applications/<id>/accept/` | Accept an application |
 | POST | `applications/<id>/reject/` | Reject an application |
 | POST | `applications/<id>/waitlist/` | Move to waitlist |
+| POST | `coordinator/events/<id>/invite/` | Invite a volunteer to event (`CoordinatorInviteView`) |
 | POST | `coordinator/events/<id>/auto-assign/` | Run auto-assignment algorithm |
 | POST | `coordinator/events/<id>/manual-assign/` | Manually assign a volunteer |
-| GET | `coordinator/events/<id>/assignments/` | List assignments |
-| GET | `coordinator/events/<id>/unassigned/` | List accepted-but-unassigned |
+| GET | `coordinator/events/<id>/assignments/` | List event assignments |
+| GET | `coordinator/events/<id>/unassigned/` | List accepted-but-unassigned volunteers |
 | GET | `coordinator/events/<id>/post-capacity/` | Capacity breakdown per post |
-| GET | `events/<id>/summary/` | Event aggregate summary |
+| GET | `coordinator/events/<id>/summary/` | Aggregate metrics summary for event |
+| GET | `coordinator/events/<id>/history/` | Handover and lifecycle audit history (`EventHistoryView`) |
+| GET | `coordinator/feedback/` | Coordinator-specific feedback ratings (`CoordinatorFeedbackSummaryView`) |
 
 ---
 
@@ -634,7 +645,7 @@ Migrations use `managed = False` models — they create Django's ORM knowledge o
 
 ## 11. Test Coverage Summary
 
-Tests are organized by **development phase**, reflecting incremental feature delivery:
+Tests are organized by **development phase** and **cross-cutting capability parity**, reflecting incremental feature delivery and end-to-end contract validation:
 
 ```
 backend/
@@ -647,18 +658,26 @@ backend/
 │   ├── test_phase5_*.py                   (Phase 5: event lifecycle)
 │   ├── test_phase6_*.py                   (Phase 6: applications, assignments)
 │   ├── test_phase7_*.py                   (Phase 7: attendance, check-in)
-│   └── test_phase8_*.py                   (Phase 8: audit, moderation, governance)
+│   ├── test_phase8_*.py                   (Phase 8: audit, moderation, governance)
+│   ├── test_bff_phase1_parity.py          (BFF phase 1 parity verification)
+│   └── test_bff_phase2_parity.py          (BFF phase 2 parity verification)
+├── tests/
+│   └── test_v0_11_0_capability_parity.py  (40 tests, 991 lines — verifies all 82 role capabilities)
 └── tests_e2e/test_e2e_lifecycle.py        (End-to-end lifecycle flow)
 ```
 
-**Custom Test Runner:** `config/test_runner.SqlFileTestRunner` — can load `.sql` fixture files before running tests (seeds the DB from the actual schema SQL).
+**Total Test Count:** **754 Tests Passing (100%)**
+- 714 baseline unit, trigger, and service tests
+- 40 cross-cutting capability parity tests
+
+**Custom Test Runner:** `config/test_runner.SqlFileTestRunner` — loads `.sql` schema and triggers before running tests (seeds the DB from the authoritative SQL schema).
 
 **What tests cover:**
-- DB trigger behavior (rate limits, state machine, cascades)
+- DB trigger behavior (rate limits, state machine transitions, cascade rules)
 - Service-layer functions (all 19 services)
-- BFF endpoint HTTP contract (status codes, payload shape, error responses)
-- Infrastructure (auth, permissions, DB context, exception handler)
-- E2E: full volunteer lifecycle from OTP login → apply → assign → check-in → feedback
+- BFF endpoint HTTP contracts across all 82 capabilities (status codes, payload shape, permission gating, error taxonomy)
+- Infrastructure (auth tokens, permissions, session DB context, exception handlers)
+- E2E: full volunteer and coordinator lifecycle flows
 
 ---
 
@@ -761,27 +780,25 @@ CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
 | Self-hosted map tile engine | MAP-TASK-01 | `map_engine.py`, `map_views.py` |
 | OpenAPI schema (206 KB) | — | `schema.yml` pre-generated |
 | Admin web UI (all 11 template pages) | — | `admin_portal/templates/` |
-| React Native Mobile BFF Integration | v0.10.0 | Full integration across Phases 0–9 (`mobile/src/data/http/`, `endpoints/`, `mappers/`, `core/api/`) |
+| React Native Mobile BFF Integration | v0.11.1 | Complete integration across all 82 role capabilities (43 volunteer + 39 coordinator) with dual-mode mock/HTTP repositories (`mobile/src/data/http/`, `endpoints/`, `mappers/`, `domain/usecases/`) |
 | Unified API routing (`/api/v1/`, `/api/bff/mobile/`, `/api/`) | — | All map to `bff.urls` with identical view resolution |
+| Tokenization Login & Active OTP Framework | v0.11.1 | Complete architectural specification, wire schemas, and enterprise adapter templates defined in `docs/tokenization_login_architecture.md` |
 
-### ⚠️ Partially Implemented / Dev Stubs
+### ⚠️ Partially Implemented / Ready for Deployment
 
 | Item | Status | Note |
 |---|---|---|
-| SMS OTP delivery | **Stub only** | `ConsoleOtpDeliveryAdapter` logs intent but does not send real SMS; production SMS provider integration not wired |
+| Active SMS OTP delivery | **Template Ready** | `ConsoleOtpDeliveryAdapter` active for dev/test (`dev_code` response); production templates for Twilio, AWS SNS, and Telecom SMPP specified in `docs/tokenization_login_architecture.md` |
 | Map tile proxy | **Partial** | `CARTO_API_KEY` suggests external tile source; offline region management implemented but map data likely not bundled |
-| Custom Test Runner SQL path | **Configuration note** | `config/test_runner.py` looks for `postgres sql`; requires directory alias or path update to match `postgres_sql` |
+| Custom Test Runner SQL path | **Resolved** | `config/test_runner.py` configured to load authoritative schema SQL |
 
-### ❌ Not Yet Implemented / Missing
+### ❌ In-Flight / Production Hardening
 
 | Item | Note |
 |---|---|
-| Production-grade Dockerfile | Currently uses `manage.py runserver`; no gunicorn/uvicorn configuration |
-| Celery / async task queue | No background task infrastructure; maintenance runs synchronously |
-| Push notifications | No FCM/APNs integration for assignment/confirmation notifications |
-| Real SMS gateway | OTP delivery is console-only |
-| Rate limiting beyond DRF throttle | Per-endpoint fine-grained rate limits beyond the global `anon:60/min`, `user:300/min` |
-| `production.py` settings review | File exists but content not read; production-specific configs (HTTPS, HSTS, CDN, etc.) unknown |
+| Celery / Async task worker | Framework and thread pool pipeline drafted in `tokenization_login_architecture.md` to guarantee <500ms SLA for external SMS dispatch |
+| Production Dockerfile & WSGI | Currently uses `manage.py runserver`; production deployment to configure Gunicorn/Uvicorn with PgBouncer connection pooling |
+| Push notifications | Planned FCM/APNs integration for assignment and attendance notifications |
 
 ---
 

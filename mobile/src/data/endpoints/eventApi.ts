@@ -117,6 +117,36 @@ export const eventApi = {
   },
 
   /**
+   * Accepts a coordinator invitation to an event (V-24 / P1-06 / INV-01).
+   * Authenticated endpoint. Canonical route: applications/${applicationId}/accept/
+   */
+  acceptInvite(
+    applicationId: number | string,
+    data: { note?: string } = {},
+    client: ApiClient = defaultApiClient,
+  ): Promise<ApiResult<{ id: number; status: string }>> {
+    return client.post<{ id: number; status: string }>(
+      `applications/${applicationId}/accept/`,
+      data,
+    );
+  },
+
+  /**
+   * Declines / rejects a coordinator invitation to an event (P1-06 / INV-01).
+   * Authenticated endpoint. Canonical route: applications/${applicationId}/reject/
+   */
+  rejectInvite(
+    applicationId: number | string,
+    data: { note?: string } = {},
+    client: ApiClient = defaultApiClient,
+  ): Promise<ApiResult<{ id: number; status: string }>> {
+    return client.post<{ id: number; status: string }>(
+      `applications/${applicationId}/reject/`,
+      data,
+    );
+  },
+
+  /**
    * Withdraws a pending or waitlisted volunteer application.
    * Authenticated endpoint.
    */

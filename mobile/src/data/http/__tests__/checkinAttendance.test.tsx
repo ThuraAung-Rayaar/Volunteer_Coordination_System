@@ -381,11 +381,21 @@ describe('Phase 8: Onboarding, QR, Attendance & Feedback Integration', () => {
         .mockResolvedValue({ ok: true, status: 200, data: { results: mockRoster } });
 
       const manualSpy = jest
-        .spyOn(coordinatorApi, 'manualCheckIn')
+        .spyOn(checkinApi, 'manualCheckIn')
         .mockResolvedValue({
           ok: true,
           status: 200,
-          data: { id: 805, status: 'checked_in', method: 'manual' },
+          data: {
+            id: 805,
+            attendance_id: 805,
+            event_id: 101,
+            user_id: 202,
+            status: 'checked_in',
+            method: 'coordinator_manual',
+            checkin_at: '2026-11-20T10:00:00Z',
+            recorded_by_user_id: 99,
+            already_checked_in: false,
+          },
         });
 
       // Load roster to populate attendanceCache

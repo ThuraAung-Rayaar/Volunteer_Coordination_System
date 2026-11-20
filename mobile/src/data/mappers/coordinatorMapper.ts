@@ -7,10 +7,14 @@ import type {
   CoordinatorApplicationDto,
   CoordinatorAssignmentDto,
   CoordinatorEventListItemDto,
+  CoordinatorHistoryItemDto,
   EventCreateRequestDto,
+  EventPostCapacityDto,
   EventSummaryViewDto,
   ManualAssignResultDto,
 } from '../dto/coordinatorDto';
+import type { GeoAttemptReviewDto } from '../dto/checkinDto';
+import type { UserUuidLookupDto } from '../dto/profileDto';
 import type {
   AttendanceRecordStatus,
   CheckInMethod,
@@ -21,9 +25,13 @@ import type {
   CoordinatorAttendanceItem,
   CoordinatorEventStatus,
   CoordinatorEventSummary,
+  CoordinatorHistoryItem,
   CreateEventWizardDraft,
+  EventPostCapacity,
   EventPurposeType,
+  GeoAttemptReview,
   VolunteerT2Capabilities,
+  VolunteerUuidLookup,
 } from '../../domain/models/coordinator';
 import type { CharityCategoryCode } from '../../domain/models/event';
 
@@ -305,5 +313,94 @@ export function mapAttendanceRosterItem(
     checkedInAt: dto.checkin_at ?? undefined,
     isPendingGeoConfirmation,
     geoAttempt,
+  };
+}
+
+/**
+ * Maps CoordinatorHistoryItemDto to domain CoordinatorHistoryItem (C-18 / P1-05).
+ */
+export function mapCoordinatorHistoryItem(
+  dto: CoordinatorHistoryItemDto,
+): CoordinatorHistoryItem {
+  return {
+    id: String(dto.id),
+    eventId: String(dto.event_id),
+    eventTitle: dto.event_title,
+    changeType: dto.change_type,
+    previousCoordinatorId:
+      dto.previous_coordinator_id != null
+        ? String(dto.previous_coordinator_id)
+        : null,
+    previousCoordinatorName: dto.previous_coordinator_name,
+    newCoordinatorId: String(dto.new_coordinator_id),
+    newCoordinatorName: dto.new_coordinator_name,
+    changedById: String(dto.changed_by_id),
+    changedByName: dto.changed_by_name,
+    reason: dto.reason,
+    changedAt: dto.changed_at,
+  };
+}
+
+/**
+ * Maps EventPostCapacityDto to domain EventPostCapacity (C-28 / P1-05).
+ */
+export function mapEventPostCapacity(
+  dto: EventPostCapacityDto,
+): EventPostCapacity {
+  return {
+    postId: String(dto.post_id),
+    title: dto.title,
+    status: dto.status,
+    requiredHeadcount: dto.required_headcount,
+    assignedCount: dto.assigned_count,
+    remainingCapacity: dto.remaining,
+  };
+}
+
+/**
+ * Maps UserUuidLookupDto to domain VolunteerUuidLookup (V-18 / C-29 / P1-05).
+ */
+export function mapVolunteerUuidLookup(
+  dto: UserUuidLookupDto,
+): VolunteerUuidLookup {
+  return {
+    userId: dto.user_id != null ? String(dto.user_id) : undefined,
+    uuid: dto.uuid,
+    displayName: dto.display_name,
+    display_name: dto.display_name,
+    skills: dto.skills ? [...dto.skills] : [],
+    physicalOk: dto.physical_ok,
+    goodEyesight: dto.good_eyesight,
+    needsGlasses: dto.needs_glasses,
+    canLiftHeavy: dto.can_lift_heavy,
+    canWorkOutdoor: dto.can_work_outdoor,
+    hasLeaderExperience: dto.has_leader_experience,
+    newToVolunteer: dto.new_to_volunteer,
+    preferredLanguage: dto.preferred_language,
+    homeArea: dto.home_area,
+    needsMealSupport: dto.needs_meal_support,
+    needsTravelSupport: dto.needs_travel_support,
+    acceptsUnpaid: dto.accepts_unpaid,
+    verificationStatus: dto.verification_status,
+  };
+}
+
+/**
+ * Maps GeoAttemptReviewDto to domain GeoAttemptReview (C-35 / P1-05).
+ */
+export function mapGeoAttemptReview(
+  dto: GeoAttemptReviewDto,
+): GeoAttemptReview {
+  return {
+    attemptId: String(dto.attempt_id),
+    eventId: String(dto.event_id),
+    userId: String(dto.user_id),
+    displayName: dto.display_name,
+    attemptedAt: dto.attempted_at,
+    distanceMeters: dto.distance_m,
+    effectiveRadiusMeters: dto.effective_radius_m,
+    accuracyMeters: dto.accuracy_m,
+    isMocked: dto.is_mocked,
+    resultCode: dto.result_code,
   };
 }

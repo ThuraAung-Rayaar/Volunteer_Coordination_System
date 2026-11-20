@@ -29,7 +29,10 @@ import {
 } from './configuration/dataMode';
 import { sessionManager } from '../core/auth/sessionManager';
 import { authApi } from '../data/endpoints/authApi';
-import type { OtpDeliveryDto } from '../data/dto/authDto';
+import type {
+  OtpDeliveryDto,
+  TokenizedOtpDeliveryDto,
+} from '../data/dto/authDto';
 import { profileApi } from '../data/endpoints/profileApi';
 import { resetDiscoveryCache } from '../features/events/screens/EventDiscoveryScreen';
 import { resetApplicationsCache } from '../features/events/screens/MyApplicationsScreen';
@@ -37,17 +40,45 @@ import { resetAssignmentsCache } from '../features/events/screens/MyAssignmentsS
 
 export type UserPreset = 'volunteer' | 'coordinator' | 'pending';
 
+/**
+ * Ephemeral OTP challenge state held strictly in React memory.
+ * Never persisted to AsyncStorage or hardware Keystore/Keychain.
+ */
+export interface EphemeralChallengeState {
+  authSessionToken: string;
+  expiresIn: number;
+  expiresAt: number;
+  codeLength: number;
+  delivery: TokenizedOtpDeliveryDto | OtpDeliveryDto;
+  devCode?: string | null;
+  phone?: string;
+}
+
 export interface RequestOtpResult {
   success: boolean;
   status?: string;
-  delivery?: OtpDeliveryDto;
-  devCode?: string;
+  authSessionToken?: string;
+  expiresIn?: number;
+  codeLength?: number;
+  delivery?: TokenizedOtpDeliveryDto | OtpDeliveryDto;
+  devCode?: string | null;
   error?: string;
 }
 
 export interface VerifyOtpResult {
   success: boolean;
   error?: string;
+}
+
+export interface RequestTokenizedOtpParams {
+  phone?: string;
+  identityToken?: string;
+  purpose?: 'login' | 'qr_registration';
+}
+
+export interface VerifyTokenizedOtpParams {
+  code: string;
+  displayName?: string;
 }
 
 export interface UserContextValue {
@@ -57,6 +88,8 @@ export interface UserContextValue {
   switchUserPreset: (preset: UserPreset) => void;
   isAuthenticated?: boolean;
   isBootstrapping?: boolean;
+  challenge?: EphemeralChallengeState | null;
+  clearChallenge?: () => void;
   requestOtp?: (
     phone: string,
     purpose?: 'login' | 'qr_registration',
@@ -66,6 +99,12 @@ export interface UserContextValue {
     code: string,
     displayName?: string,
   ) => Promise<VerifyOtpResult>;
+  requestTokenizedOtp?: (
+    params: RequestTokenizedOtpParams,
+  ) => Promise<RequestOtpResult>;
+  verifyTokenizedOtp?: (
+    params: VerifyTokenizedOtpParams,
+  ) => Promise<VerifyOtpResult>;
   logout?: () => Promise<void>;
   refreshSessionUser?: () => Promise<void>;
 }
@@ -73,6 +112,8 @@ export interface UserContextValue {
 export interface FullUserContextValue extends UserContextValue {
   isAuthenticated: boolean;
   isBootstrapping: boolean;
+  challenge?: EphemeralChallengeState | null;
+  clearChallenge?: () => void;
   requestOtp: (
     phone: string,
     purpose?: 'login' | 'qr_registration',
@@ -81,6 +122,12 @@ export interface FullUserContextValue extends UserContextValue {
     phone: string,
     code: string,
     displayName?: string,
+  ) => Promise<VerifyOtpResult>;
+  requestTokenizedOtp?: (
+    params: RequestTokenizedOtpParams,
+  ) => Promise<RequestOtpResult>;
+  verifyTokenizedOtp?: (
+    params: VerifyTokenizedOtpParams,
   ) => Promise<VerifyOtpResult>;
   logout: () => Promise<void>;
   refreshSessionUser: () => Promise<void>;
@@ -114,6 +161,9 @@ export function UserProvider({
     () => getDataMode() === 'http',
   );
 
+  // Ephemeral challenge state held strictly in memory, isolated from persisted DRF token
+  const [challenge, setChallenge] = useState<EphemeralChallengeState | null>(null);
+
   // Sync with global dataMode changes
   useEffect(() => {
     const unsubscribe = addDataModeListener(newMode => {
@@ -121,6 +171,7 @@ export function UserProvider({
       if (newMode === 'mock') {
         setIsAuthenticated(true);
         setIsBootstrapping(false);
+        setChallenge(null);
       }
     });
     return unsubscribe;
@@ -143,6 +194,7 @@ export function UserProvider({
       resetDiscoveryCache();
       resetApplicationsCache();
       resetAssignmentsCache();
+      setChallenge(null);
       if (getDataMode() === 'http') {
         setIsAuthenticated(false);
       }
@@ -150,7 +202,38 @@ export function UserProvider({
     return unsubscribe;
   }, []);
 
+  /**
+   * Refreshes active user identity.
+   * PHASE 6 / API-01: Uses single-roundtrip GET /api/v1/me/bootstrap/ as primary.
+   * P1-01 / MAP-01: Removes phone-to-email fallback (email is null/undefined if absent).
+   */
   const refreshSessionUser = useCallback(async () => {
+    // Attempt single-roundtrip bootstrap first (Phase 3/6 canonical route)
+    const bootRes = await authApi.getBootstrap();
+    if (bootRes.ok) {
+      const user = bootRes.data.user;
+      const coord = bootRes.data.coordinator;
+      const snapshot: UserProfileSnapshot = {
+        id: String(user.id),
+        displayName: user.display_name,
+        phone: user.phone ?? null,
+        // P1-01 / MAP-01: Absent email remains null/undefined (NO phone fallback)
+        email: user.email ?? undefined,
+        coordinatorStatus: (coord.status as CoordinatorStatus) || 'none',
+        accountStatus: (user.account_status as UserAccountStatus) || 'active',
+      };
+
+      setCurrentUser(snapshot);
+      setIsAuthenticated(true);
+      return;
+    }
+
+    if (bootRes.status === 401) {
+      setIsAuthenticated(false);
+      return;
+    }
+
+    // Graceful fallback to legacy profile endpoints in test environments without bootstrap mock
     const [meRes, coordRes] = await Promise.all([
       profileApi.getProfile(),
       profileApi.getCoordinatorProfile(),
@@ -174,7 +257,8 @@ export function UserProvider({
       id: String(meRes.data.id),
       displayName: meRes.data.display_name,
       phone: meRes.data.phone ?? null,
-      email: meRes.data.phone || 'volunteer@example.com',
+      // P1-01 / MAP-01: Absent email remains null/undefined (NO phone fallback)
+      email: (meRes.data as { email?: string | null }).email ?? undefined,
       coordinatorStatus: coordStatus,
       accountStatus: acctStatus,
     };
@@ -222,21 +306,53 @@ export function UserProvider({
     };
   }, [dataMode, refreshSessionUser]);
 
-  const requestOtp = useCallback(
-    async (
-      phone: string,
-      purpose: 'login' | 'qr_registration' = 'login',
-    ): Promise<RequestOtpResult> => {
-      const res = await authApi.requestOtp({ phone, purpose });
+  /**
+   * Clears the ephemeral OTP challenge state.
+   */
+  const clearChallenge = useCallback(() => {
+    setChallenge(null);
+  }, []);
+
+  /**
+   * Requests a tokenized challenge OTP code (POST /api/v1/auth/tokenized/request-otp/).
+   * Holds the returned challenge token ephemerally in memory.
+   */
+  const requestTokenizedOtp = useCallback(
+    async (params: RequestTokenizedOtpParams): Promise<RequestOtpResult> => {
+      // Clear any prior challenge on new phone, resend, or retry
+      setChallenge(null);
+
+      const res = await authApi.requestTokenizedOtp({
+        phone: params.phone,
+        identity_token: params.identityToken,
+        purpose: params.purpose || 'login',
+      });
+
       if (!res.ok) {
         return {
           success: false,
           error: res.error.message,
         };
       }
+
+      const challengeData: EphemeralChallengeState = {
+        authSessionToken: res.data.auth_session_token,
+        expiresIn: res.data.expires_in,
+        expiresAt: Date.now() + res.data.expires_in * 1000,
+        codeLength: res.data.code_length,
+        delivery: res.data.delivery,
+        devCode: res.data.dev_code,
+        phone: params.phone,
+      };
+
+      setChallenge(challengeData);
+
       return {
         success: true,
         status: res.data.status,
+        authSessionToken: res.data.auth_session_token,
+        expiresIn: res.data.expires_in,
+        codeLength: res.data.code_length,
         delivery: res.data.delivery,
         devCode: res.data.dev_code,
       };
@@ -244,12 +360,148 @@ export function UserProvider({
     [],
   );
 
+  /**
+   * Verifies an OTP code using the active ephemeral challenge token.
+   * STRICT ARCHITECTURAL INVARIANT: Does NOT send phone over the wire.
+   * Persists the DRF token to sessionManager ONLY after verification succeeds.
+   */
+  const verifyTokenizedOtp = useCallback(
+    async (params: VerifyTokenizedOtpParams): Promise<VerifyOtpResult> => {
+      if (!challenge || !challenge.authSessionToken) {
+        return {
+          success: false,
+          error: 'No active OTP challenge found. Please request a new code.',
+        };
+      }
+
+      if (Date.now() > challenge.expiresAt) {
+        setChallenge(null);
+        return {
+          success: false,
+          error: 'Challenge expired. Please request a new code.',
+        };
+      }
+
+      const res = await authApi.verifyTokenizedOtp({
+        auth_session_token: challenge.authSessionToken,
+        code: params.code.trim(),
+        display_name: params.displayName?.trim(),
+      });
+
+      if (!res.ok) {
+        if (
+          res.status === 409 ||
+          ('code' in res.error &&
+            (res.error.code === 'challenge_consumed' ||
+              res.error.code === 'challenge_expired'))
+        ) {
+          setChallenge(null);
+        }
+        return {
+          success: false,
+          error: res.error.message,
+        };
+      }
+
+      // Persist DRF token ONLY after successful verification
+      await sessionManager.setToken(res.data.token);
+
+      // Challenge is consumed — clear ephemeral challenge state
+      const savedPhone = challenge.phone;
+      setChallenge(null);
+
+      // Bootstrap session via single round-trip
+      try {
+        await refreshSessionUser();
+      } catch {
+        // Fallback minimal snapshot if network fails during bootstrap
+        const snapshot: UserProfileSnapshot = {
+          id: String(res.data.user.id),
+          displayName: res.data.user.display_name,
+          phone: savedPhone ?? null,
+          email: undefined, // P1-01 / MAP-01: NO phone fallback!
+          coordinatorStatus: 'none',
+          accountStatus: 'active',
+        };
+        setCurrentUser(snapshot);
+        setIsAuthenticated(true);
+      }
+
+      return {
+        success: true,
+      };
+    },
+    [challenge, refreshSessionUser],
+  );
+
+  /**
+   * Request OTP code. Dispatches tokenized challenge if available, falling back to legacy.
+   */
+  const requestOtp = useCallback(
+    async (
+      phone: string,
+      purpose: 'login' | 'qr_registration' = 'login',
+    ): Promise<RequestOtpResult> => {
+      setChallenge(null);
+
+      // Attempt canonical tokenized request
+      const res = await authApi.requestTokenizedOtp({ phone, purpose });
+      if (res.ok) {
+        const challengeData: EphemeralChallengeState = {
+          authSessionToken: res.data.auth_session_token,
+          expiresIn: res.data.expires_in,
+          expiresAt: Date.now() + res.data.expires_in * 1000,
+          codeLength: res.data.code_length,
+          delivery: res.data.delivery,
+          devCode: res.data.dev_code,
+          phone,
+        };
+        setChallenge(challengeData);
+        return {
+          success: true,
+          status: res.data.status,
+          authSessionToken: res.data.auth_session_token,
+          expiresIn: res.data.expires_in,
+          codeLength: res.data.code_length,
+          delivery: res.data.delivery,
+          devCode: res.data.dev_code,
+        };
+      }
+
+      // Fallback to legacy requestOtp (e.g. In mock mode or legacy unit test)
+      const legacyRes = await authApi.requestOtp({ phone, purpose });
+      if (!legacyRes.ok) {
+        return {
+          success: false,
+          error: legacyRes.error.message,
+        };
+      }
+      return {
+        success: true,
+        status: legacyRes.data.status,
+        delivery: legacyRes.data.delivery,
+        devCode: legacyRes.data.dev_code,
+      };
+    },
+    [],
+  );
+
+  /**
+   * Verify OTP code. Dispatches tokenized challenge verification if challenge is active,
+   * otherwise falls back to legacy verify endpoint.
+   */
   const verifyOtp = useCallback(
     async (
       phone: string,
       code: string,
       displayName?: string,
     ): Promise<VerifyOtpResult> => {
+      // If we hold an active tokenized challenge, use verifyTokenizedOtp (NO phone sent!)
+      if (challenge && challenge.authSessionToken) {
+        return verifyTokenizedOtp({ code, displayName });
+      }
+
+      // Legacy fallback
       const res = await authApi.verifyOtp({
         phone,
         code,
@@ -265,16 +517,16 @@ export function UserProvider({
       }
 
       await sessionManager.setToken(res.data.token);
+      setChallenge(null);
 
       try {
         await refreshSessionUser();
       } catch {
-        // Fallback to minimal snapshot from verify response if profile call fails
         const snapshot: UserProfileSnapshot = {
           id: String(res.data.user.id),
           displayName: res.data.user.display_name,
           phone: phone,
-          email: phone,
+          email: undefined, // P1-01 / MAP-01: NO phone fallback!
           coordinatorStatus: 'none',
           accountStatus: 'active',
         };
@@ -286,13 +538,14 @@ export function UserProvider({
         success: true,
       };
     },
-    [refreshSessionUser],
+    [challenge, verifyTokenizedOtp, refreshSessionUser],
   );
 
   const logout = useCallback(async (): Promise<void> => {
     resetDiscoveryCache();
     resetApplicationsCache();
     resetAssignmentsCache();
+    setChallenge(null);
     if (getDataMode() === 'http') {
       try {
         await authApi.logout();
@@ -332,8 +585,12 @@ export function UserProvider({
       switchUserPreset,
       isAuthenticated,
       isBootstrapping,
+      challenge,
+      clearChallenge,
       requestOtp,
       verifyOtp,
+      requestTokenizedOtp,
+      verifyTokenizedOtp,
       logout,
       refreshSessionUser,
     }),
@@ -343,8 +600,12 @@ export function UserProvider({
       switchUserPreset,
       isAuthenticated,
       isBootstrapping,
+      challenge,
+      clearChallenge,
       requestOtp,
       verifyOtp,
+      requestTokenizedOtp,
+      verifyTokenizedOtp,
       logout,
       refreshSessionUser,
     ],
@@ -362,8 +623,12 @@ const fallbackUserContext: FullUserContextValue = {
   switchUserPreset: () => {},
   isAuthenticated: true,
   isBootstrapping: false,
+  challenge: null,
+  clearChallenge: () => {},
   requestOtp: async () => ({ success: true }),
   verifyOtp: async () => ({ success: true }),
+  requestTokenizedOtp: async () => ({ success: true }),
+  verifyTokenizedOtp: async () => ({ success: true }),
   logout: async () => {},
   refreshSessionUser: async () => {},
 };

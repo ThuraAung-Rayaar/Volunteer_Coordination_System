@@ -129,6 +129,29 @@ describe('Phase 4: Authentication & Session Integration', () => {
       status: 200,
       data: { coordinator: null },
     });
+    jest.spyOn(authApi, 'getBootstrap').mockResolvedValue({
+      ok: true,
+      status: 200,
+      data: {
+        user: {
+          id: mockProfileDto.id,
+          uuid: mockProfileDto.uuid,
+          display_name: mockProfileDto.display_name,
+          phone: mockProfileDto.phone,
+          email: null,
+          account_status: mockProfileDto.account_status,
+          verification_status: mockProfileDto.verification_status,
+        },
+        coordinator: {
+          status: 'approved',
+          can_access_workspace: true,
+        },
+        capabilities: {
+          volunteer: true,
+          coordinator: true,
+        },
+      },
+    });
   });
 
   afterEach(async () => {
@@ -522,6 +545,30 @@ describe('Phase 4: Authentication & Session Integration', () => {
         },
       });
 
+      jest.spyOn(authApi, 'getBootstrap').mockResolvedValue({
+        ok: true,
+        status: 200,
+        data: {
+          user: {
+            id: 42,
+            uuid: 'uuid-42',
+            display_name: 'Fresh Volunteer',
+            phone: '+95912345678',
+            email: null,
+            account_status: 'active',
+            verification_status: 'approved',
+          },
+          coordinator: {
+            status: 'none',
+            can_access_workspace: false,
+          },
+          capabilities: {
+            volunteer: true,
+            coordinator: false,
+          },
+        },
+      });
+
       jest.spyOn(profileApi, 'getProfile').mockResolvedValue({
         ok: true,
         status: 200,
@@ -645,7 +692,13 @@ describe('Phase 4: Authentication & Session Integration', () => {
       // Non-401 errors must never call sessionManager.handleUnauthorized
       const unauthSpy = jest.spyOn(sessionManager, 'handleUnauthorized');
 
-      // Simulate a network failure in profileApi
+      // Simulate a network failure in authApi.getBootstrap
+      jest.spyOn(authApi, 'getBootstrap').mockResolvedValue({
+        ok: false,
+        status: 0,
+        error: { kind: 'network', retryable: true, message: 'Network offline' },
+      });
+
       jest.spyOn(profileApi, 'getProfile').mockResolvedValue({
         ok: false,
         status: 0,

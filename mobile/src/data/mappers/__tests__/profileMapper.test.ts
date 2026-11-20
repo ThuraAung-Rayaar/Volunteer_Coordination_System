@@ -96,8 +96,9 @@ describe('profileMapper', () => {
       );
 
       expect(profile.id).toBe('201');
-      // Preserves phone under email property for UI backward compatibility
-      expect(profile.email).toBe('+95912345678');
+      // P1-01 / MAP-01: phone maps strictly to phone; absent email is undefined
+      expect(profile.phone).toBe('+95912345678');
+      expect(profile.email).toBeUndefined();
       expect(profile.displayName).toBe('Ko Thura');
       expect(profile.preferredLanguage).toBe('my');
       expect(profile.homeArea).toBe('Kamayut, Yangon');

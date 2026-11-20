@@ -1,0 +1,2250 @@
+================================================================================
+LIVE LOCAL DATABASE FULL REPORT: volunteer_coordination_db
+================================================================================
+
+Database: volunteer_coordination_db
+Connected User: postgres
+Engine Version: PostgreSQL 18.6 on x86_64-windows, compiled by msvc-19.44.35229, 64-bit
+
+--------------------------------------------------------------------------------
+1. ALL DATABASES ON LOCAL POSTGRESQL INSTANCE
+--------------------------------------------------------------------------------
+Database Name                       | Size         | Encoding
+-----------------------------------------------------------------
+USER                                | 8086 kB      | UTF8
+demo_db                             | 2642 MB      | UTF8
+inventory                           | 9446 kB      | UTF8
+knovira_dev                         | 63 MB        | UTF8
+postgres                            | 8014 kB      | UTF8
+template0                           | 7857 kB      | UTF8
+template1                           | 8086 kB      | UTF8
+test_test_volunteer_coordination_db | 8065 kB      | UTF8
+volunteer_coordination_db           | 14 MB        | UTF8
+
+--------------------------------------------------------------------------------
+2. ALL TABLES IN DATABASE (WITH LIVE ROW COUNTS & DISK SIZES)
+--------------------------------------------------------------------------------
+Table Name                               | Live Rows    | Total Disk Size
+---------------------------------------------------------------------------
+app_settings                             | 0            | 32 kB
+assignments                              | 35           | 200 kB
+attendance                               | 35           | 128 kB
+attendance_geo_attempts                  | 0            | 64 kB
+audit_logs                               | 1356         | 968 kB
+auth_group                               | 0            | 24 kB
+auth_group_permissions                   | 0            | 32 kB
+auth_otp                                 | 84           | 120 kB
+auth_otp_challenge                       | 81           | 120 kB
+auth_permission                          | 0            | 88 kB
+authtoken_token                          | 192          | 144 kB
+charity_fields                           | 0            | 32 kB
+coordinator_profiles                     | 68           | 96 kB
+django_admin_log                         | 0            | 32 kB
+django_content_type                      | 0            | 40 kB
+django_migrations                        | 0            | 32 kB
+django_session                           | 0            | 64 kB
+event_applications                       | 35           | 160 kB
+event_charity_fields                     | 0            | 80 kB
+event_coordinator_history                | 18           | 48 kB
+event_posts                              | 40           | 160 kB
+events                                   | 35           | 144 kB
+feedback                                 | 0            | 136 kB
+moderation_actions                       | 0            | 80 kB
+onboarding_acknowledgments               | 35           | 64 kB
+qr_tokens                                | 0            | 80 kB
+user_charity_interests                   | 0            | 80 kB
+user_verification_images                 | 0            | 144 kB
+users                                    | 233          | 328 kB
+volunteer_availability_exceptions        | 0            | 32 kB
+volunteer_availability_rules             | 0            | 112 kB
+
+--------------------------------------------------------------------------------
+3. FULL TABLE COLUMN DEFINITIONS
+--------------------------------------------------------------------------------
+
+[TABLE: app_settings]
+  Column                           | Type                       | Nullable | Default
+  -------------------------------------------------------------------------------------
+  key                              | text                       | NO       | 
+  value_int                        | integer                    | NO       | 
+  description                      | text                       | YES      | 
+
+[TABLE: assignments]
+  Column                           | Type                       | Nullable | Default
+  -------------------------------------------------------------------------------------
+  id                               | bigint                     | NO       | 
+  event_id                         | bigint                     | NO       | 
+  application_id                   | bigint                     | NO       | 
+  user_id                          | bigint                     | NO       | 
+  post_id                          | bigint                     | YES      | 
+  group_code                       | text                       | YES      | 
+  is_group_leader                  | boolean                    | NO       | false
+  status                           | text                       | NO       | 'assigned'::text
+  assigned_by                      | text                       | NO       | 'auto'::text
+  assigned_by_user_id              | bigint                     | YES      | 
+  schedule_start                   | timestamp with time zone   | NO       | 
+  schedule_end                     | timestamp with time zone   | NO       | 
+  confirmed_at                     | timestamp with time zone   | YES      | 
+  cancelled_at                     | timestamp with time zone   | YES      | 
+  cancel_reason                    | text                       | YES      | 
+  conditions_snapshot              | jsonb                      | YES      | 
+  created_at                       | timestamp with time zone   | NO       | now()
+  updated_at                       | timestamp with time zone   | NO       | now()
+
+[TABLE: attendance]
+  Column                           | Type                       | Nullable | Default
+  -------------------------------------------------------------------------------------
+  id                               | bigint                     | NO       | 
+  event_id                         | bigint                     | NO       | 
+  user_id                          | bigint                     | NO       | 
+  assignment_id                    | bigint                     | NO       | 
+  qr_token_id                      | bigint                     | YES      | 
+  status                           | text                       | NO       | 'expected'::text
+  checkin_at                       | timestamp with time zone   | YES      | 
+  checkout_at                      | timestamp with time zone   | YES      | 
+  method                           | text                       | YES      | 
+  recorded_by_user_id              | bigint                     | YES      | 
+  walk_in_flag                     | boolean                    | NO       | false
+  note                             | text                       | YES      | 
+  checkin_latitude                 | numeric                    | YES      | 
+  checkin_longitude                | numeric                    | YES      | 
+  checkin_accuracy_m               | numeric                    | YES      | 
+  checkin_distance_m               | numeric                    | YES      | 
+  geo_verified                     | boolean                    | NO       | false
+  confirmation_status              | text                       | NO       | 'not_required'::text
+  confirmed_by_user_id             | bigint                     | YES      | 
+  confirmed_at                     | timestamp with time zone   | YES      | 
+  confirmation_note                | text                       | YES      | 
+  created_at                       | timestamp with time zone   | NO       | now()
+  updated_at                       | timestamp with time zone   | NO       | now()
+
+[TABLE: attendance_geo_attempts]
+  Column                           | Type                       | Nullable | Default
+  -------------------------------------------------------------------------------------
+  id                               | bigint                     | NO       | 
+  event_id                         | bigint                     | NO       | 
+  user_id                          | bigint                     | NO       | 
+  attendance_id                    | bigint                     | YES      | 
+  attempted_at                     | timestamp with time zone   | NO       | now()
+  latitude                         | numeric                    | YES      | 
+  longitude                        | numeric                    | YES      | 
+  accuracy_m                       | numeric                    | YES      | 
+  captured_at                      | timestamp with time zone   | YES      | 
+  device_mocked                    | boolean                    | NO       | false
+  distance_m                       | numeric                    | YES      | 
+  radius_m                         | integer                    | YES      | 
+  result                           | text                       | NO       | 
+  review_status                    | text                       | NO       | 'none'::text
+  reviewed_by_user_id              | bigint                     | YES      | 
+  reviewed_at                      | timestamp with time zone   | YES      | 
+  review_note                      | text                       | YES      | 
+
+[TABLE: audit_logs]
+  Column                           | Type                       | Nullable | Default
+  -------------------------------------------------------------------------------------
+  id                               | bigint                     | NO       | 
+  actor_user_id                    | bigint                     | YES      | 
+  action                           | text                       | NO       | 
+  entity_type                      | text                       | NO       | 
+  entity_id                        | bigint                     | YES      | 
+  before_data                      | jsonb                      | YES      | 
+  after_data                       | jsonb                      | YES      | 
+  ip_address                       | inet                       | YES      | 
+  created_at                       | timestamp with time zone   | NO       | now()
+
+[TABLE: auth_group]
+  Column                           | Type                       | Nullable | Default
+  -------------------------------------------------------------------------------------
+  id                               | integer                    | NO       | 
+  name                             | character varying          | NO       | 
+
+[TABLE: auth_group_permissions]
+  Column                           | Type                       | Nullable | Default
+  -------------------------------------------------------------------------------------
+  id                               | bigint                     | NO       | 
+  group_id                         | integer                    | NO       | 
+  permission_id                    | integer                    | NO       | 
+
+[TABLE: auth_otp]
+  Column                           | Type                       | Nullable | Default
+  -------------------------------------------------------------------------------------
+  id                               | bigint                     | NO       | 
+  phone_hash                       | text                       | NO       | 
+  code_hash                        | text                       | NO       | 
+  purpose                          | text                       | NO       | 'login'::text
+  attempt_count                    | integer                    | NO       | 0
+  expires_at                       | timestamp with time zone   | NO       | 
+  consumed_at                      | timestamp with time zone   | YES      | 
+  created_at                       | timestamp with time zone   | NO       | now()
+
+[TABLE: auth_otp_challenge]
+  Column                           | Type                       | Nullable | Default
+  -------------------------------------------------------------------------------------
+  id                               | bigint                     | NO       | 
+  otp_id                           | bigint                     | NO       | 
+  challenge_token_hash             | text                       | NO       | 
+  purpose                          | text                       | NO       | 'login'::text
+  created_at                       | timestamp with time zone   | NO       | now()
+  expires_at                       | timestamp with time zone   | NO       | 
+  consumed_at                      | timestamp with time zone   | YES      | 
+  request_id                       | text                       | YES      | 
+  identity_nonce_hash              | text                       | YES      | 
+
+[TABLE: auth_permission]
+  Column                           | Type                       | Nullable | Default
+  -------------------------------------------------------------------------------------
+  id                               | integer                    | NO       | 
+  name                             | character varying          | NO       | 
+  content_type_id                  | integer                    | NO       | 
+  codename                         | character varying          | NO       | 
+
+[TABLE: authtoken_token]
+  Column                           | Type                       | Nullable | Default
+  -------------------------------------------------------------------------------------
+  key                              | character varying          | NO       | 
+  created                          | timestamp with time zone   | NO       | 
+  user_id                          | bigint                     | NO       | 
+
+[TABLE: charity_fields]
+  Column                           | Type                       | Nullable | Default
+  -------------------------------------------------------------------------------------
+  code                             | text                       | NO       | 
+  label                            | text                       | NO       | 
+  active                           | boolean                    | NO       | true
+  sort_order                       | integer                    | NO       | 100
+
+[TABLE: coordinator_profiles]
+  Column                           | Type                       | Nullable | Default
+  -------------------------------------------------------------------------------------
+  user_id                          | bigint                     | NO       | 
+  status                           | text                       | NO       | 'pending'::text
+  approved_by_id                   | bigint                     | YES      | 
+  approved_at                      | timestamp with time zone   | YES      | 
+  notes                            | text                       | YES      | 
+  created_at                       | timestamp with time zone   | NO       | now()
+  updated_at                       | timestamp with time zone   | NO       | now()
+
+[TABLE: django_admin_log]
+  Column                           | Type                       | Nullable | Default
+  -------------------------------------------------------------------------------------
+  id                               | integer                    | NO       | 
+  action_time                      | timestamp with time zone   | NO       | 
+  object_id                        | text                       | YES      | 
+  object_repr                      | character varying          | NO       | 
+  action_flag                      | smallint                   | NO       | 
+  change_message                   | text                       | NO       | 
+  content_type_id                  | integer                    | YES      | 
+  user_id                          | bigint                     | NO       | 
+
+[TABLE: django_content_type]
+  Column                           | Type                       | Nullable | Default
+  -------------------------------------------------------------------------------------
+  id                               | integer                    | NO       | 
+  app_label                        | character varying          | NO       | 
+  model                            | character varying          | NO       | 
+
+[TABLE: django_migrations]
+  Column                           | Type                       | Nullable | Default
+  -------------------------------------------------------------------------------------
+  id                               | bigint                     | NO       | 
+  app                              | character varying          | NO       | 
+  name                             | character varying          | NO       | 
+  applied                          | timestamp with time zone   | NO       | 
+
+[TABLE: django_session]
+  Column                           | Type                       | Nullable | Default
+  -------------------------------------------------------------------------------------
+  session_key                      | character varying          | NO       | 
+  session_data                     | text                       | NO       | 
+  expire_date                      | timestamp with time zone   | NO       | 
+
+[TABLE: event_applications]
+  Column                           | Type                       | Nullable | Default
+  -------------------------------------------------------------------------------------
+  id                               | bigint                     | NO       | 
+  event_id                         | bigint                     | NO       | 
+  post_id                          | bigint                     | YES      | 
+  user_id                          | bigint                     | NO       | 
+  qr_token_id                      | bigint                     | YES      | 
+  source                           | text                       | NO       | 'browse'::text
+  status                           | text                       | NO       | 'pending'::text
+  applied_at                       | timestamp with time zone   | NO       | now()
+  decided_by_id                    | bigint                     | YES      | 
+  decided_at                       | timestamp with time zone   | YES      | 
+  conditions_acknowledged_at       | timestamp with time zone   | YES      | 
+  conditions_snapshot              | jsonb                      | YES      | 
+  note                             | text                       | YES      | 
+  created_at                       | timestamp with time zone   | NO       | now()
+  updated_at                       | timestamp with time zone   | NO       | now()
+
+[TABLE: event_charity_fields]
+  Column                           | Type                       | Nullable | Default
+  -------------------------------------------------------------------------------------
+  id                               | bigint                     | NO       | 
+  event_id                         | bigint                     | NO       | 
+  field_code                       | text                       | NO       | 
+
+[TABLE: event_coordinator_history]
+  Column                           | Type                       | Nullable | Default
+  -------------------------------------------------------------------------------------
+  id                               | bigint                     | NO       | 
+  event_id                         | bigint                     | NO       | 
+  from_coordinator_id              | bigint                     | YES      | 
+  to_coordinator_id                | bigint                     | NO       | 
+  changed_by_user_id               | bigint                     | YES      | 
+  reason                           | text                       | YES      | 
+  changed_at                       | timestamp with time zone   | NO       | now()
+
+[TABLE: event_posts]
+  Column                           | Type                       | Nullable | Default
+  -------------------------------------------------------------------------------------
+  id                               | bigint                     | NO       | 
+  event_id                         | bigint                     | NO       | 
+  title                            | text                       | NO       | 
+  description                      | text                       | YES      | 
+  required_headcount               | integer                    | NO       | 
+  physical_level                   | text                       | NO       | 'none'::text
+  required_skills                  | ARRAY                      | NO       | '{}'::text[]
+  leader_needed                    | boolean                    | NO       | false
+  new_volunteers_allowed           | boolean                    | NO       | true
+  priority                         | integer                    | NO       | 100
+  status                           | text                       | NO       | 'open'::text
+  created_at                       | timestamp with time zone   | NO       | now()
+  updated_at                       | timestamp with time zone   | NO       | now()
+
+[TABLE: events]
+  Column                           | Type                       | Nullable | Default
+  -------------------------------------------------------------------------------------
+  id                               | bigint                     | NO       | 
+  owner_id                         | bigint                     | NO       | 
+  current_coordinator_id           | bigint                     | NO       | 
+  title                            | text                       | NO       | 
+  description                      | text                       | YES      | 
+  purpose_type                     | text                       | NO       | 'charity_event'::text
+  location_name                    | text                       | YES      | 
+  landmark_text                    | text                       | YES      | 
+  latitude                         | numeric                    | YES      | 
+  longitude                        | numeric                    | YES      | 
+  geo_radius_m                     | integer                    | YES      | 
+  geo_checkin_enabled              | boolean                    | NO       | false
+  geo_checkin_opens_before_min     | integer                    | NO       | 30
+  require_checkin_confirmation     | boolean                    | NO       | true
+  map_provider                     | text                       | NO       | 'openstreetmap'::text
+  start_at                         | timestamp with time zone   | NO       | 
+  end_at                           | timestamp with time zone   | NO       | 
+  application_deadline             | timestamp with time zone   | YES      | 
+  status                           | text                       | NO       | 'draft'::text
+  acceptance_mode                  | text                       | NO       | 'manual'::text
+  auto_assign_enabled              | boolean                    | NO       | true
+  group_size                       | integer                    | YES      | 
+  leader_strategy                  | text                       | NO       | 'none'::text
+  max_participants                 | integer                    | YES      | 
+  meals_provided                   | boolean                    | NO       | false
+  lodging_provided                 | boolean                    | NO       | false
+  travel_support_provided          | boolean                    | NO       | false
+  compensation_kind                | text                       | NO       | 'unpaid'::text
+  compensation_note                | text                       | YES      | 
+  onboarding_text                  | text                       | YES      | 
+  onboarding_version               | integer                    | NO       | 1
+  require_onboarding_ack           | boolean                    | NO       | true
+  qr_registration_enabled          | boolean                    | NO       | true
+  published_at                     | timestamp with time zone   | YES      | 
+  activated_at                     | timestamp with time zone   | YES      | 
+  completed_at                     | timestamp with time zone   | YES      | 
+  cancelled_at                     | timestamp with time zone   | YES      | 
+  cancel_reason                    | text                       | YES      | 
+  deleted_at                       | timestamp with time zone   | YES      | 
+  deleted_by_id                    | bigint                     | YES      | 
+  created_at                       | timestamp with time zone   | NO       | now()
+  updated_at                       | timestamp with time zone   | NO       | now()
+
+[TABLE: feedback]
+  Column                           | Type                       | Nullable | Default
+  -------------------------------------------------------------------------------------
+  id                               | bigint                     | NO       | 
+  event_id                         | bigint                     | NO       | 
+  rater_user_id                    | bigint                     | NO       | 
+  target_user_id                   | bigint                     | YES      | 
+  direction                        | text                       | NO       | 
+  score                            | integer                    | NO       | 
+  tags                             | ARRAY                      | NO       | '{}'::text[]
+  comment                          | text                       | YES      | 
+  status                           | text                       | NO       | 'active'::text
+  created_at                       | timestamp with time zone   | NO       | now()
+
+[TABLE: moderation_actions]
+  Column                           | Type                       | Nullable | Default
+  -------------------------------------------------------------------------------------
+  id                               | bigint                     | NO       | 
+  admin_user_id                    | bigint                     | NO       | 
+  target_user_id                   | bigint                     | YES      | 
+  event_id                         | bigint                     | YES      | 
+  feedback_id                      | bigint                     | YES      | 
+  action_type                      | text                       | NO       | 
+  reason                           | text                       | YES      | 
+  expires_at                       | timestamp with time zone   | YES      | 
+  created_at                       | timestamp with time zone   | NO       | now()
+
+[TABLE: onboarding_acknowledgments]
+  Column                           | Type                       | Nullable | Default
+  -------------------------------------------------------------------------------------
+  id                               | bigint                     | NO       | 
+  user_id                          | bigint                     | NO       | 
+  event_id                         | bigint                     | NO       | 
+  onboarding_version               | integer                    | NO       | 
+  method                           | text                       | NO       | 'app_tick'::text
+  acknowledged_at                  | timestamp with time zone   | NO       | now()
+
+[TABLE: qr_tokens]
+  Column                           | Type                       | Nullable | Default
+  -------------------------------------------------------------------------------------
+  id                               | bigint                     | NO       | 
+  event_id                         | bigint                     | NO       | 
+  created_by_id                    | bigint                     | NO       | 
+  purpose                          | text                       | NO       | 
+  token_hash                       | text                       | NO       | 
+  max_uses                         | integer                    | YES      | 
+  used_count                       | integer                    | NO       | 0
+  expires_at                       | timestamp with time zone   | NO       | 
+  revoked_at                       | timestamp with time zone   | YES      | 
+  created_at                       | timestamp with time zone   | NO       | now()
+
+[TABLE: user_charity_interests]
+  Column                           | Type                       | Nullable | Default
+  -------------------------------------------------------------------------------------
+  id                               | bigint                     | NO       | 
+  user_id                          | bigint                     | NO       | 
+  field_code                       | text                       | NO       | 
+  created_at                       | timestamp with time zone   | NO       | now()
+
+[TABLE: user_verification_images]
+  Column                           | Type                       | Nullable | Default
+  -------------------------------------------------------------------------------------
+  id                               | bigint                     | NO       | 
+  user_id                          | bigint                     | NO       | 
+  image_type                       | text                       | NO       | 
+  image_path                       | text                       | NO       | 
+  file_format                      | text                       | NO       | 'jpeg'::text
+  file_sha256                      | text                       | YES      | 
+  status                           | text                       | NO       | 'pending'::text
+  comparison_status                | text                       | NO       | 'pending'::text
+  comparison_score                 | numeric                    | YES      | 
+  is_current                       | boolean                    | NO       | true
+  reviewed_by_id                   | bigint                     | YES      | 
+  reviewed_at                      | timestamp with time zone   | YES      | 
+  note                             | text                       | YES      | 
+  created_at                       | timestamp with time zone   | NO       | now()
+  updated_at                       | timestamp with time zone   | NO       | now()
+
+[TABLE: users]
+  Column                           | Type                       | Nullable | Default
+  -------------------------------------------------------------------------------------
+  id                               | bigint                     | NO       | 
+  phone_hash                       | text                       | NO       | 
+  phone_enc                        | text                       | NO       | 
+  password                         | text                       | YES      | 
+  last_login                       | timestamp with time zone   | YES      | 
+  display_name                     | text                       | NO       | 
+  is_admin                         | boolean                    | NO       | false
+  is_staff                         | boolean                    | NO       | false
+  is_superuser                     | boolean                    | NO       | false
+  is_active                        | boolean                    | NO       | true
+  account_status                   | text                       | NO       | 'active'::text
+  blocked_until                    | timestamp with time zone   | YES      | 
+  preferred_language               | text                       | NO       | 'en'::text
+  home_area                        | text                       | YES      | 
+  emergency_contact_name           | text                       | YES      | 
+  emergency_contact_phone_enc      | text                       | YES      | 
+  blood_type                       | text                       | NO       | 'unknown'::text
+  is_willing_to_donate             | boolean                    | NO       | false
+  is_willing_to_donate_blood       | boolean                    | NO       | false
+  is_willing_to_donate_items       | boolean                    | NO       | false
+  physical_ok                      | boolean                    | NO       | false
+  good_eyesight                    | boolean                    | NO       | true
+  needs_glasses                    | boolean                    | NO       | false
+  can_lift_heavy                   | boolean                    | NO       | false
+  can_work_outdoor                 | boolean                    | NO       | false
+  has_leader_experience            | boolean                    | NO       | false
+  new_to_volunteer                 | boolean                    | NO       | true
+  skills                           | ARRAY                      | NO       | '{}'::text[]
+  needs_meal_support               | boolean                    | NO       | false
+  needs_travel_support             | boolean                    | NO       | false
+  accepts_unpaid                   | boolean                    | NO       | true
+  verification_status              | text                       | NO       | 'none'::text
+  created_at                       | timestamp with time zone   | NO       | now()
+  updated_at                       | timestamp with time zone   | NO       | now()
+  uuid                             | uuid                       | NO       | uuidv7()
+
+[TABLE: v_accepted_unassigned]
+  Column                           | Type                       | Nullable | Default
+  -------------------------------------------------------------------------------------
+  application_id                   | bigint                     | YES      | 
+  event_id                         | bigint                     | YES      | 
+  user_id                          | bigint                     | YES      | 
+  display_name                     | text                       | YES      | 
+  skills                           | ARRAY                      | YES      | 
+  physical_ok                      | boolean                    | YES      | 
+  can_lift_heavy                   | boolean                    | YES      | 
+  has_leader_experience            | boolean                    | YES      | 
+  new_to_volunteer                 | boolean                    | YES      | 
+
+[TABLE: v_admin_dashboard]
+  Column                           | Type                       | Nullable | Default
+  -------------------------------------------------------------------------------------
+  active_users                     | bigint                     | YES      | 
+  blocked_users                    | bigint                     | YES      | 
+  users_pending_verification       | bigint                     | YES      | 
+  images_pending_review            | bigint                     | YES      | 
+  coordinators_pending_approval    | bigint                     | YES      | 
+  coordinators_approved            | bigint                     | YES      | 
+  events_draft                     | bigint                     | YES      | 
+  events_published                 | bigint                     | YES      | 
+  events_active                    | bigint                     | YES      | 
+  events_completed                 | bigint                     | YES      | 
+  events_cancelled                 | bigint                     | YES      | 
+  events_deleted                   | bigint                     | YES      | 
+  pending_checkin_confirmations    | bigint                     | YES      | 
+  warnings_last_30d                | bigint                     | YES      | 
+
+[TABLE: v_event_checkin_board]
+  Column                           | Type                       | Nullable | Default
+  -------------------------------------------------------------------------------------
+  event_id                         | bigint                     | YES      | 
+  assignment_id                    | bigint                     | YES      | 
+  user_id                          | bigint                     | YES      | 
+  display_name                     | text                       | YES      | 
+  post_id                          | bigint                     | YES      | 
+  post_title                       | text                       | YES      | 
+  group_code                       | text                       | YES      | 
+  is_group_leader                  | boolean                    | YES      | 
+  assignment_status                | text                       | YES      | 
+  attendance_id                    | bigint                     | YES      | 
+  attendance_status                | text                       | YES      | 
+  method                           | text                       | YES      | 
+  walk_in_flag                     | boolean                    | YES      | 
+  checkin_at                       | timestamp with time zone   | YES      | 
+  checkin_distance_m               | numeric                    | YES      | 
+  confirmation_status              | text                       | YES      | 
+
+[TABLE: v_event_checkin_status]
+  Column                           | Type                       | Nullable | Default
+  -------------------------------------------------------------------------------------
+  event_id                         | bigint                     | YES      | 
+  user_id                          | bigint                     | YES      | 
+  display_name                     | text                       | YES      | 
+  post_id                          | bigint                     | YES      | 
+  post_title                       | text                       | YES      | 
+  group_code                       | text                       | YES      | 
+  is_group_leader                  | boolean                    | YES      | 
+  attendance_status                | text                       | YES      | 
+  checkin_at                       | timestamp with time zone   | YES      | 
+  checkin_method                   | text                       | YES      | 
+  walk_in_flag                     | boolean                    | YES      | 
+  confirmation_status              | text                       | YES      | 
+  checkin_distance_m               | numeric                    | YES      | 
+
+[TABLE: v_event_coordinator_history]
+  Column                           | Type                       | Nullable | Default
+  -------------------------------------------------------------------------------------
+  event_id                         | bigint                     | YES      | 
+  event_title                      | text                       | YES      | 
+  from_coordinator_id              | bigint                     | YES      | 
+  from_name                        | text                       | YES      | 
+  to_coordinator_id                | bigint                     | YES      | 
+  to_name                          | text                       | YES      | 
+  changed_by_user_id               | bigint                     | YES      | 
+  changed_by_name                  | text                       | YES      | 
+  reason                           | text                       | YES      | 
+  changed_at                       | timestamp with time zone   | YES      | 
+
+[TABLE: v_event_post_capacity]
+  Column                           | Type                       | Nullable | Default
+  -------------------------------------------------------------------------------------
+  post_id                          | bigint                     | YES      | 
+  event_id                         | bigint                     | YES      | 
+  title                            | text                       | YES      | 
+  status                           | text                       | YES      | 
+  required_headcount               | integer                    | YES      | 
+  assigned_count                   | bigint                     | YES      | 
+  remaining                        | bigint                     | YES      | 
+
+[TABLE: v_event_summary]
+  Column                           | Type                       | Nullable | Default
+  -------------------------------------------------------------------------------------
+  event_id                         | bigint                     | YES      | 
+  title                            | text                       | YES      | 
+  status                           | text                       | YES      | 
+  owner_id                         | bigint                     | YES      | 
+  current_coordinator_id           | bigint                     | YES      | 
+  start_at                         | timestamp with time zone   | YES      | 
+  end_at                           | timestamp with time zone   | YES      | 
+  acceptance_mode                  | text                       | YES      | 
+  auto_assign_enabled              | boolean                    | YES      | 
+  max_participants                 | integer                    | YES      | 
+  geo_checkin_enabled              | boolean                    | YES      | 
+  map_provider                     | text                       | YES      | 
+  pending_count                    | bigint                     | YES      | 
+  accepted_count                   | bigint                     | YES      | 
+  waitlisted_count                 | bigint                     | YES      | 
+  assignment_count                 | bigint                     | YES      | 
+  checked_in_count                 | bigint                     | YES      | 
+  pending_confirmations            | bigint                     | YES      | 
+
+[TABLE: v_geo_attempts_review]
+  Column                           | Type                       | Nullable | Default
+  -------------------------------------------------------------------------------------
+  id                               | bigint                     | YES      | 
+  event_id                         | bigint                     | YES      | 
+  event_title                      | text                       | YES      | 
+  user_id                          | bigint                     | YES      | 
+  display_name                     | text                       | YES      | 
+  attempted_at                     | timestamp with time zone   | YES      | 
+  result                           | text                       | YES      | 
+  distance_m                       | numeric                    | YES      | 
+  radius_m                         | integer                    | YES      | 
+  accuracy_m                       | numeric                    | YES      | 
+  device_mocked                    | boolean                    | YES      | 
+  review_status                    | text                       | YES      | 
+  reviewed_by_user_id              | bigint                     | YES      | 
+  reviewed_at                      | timestamp with time zone   | YES      | 
+  review_note                      | text                       | YES      | 
+
+[TABLE: v_pending_confirmations]
+  Column                           | Type                       | Nullable | Default
+  -------------------------------------------------------------------------------------
+  attendance_id                    | bigint                     | YES      | 
+  event_id                         | bigint                     | YES      | 
+  event_title                      | text                       | YES      | 
+  owner_id                         | bigint                     | YES      | 
+  current_coordinator_id           | bigint                     | YES      | 
+  user_id                          | bigint                     | YES      | 
+  volunteer_name                   | text                       | YES      | 
+  checkin_at                       | timestamp with time zone   | YES      | 
+  checkin_latitude                 | numeric                    | YES      | 
+  checkin_longitude                | numeric                    | YES      | 
+  checkin_accuracy_m               | numeric                    | YES      | 
+  checkin_distance_m               | numeric                    | YES      | 
+
+[TABLE: v_public_events]
+  Column                           | Type                       | Nullable | Default
+  -------------------------------------------------------------------------------------
+  event_id                         | bigint                     | YES      | 
+  title                            | text                       | YES      | 
+  description                      | text                       | YES      | 
+  purpose_type                     | text                       | YES      | 
+  location_name                    | text                       | YES      | 
+  landmark_text                    | text                       | YES      | 
+  latitude                         | numeric                    | YES      | 
+  longitude                        | numeric                    | YES      | 
+  geo_radius_m                     | integer                    | YES      | 
+  geo_checkin_enabled              | boolean                    | YES      | 
+  map_provider                     | text                       | YES      | 
+  start_at                         | timestamp with time zone   | YES      | 
+  end_at                           | timestamp with time zone   | YES      | 
+  application_deadline             | timestamp with time zone   | YES      | 
+  status                           | text                       | YES      | 
+  acceptance_mode                  | text                       | YES      | 
+  max_participants                 | integer                    | YES      | 
+  meals_provided                   | boolean                    | YES      | 
+  lodging_provided                 | boolean                    | YES      | 
+  travel_support_provided          | boolean                    | YES      | 
+  compensation_kind                | text                       | YES      | 
+  current_coordinator_id           | bigint                     | YES      | 
+  coordinator_name                 | text                       | YES      | 
+  charity_fields                   | ARRAY                      | YES      | 
+  spots_remaining                  | numeric                    | YES      | 
+
+[TABLE: v_user_moderation_summary]
+  Column                           | Type                       | Nullable | Default
+  -------------------------------------------------------------------------------------
+  user_id                          | bigint                     | YES      | 
+  warning_count                    | bigint                     | YES      | 
+  last_warning_at                  | timestamp with time zone   | YES      | 
+  block_count                      | bigint                     | YES      | 
+  last_block_at                    | timestamp with time zone   | YES      | 
+
+[TABLE: volunteer_availability_exceptions]
+  Column                           | Type                       | Nullable | Default
+  -------------------------------------------------------------------------------------
+  id                               | bigint                     | NO       | 
+  user_id                          | bigint                     | NO       | 
+  date                             | date                       | NO       | 
+  is_available                     | boolean                    | NO       | false
+  start_time                       | time without time zone     | YES      | 
+  end_time                         | time without time zone     | YES      | 
+  note                             | text                       | YES      | 
+  created_at                       | timestamp with time zone   | NO       | now()
+
+[TABLE: volunteer_availability_rules]
+  Column                           | Type                       | Nullable | Default
+  -------------------------------------------------------------------------------------
+  id                               | bigint                     | NO       | 
+  user_id                          | bigint                     | NO       | 
+  weekday                          | integer                    | NO       | 
+  start_time                       | time without time zone     | NO       | 
+  end_time                         | time without time zone     | NO       | 
+  valid_from                       | date                       | YES      | 
+  valid_to                         | date                       | YES      | 
+  created_at                       | timestamp with time zone   | NO       | now()
+
+--------------------------------------------------------------------------------
+4. TABLE CONSTRAINTS (PRIMARY, FOREIGN KEY & CHECKS)
+--------------------------------------------------------------------------------
+Table: app_settings | Type: n | app_settings_key_not_null
+  Def: NOT NULL key
+Table: app_settings | Type: p | app_settings_pkey
+  Def: PRIMARY KEY (key)
+Table: app_settings | Type: n | app_settings_value_int_not_null
+  Def: NOT NULL value_int
+Table: app_settings | Type: c | ck_app_settings_key
+  Def: CHECK ((key ~ '^[a-z][a-z0-9_]*$'::text))
+Table: charity_fields | Type: n | charity_fields_active_not_null
+  Def: NOT NULL active
+Table: charity_fields | Type: n | charity_fields_code_not_null
+  Def: NOT NULL code
+Table: charity_fields | Type: n | charity_fields_label_not_null
+  Def: NOT NULL label
+Table: charity_fields | Type: p | charity_fields_pkey
+  Def: PRIMARY KEY (code)
+Table: charity_fields | Type: n | charity_fields_sort_order_not_null
+  Def: NOT NULL sort_order
+Table: charity_fields | Type: c | ck_charity_fields_code
+  Def: CHECK ((code ~ '^[a-z][a-z0-9_]{1,49}$'::text))
+Table: charity_fields | Type: c | ck_charity_fields_label
+  Def: CHECK (((char_length(btrim(label)) >= 1) AND (char_length(btrim(label)) <= 100)))
+Table: users | Type: c | ck_users_account_status
+  Def: CHECK ((account_status = ANY (ARRAY['active'::text, 'blocked'::text, 'closed'::text])))
+Table: users | Type: c | ck_users_active_status_sync
+  Def: CHECK ((is_active = (account_status = 'active'::text)))
+Table: users | Type: c | ck_users_admin_flags
+  Def: CHECK ((((NOT is_staff) AND (NOT is_superuser)) OR is_admin))
+Table: users | Type: c | ck_users_blocked_until
+  Def: CHECK (((blocked_until IS NULL) OR (account_status = 'blocked'::text)))
+Table: users | Type: c | ck_users_blood_type
+  Def: CHECK ((blood_type = ANY (ARRAY['A+'::text, 'A-'::text, 'B+'::text, 'B-'::text, 'AB+'::text, 'AB-'::text, 'O+'::text, 'O-'::text, 'unknown'::text])))
+Table: users | Type: c | ck_users_display_name
+  Def: CHECK (((char_length(btrim(display_name)) >= 1) AND (char_length(btrim(display_name)) <= 150)))
+Table: users | Type: c | ck_users_donation_consistency
+  Def: CHECK ((is_willing_to_donate OR ((NOT is_willing_to_donate_blood) AND (NOT is_willing_to_donate_items))))
+Table: users | Type: c | ck_users_emergency_pair
+  Def: CHECK (((emergency_contact_name IS NULL) = (emergency_contact_phone_enc IS NULL)))
+Table: users | Type: c | ck_users_language
+  Def: CHECK ((preferred_language ~ '^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$'::text))
+Table: users | Type: c | ck_users_phone_hash_len
+  Def: CHECK (((char_length(phone_hash) >= 32) AND (char_length(phone_hash) <= 128)))
+Table: users | Type: c | ck_users_skills
+  Def: CHECK (tags_are_normalized(skills))
+Table: users | Type: c | ck_users_verification_status
+  Def: CHECK ((verification_status = ANY (ARRAY['none'::text, 'pending'::text, 'verified'::text, 'rejected'::text])))
+Table: users | Type: u | uq_users_phone_hash
+  Def: UNIQUE (phone_hash)
+Table: users | Type: u | uq_users_uuid
+  Def: UNIQUE (uuid)
+Table: users | Type: n | users_accepts_unpaid_not_null
+  Def: NOT NULL accepts_unpaid
+Table: users | Type: n | users_account_status_not_null
+  Def: NOT NULL account_status
+Table: users | Type: n | users_blood_type_not_null
+  Def: NOT NULL blood_type
+Table: users | Type: n | users_can_lift_heavy_not_null
+  Def: NOT NULL can_lift_heavy
+Table: users | Type: n | users_can_work_outdoor_not_null
+  Def: NOT NULL can_work_outdoor
+Table: users | Type: n | users_created_at_not_null
+  Def: NOT NULL created_at
+Table: users | Type: n | users_display_name_not_null
+  Def: NOT NULL display_name
+Table: users | Type: n | users_good_eyesight_not_null
+  Def: NOT NULL good_eyesight
+Table: users | Type: n | users_has_leader_experience_not_null
+  Def: NOT NULL has_leader_experience
+Table: users | Type: n | users_id_not_null
+  Def: NOT NULL id
+Table: users | Type: n | users_is_active_not_null
+  Def: NOT NULL is_active
+Table: users | Type: n | users_is_admin_not_null
+  Def: NOT NULL is_admin
+Table: users | Type: n | users_is_staff_not_null
+  Def: NOT NULL is_staff
+Table: users | Type: n | users_is_superuser_not_null
+  Def: NOT NULL is_superuser
+Table: users | Type: n | users_is_willing_to_donate_blood_not_null
+  Def: NOT NULL is_willing_to_donate_blood
+Table: users | Type: n | users_is_willing_to_donate_items_not_null
+  Def: NOT NULL is_willing_to_donate_items
+Table: users | Type: n | users_is_willing_to_donate_not_null
+  Def: NOT NULL is_willing_to_donate
+Table: users | Type: n | users_needs_glasses_not_null
+  Def: NOT NULL needs_glasses
+Table: users | Type: n | users_needs_meal_support_not_null
+  Def: NOT NULL needs_meal_support
+Table: users | Type: n | users_needs_travel_support_not_null
+  Def: NOT NULL needs_travel_support
+Table: users | Type: n | users_new_to_volunteer_not_null
+  Def: NOT NULL new_to_volunteer
+Table: users | Type: n | users_phone_enc_not_null
+  Def: NOT NULL phone_enc
+Table: users | Type: n | users_phone_hash_not_null
+  Def: NOT NULL phone_hash
+Table: users | Type: n | users_physical_ok_not_null
+  Def: NOT NULL physical_ok
+Table: users | Type: p | users_pkey
+  Def: PRIMARY KEY (id)
+Table: users | Type: n | users_preferred_language_not_null
+  Def: NOT NULL preferred_language
+Table: users | Type: n | users_skills_not_null
+  Def: NOT NULL skills
+Table: users | Type: n | users_updated_at_not_null
+  Def: NOT NULL updated_at
+Table: users | Type: n | users_uuid_not_null
+  Def: NOT NULL uuid
+Table: users | Type: n | users_verification_status_not_null
+  Def: NOT NULL verification_status
+Table: user_charity_interests | Type: u | uq_user_charity_interest
+  Def: UNIQUE (user_id, field_code)
+Table: user_charity_interests | Type: n | user_charity_interests_created_at_not_null
+  Def: NOT NULL created_at
+Table: user_charity_interests | Type: f | user_charity_interests_field_code_fkey
+  Def: FOREIGN KEY (field_code) REFERENCES charity_fields(code) ON DELETE RESTRICT
+Table: user_charity_interests | Type: n | user_charity_interests_field_code_not_null
+  Def: NOT NULL field_code
+Table: user_charity_interests | Type: n | user_charity_interests_id_not_null
+  Def: NOT NULL id
+Table: user_charity_interests | Type: p | user_charity_interests_pkey
+  Def: PRIMARY KEY (id)
+Table: user_charity_interests | Type: f | user_charity_interests_user_id_fkey
+  Def: FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+Table: user_charity_interests | Type: n | user_charity_interests_user_id_not_null
+  Def: NOT NULL user_id
+Table: volunteer_availability_rules | Type: c | ck_availability_time_order
+  Def: CHECK ((end_time > start_time))
+Table: volunteer_availability_rules | Type: c | ck_availability_valid_range
+  Def: CHECK (((valid_from IS NULL) OR (valid_to IS NULL) OR (valid_to >= valid_from)))
+Table: volunteer_availability_rules | Type: c | ck_availability_weekday
+  Def: CHECK (((weekday >= 1) AND (weekday <= 7)))
+Table: volunteer_availability_rules | Type: u | uq_availability_rule
+  Def: UNIQUE (user_id, weekday, start_time)
+Table: volunteer_availability_rules | Type: n | volunteer_availability_rules_created_at_not_null
+  Def: NOT NULL created_at
+Table: volunteer_availability_rules | Type: n | volunteer_availability_rules_end_time_not_null
+  Def: NOT NULL end_time
+Table: volunteer_availability_rules | Type: n | volunteer_availability_rules_id_not_null
+  Def: NOT NULL id
+Table: volunteer_availability_rules | Type: p | volunteer_availability_rules_pkey
+  Def: PRIMARY KEY (id)
+Table: volunteer_availability_rules | Type: n | volunteer_availability_rules_start_time_not_null
+  Def: NOT NULL start_time
+Table: volunteer_availability_rules | Type: f | volunteer_availability_rules_user_id_fkey
+  Def: FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+Table: volunteer_availability_rules | Type: n | volunteer_availability_rules_user_id_not_null
+  Def: NOT NULL user_id
+Table: volunteer_availability_rules | Type: n | volunteer_availability_rules_weekday_not_null
+  Def: NOT NULL weekday
+Table: volunteer_availability_exceptions | Type: c | ck_availability_exception_times
+  Def: CHECK ((((start_time IS NULL) AND (end_time IS NULL)) OR ((start_time IS NOT NULL) AND (end_time IS NOT NULL) AND (end_time > start_time))))
+Table: volunteer_availability_exceptions | Type: u | uq_availability_exception
+  Def: UNIQUE (user_id, date)
+Table: volunteer_availability_exceptions | Type: n | volunteer_availability_exceptions_created_at_not_null
+  Def: NOT NULL created_at
+Table: volunteer_availability_exceptions | Type: n | volunteer_availability_exceptions_date_not_null
+  Def: NOT NULL date
+Table: volunteer_availability_exceptions | Type: n | volunteer_availability_exceptions_id_not_null
+  Def: NOT NULL id
+Table: volunteer_availability_exceptions | Type: n | volunteer_availability_exceptions_is_available_not_null
+  Def: NOT NULL is_available
+Table: volunteer_availability_exceptions | Type: p | volunteer_availability_exceptions_pkey
+  Def: PRIMARY KEY (id)
+Table: volunteer_availability_exceptions | Type: f | volunteer_availability_exceptions_user_id_fkey
+  Def: FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+Table: volunteer_availability_exceptions | Type: n | volunteer_availability_exceptions_user_id_not_null
+  Def: NOT NULL user_id
+Table: coordinator_profiles | Type: c | ck_coordinator_approval
+  Def: CHECK (((status = ANY (ARRAY['pending'::text, 'revoked'::text])) OR ((approved_at IS NOT NULL) AND (approved_by_id IS NOT NULL))))
+Table: coordinator_profiles | Type: c | ck_coordinator_no_self_approval
+  Def: CHECK (((approved_by_id IS NULL) OR (approved_by_id <> user_id)))
+Table: coordinator_profiles | Type: c | ck_coordinator_status
+  Def: CHECK ((status = ANY (ARRAY['pending'::text, 'approved'::text, 'suspended'::text, 'revoked'::text])))
+Table: coordinator_profiles | Type: f | coordinator_profiles_approved_by_id_fkey
+  Def: FOREIGN KEY (approved_by_id) REFERENCES users(id) ON DELETE RESTRICT
+Table: coordinator_profiles | Type: n | coordinator_profiles_created_at_not_null
+  Def: NOT NULL created_at
+Table: coordinator_profiles | Type: p | coordinator_profiles_pkey
+  Def: PRIMARY KEY (user_id)
+Table: coordinator_profiles | Type: n | coordinator_profiles_status_not_null
+  Def: NOT NULL status
+Table: coordinator_profiles | Type: n | coordinator_profiles_updated_at_not_null
+  Def: NOT NULL updated_at
+Table: coordinator_profiles | Type: f | coordinator_profiles_user_id_fkey
+  Def: FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT
+Table: coordinator_profiles | Type: n | coordinator_profiles_user_id_not_null
+  Def: NOT NULL user_id
+Table: user_verification_images | Type: c | ck_verification_comparison_status
+  Def: CHECK ((comparison_status = ANY (ARRAY['pending'::text, 'match'::text, 'no_match'::text, 'needs_review'::text])))
+Table: user_verification_images | Type: c | ck_verification_file_format
+  Def: CHECK ((file_format = 'jpeg'::text))
+Table: user_verification_images | Type: c | ck_verification_image_path
+  Def: CHECK ((((char_length(btrim(image_path)) >= 1) AND (char_length(btrim(image_path)) <= 255)) AND (lower(image_path) ~ '\.jpe?g$'::text)))
+Table: user_verification_images | Type: c | ck_verification_image_type
+  Def: CHECK ((image_type = ANY (ARRAY['mock_selfie'::text, 'id_license'::text, 'driver_license'::text])))
+Table: user_verification_images | Type: c | ck_verification_no_self_review
+  Def: CHECK (((reviewed_by_id IS NULL) OR (reviewed_by_id <> user_id)))
+Table: user_verification_images | Type: c | ck_verification_review
+  Def: CHECK (((status = 'pending'::text) OR ((reviewed_by_id IS NOT NULL) AND (reviewed_at IS NOT NULL))))
+Table: user_verification_images | Type: c | ck_verification_score_range
+  Def: CHECK (((comparison_score IS NULL) OR ((comparison_score >= (0)::numeric) AND (comparison_score <= (1)::numeric))))
+Table: user_verification_images | Type: c | ck_verification_sha256
+  Def: CHECK (((file_sha256 IS NULL) OR (file_sha256 ~ '^[0-9a-f]{64}$'::text)))
+Table: user_verification_images | Type: c | ck_verification_status
+  Def: CHECK ((status = ANY (ARRAY['pending'::text, 'approved'::text, 'rejected'::text])))
+Table: user_verification_images | Type: n | user_verification_images_comparison_status_not_null
+  Def: NOT NULL comparison_status
+Table: user_verification_images | Type: n | user_verification_images_created_at_not_null
+  Def: NOT NULL created_at
+Table: user_verification_images | Type: n | user_verification_images_file_format_not_null
+  Def: NOT NULL file_format
+Table: user_verification_images | Type: n | user_verification_images_id_not_null
+  Def: NOT NULL id
+Table: user_verification_images | Type: n | user_verification_images_image_path_not_null
+  Def: NOT NULL image_path
+Table: user_verification_images | Type: n | user_verification_images_image_type_not_null
+  Def: NOT NULL image_type
+Table: user_verification_images | Type: n | user_verification_images_is_current_not_null
+  Def: NOT NULL is_current
+Table: user_verification_images | Type: p | user_verification_images_pkey
+  Def: PRIMARY KEY (id)
+Table: user_verification_images | Type: f | user_verification_images_reviewed_by_id_fkey
+  Def: FOREIGN KEY (reviewed_by_id) REFERENCES users(id) ON DELETE RESTRICT
+Table: user_verification_images | Type: n | user_verification_images_status_not_null
+  Def: NOT NULL status
+Table: user_verification_images | Type: n | user_verification_images_updated_at_not_null
+  Def: NOT NULL updated_at
+Table: user_verification_images | Type: f | user_verification_images_user_id_fkey
+  Def: FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT
+Table: user_verification_images | Type: n | user_verification_images_user_id_not_null
+  Def: NOT NULL user_id
+Table: auth_otp | Type: n | auth_otp_attempt_count_not_null
+  Def: NOT NULL attempt_count
+Table: auth_otp | Type: n | auth_otp_code_hash_not_null
+  Def: NOT NULL code_hash
+Table: auth_otp | Type: n | auth_otp_created_at_not_null
+  Def: NOT NULL created_at
+Table: auth_otp | Type: n | auth_otp_expires_at_not_null
+  Def: NOT NULL expires_at
+Table: auth_otp | Type: n | auth_otp_id_not_null
+  Def: NOT NULL id
+Table: auth_otp | Type: n | auth_otp_phone_hash_not_null
+  Def: NOT NULL phone_hash
+Table: auth_otp | Type: p | auth_otp_pkey
+  Def: PRIMARY KEY (id)
+Table: auth_otp | Type: n | auth_otp_purpose_not_null
+  Def: NOT NULL purpose
+Table: auth_otp | Type: c | ck_auth_otp_attempt_count
+  Def: CHECK (((attempt_count >= 0) AND (attempt_count <= 100)))
+Table: auth_otp | Type: c | ck_auth_otp_consumed
+  Def: CHECK (((consumed_at IS NULL) OR (consumed_at >= created_at)))
+Table: auth_otp | Type: c | ck_auth_otp_expiry
+  Def: CHECK ((expires_at > created_at))
+Table: auth_otp | Type: c | ck_auth_otp_purpose
+  Def: CHECK ((purpose = ANY (ARRAY['login'::text, 'qr_registration'::text])))
+Table: events | Type: c | ck_events_acceptance_mode
+  Def: CHECK ((acceptance_mode = ANY (ARRAY['auto'::text, 'manual'::text])))
+Table: events | Type: c | ck_events_compensation_kind
+  Def: CHECK ((compensation_kind = ANY (ARRAY['unpaid'::text, 'arranged_outside_system'::text])))
+Table: events | Type: c | ck_events_deadline
+  Def: CHECK (((application_deadline IS NULL) OR (application_deadline <= start_at)))
+Table: events | Type: c | ck_events_geo_enabled_needs_point
+  Def: CHECK (((NOT geo_checkin_enabled) OR (latitude IS NOT NULL)))
+Table: events | Type: c | ck_events_geo_pair
+  Def: CHECK (((latitude IS NULL) = (longitude IS NULL)))
+Table: events | Type: c | ck_events_geo_radius
+  Def: CHECK (((geo_radius_m IS NULL) OR ((geo_radius_m >= 20) AND (geo_radius_m <= 5000))))
+Table: events | Type: c | ck_events_geo_window
+  Def: CHECK (((geo_checkin_opens_before_min >= 0) AND (geo_checkin_opens_before_min <= 240)))
+Table: events | Type: c | ck_events_group_size
+  Def: CHECK (((group_size IS NULL) OR (group_size > 0)))
+Table: events | Type: c | ck_events_lat_range
+  Def: CHECK (((latitude IS NULL) OR ((latitude >= ('-90'::integer)::numeric) AND (latitude <= (90)::numeric))))
+Table: events | Type: c | ck_events_leader_strategy
+  Def: CHECK ((leader_strategy = ANY (ARRAY['none'::text, 'first_experienced'::text, 'manual'::text])))
+Table: events | Type: c | ck_events_lng_range
+  Def: CHECK (((longitude IS NULL) OR ((longitude >= ('-180'::integer)::numeric) AND (longitude <= (180)::numeric))))
+Table: events | Type: c | ck_events_map_provider
+  Def: CHECK ((map_provider = ANY (ARRAY['openstreetmap'::text, 'google'::text])))
+Table: events | Type: c | ck_events_max_participants
+  Def: CHECK (((max_participants IS NULL) OR (max_participants > 0)))
+Table: events | Type: c | ck_events_onboarding_version
+  Def: CHECK ((onboarding_version >= 1))
+Table: events | Type: c | ck_events_purpose_type
+  Def: CHECK ((purpose_type = ANY (ARRAY['charity_event'::text, 'help_wanted_event'::text])))
+Table: events | Type: c | ck_events_soft_delete
+  Def: CHECK (((deleted_at IS NULL) = (deleted_by_id IS NULL)))
+Table: events | Type: c | ck_events_status
+  Def: CHECK ((status = ANY (ARRAY['draft'::text, 'published'::text, 'active'::text, 'completed'::text, 'cancelled'::text])))
+Table: events | Type: c | ck_events_status_timestamps
+  Def: CHECK ((((status = 'draft'::text) AND (published_at IS NULL) AND (activated_at IS NULL) AND (completed_at IS NULL) AND (cancelled_at IS NULL)) OR ((status = 'published'::text) AND (published_at IS NOT NULL) AND (activated_at IS NULL) AND (completed_at IS NULL) AND (cancelled_at IS NULL)) OR ((status = 'active'::text) AND (published_at IS NOT NULL) AND (activated_at IS NOT NULL) AND (completed_at IS NULL) AND (cancelled_at IS NULL)) OR ((status = 'completed'::text) AND (published_at IS NOT NULL) AND (activated_at IS NOT NULL) AND (completed_at IS NOT NULL) AND (cancelled_at IS NULL)) OR ((status = 'cancelled'::text) AND (cancelled_at IS NOT NULL) AND (completed_at IS NULL))))
+Table: events | Type: c | ck_events_time
+  Def: CHECK ((end_at > start_at))
+Table: events | Type: c | ck_events_title
+  Def: CHECK (((char_length(btrim(title)) >= 1) AND (char_length(btrim(title)) <= 255)))
+Table: events | Type: n | events_acceptance_mode_not_null
+  Def: NOT NULL acceptance_mode
+Table: events | Type: n | events_auto_assign_enabled_not_null
+  Def: NOT NULL auto_assign_enabled
+Table: events | Type: n | events_compensation_kind_not_null
+  Def: NOT NULL compensation_kind
+Table: events | Type: n | events_created_at_not_null
+  Def: NOT NULL created_at
+Table: events | Type: f | events_current_coordinator_id_fkey
+  Def: FOREIGN KEY (current_coordinator_id) REFERENCES coordinator_profiles(user_id) ON DELETE RESTRICT
+Table: events | Type: n | events_current_coordinator_id_not_null
+  Def: NOT NULL current_coordinator_id
+Table: events | Type: f | events_deleted_by_id_fkey
+  Def: FOREIGN KEY (deleted_by_id) REFERENCES users(id) ON DELETE RESTRICT
+Table: events | Type: n | events_end_at_not_null
+  Def: NOT NULL end_at
+Table: events | Type: n | events_geo_checkin_enabled_not_null
+  Def: NOT NULL geo_checkin_enabled
+Table: events | Type: n | events_geo_checkin_opens_before_min_not_null
+  Def: NOT NULL geo_checkin_opens_before_min
+Table: events | Type: n | events_id_not_null
+  Def: NOT NULL id
+Table: events | Type: n | events_leader_strategy_not_null
+  Def: NOT NULL leader_strategy
+Table: events | Type: n | events_lodging_provided_not_null
+  Def: NOT NULL lodging_provided
+Table: events | Type: n | events_map_provider_not_null
+  Def: NOT NULL map_provider
+Table: events | Type: n | events_meals_provided_not_null
+  Def: NOT NULL meals_provided
+Table: events | Type: n | events_onboarding_version_not_null
+  Def: NOT NULL onboarding_version
+Table: events | Type: f | events_owner_id_fkey
+  Def: FOREIGN KEY (owner_id) REFERENCES coordinator_profiles(user_id) ON DELETE RESTRICT
+Table: events | Type: n | events_owner_id_not_null
+  Def: NOT NULL owner_id
+Table: events | Type: p | events_pkey
+  Def: PRIMARY KEY (id)
+Table: events | Type: n | events_purpose_type_not_null
+  Def: NOT NULL purpose_type
+Table: events | Type: n | events_qr_registration_enabled_not_null
+  Def: NOT NULL qr_registration_enabled
+Table: events | Type: n | events_require_checkin_confirmation_not_null
+  Def: NOT NULL require_checkin_confirmation
+Table: events | Type: n | events_require_onboarding_ack_not_null
+  Def: NOT NULL require_onboarding_ack
+Table: events | Type: n | events_start_at_not_null
+  Def: NOT NULL start_at
+Table: events | Type: n | events_status_not_null
+  Def: NOT NULL status
+Table: events | Type: n | events_title_not_null
+  Def: NOT NULL title
+Table: events | Type: n | events_travel_support_provided_not_null
+  Def: NOT NULL travel_support_provided
+Table: events | Type: n | events_updated_at_not_null
+  Def: NOT NULL updated_at
+Table: event_coordinator_history | Type: c | ck_coord_history_changed
+  Def: CHECK ((from_coordinator_id IS DISTINCT FROM to_coordinator_id))
+Table: event_coordinator_history | Type: n | event_coordinator_history_changed_at_not_null
+  Def: NOT NULL changed_at
+Table: event_coordinator_history | Type: f | event_coordinator_history_changed_by_user_id_fkey
+  Def: FOREIGN KEY (changed_by_user_id) REFERENCES users(id) ON DELETE RESTRICT
+Table: event_coordinator_history | Type: f | event_coordinator_history_event_id_fkey
+  Def: FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE RESTRICT
+Table: event_coordinator_history | Type: n | event_coordinator_history_event_id_not_null
+  Def: NOT NULL event_id
+Table: event_coordinator_history | Type: f | event_coordinator_history_from_coordinator_id_fkey
+  Def: FOREIGN KEY (from_coordinator_id) REFERENCES coordinator_profiles(user_id) ON DELETE RESTRICT
+Table: event_coordinator_history | Type: n | event_coordinator_history_id_not_null
+  Def: NOT NULL id
+Table: event_coordinator_history | Type: p | event_coordinator_history_pkey
+  Def: PRIMARY KEY (id)
+Table: event_coordinator_history | Type: f | event_coordinator_history_to_coordinator_id_fkey
+  Def: FOREIGN KEY (to_coordinator_id) REFERENCES coordinator_profiles(user_id) ON DELETE RESTRICT
+Table: event_coordinator_history | Type: n | event_coordinator_history_to_coordinator_id_not_null
+  Def: NOT NULL to_coordinator_id
+Table: event_charity_fields | Type: f | event_charity_fields_event_id_fkey
+  Def: FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
+Table: event_charity_fields | Type: n | event_charity_fields_event_id_not_null
+  Def: NOT NULL event_id
+Table: event_charity_fields | Type: f | event_charity_fields_field_code_fkey
+  Def: FOREIGN KEY (field_code) REFERENCES charity_fields(code) ON DELETE RESTRICT
+Table: event_charity_fields | Type: n | event_charity_fields_field_code_not_null
+  Def: NOT NULL field_code
+Table: event_charity_fields | Type: n | event_charity_fields_id_not_null
+  Def: NOT NULL id
+Table: event_charity_fields | Type: p | event_charity_fields_pkey
+  Def: PRIMARY KEY (id)
+Table: event_charity_fields | Type: u | uq_event_charity_field
+  Def: UNIQUE (event_id, field_code)
+Table: event_posts | Type: c | ck_event_posts_headcount
+  Def: CHECK (((required_headcount >= 1) AND (required_headcount <= 100000)))
+Table: event_posts | Type: c | ck_event_posts_physical_level
+  Def: CHECK ((physical_level = ANY (ARRAY['none'::text, 'light'::text, 'medium'::text, 'heavy'::text])))
+Table: event_posts | Type: c | ck_event_posts_skills
+  Def: CHECK (tags_are_normalized(required_skills))
+Table: event_posts | Type: c | ck_event_posts_status
+  Def: CHECK ((status = ANY (ARRAY['open'::text, 'full'::text, 'closed'::text])))
+Table: event_posts | Type: c | ck_event_posts_title
+  Def: CHECK (((char_length(btrim(title)) >= 1) AND (char_length(btrim(title)) <= 150)))
+Table: event_posts | Type: n | event_posts_created_at_not_null
+  Def: NOT NULL created_at
+Table: event_posts | Type: f | event_posts_event_id_fkey
+  Def: FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE RESTRICT
+Table: event_posts | Type: n | event_posts_event_id_not_null
+  Def: NOT NULL event_id
+Table: event_posts | Type: n | event_posts_id_not_null
+  Def: NOT NULL id
+Table: event_posts | Type: n | event_posts_leader_needed_not_null
+  Def: NOT NULL leader_needed
+Table: event_posts | Type: n | event_posts_new_volunteers_allowed_not_null
+  Def: NOT NULL new_volunteers_allowed
+Table: event_posts | Type: n | event_posts_physical_level_not_null
+  Def: NOT NULL physical_level
+Table: event_posts | Type: p | event_posts_pkey
+  Def: PRIMARY KEY (id)
+Table: event_posts | Type: n | event_posts_priority_not_null
+  Def: NOT NULL priority
+Table: event_posts | Type: n | event_posts_required_headcount_not_null
+  Def: NOT NULL required_headcount
+Table: event_posts | Type: n | event_posts_required_skills_not_null
+  Def: NOT NULL required_skills
+Table: event_posts | Type: n | event_posts_status_not_null
+  Def: NOT NULL status
+Table: event_posts | Type: n | event_posts_title_not_null
+  Def: NOT NULL title
+Table: event_posts | Type: n | event_posts_updated_at_not_null
+  Def: NOT NULL updated_at
+Table: event_posts | Type: u | uq_event_posts_event_title
+  Def: UNIQUE (event_id, title)
+Table: event_posts | Type: u | uq_event_posts_id_event
+  Def: UNIQUE (id, event_id)
+Table: qr_tokens | Type: c | ck_qr_expiry
+  Def: CHECK ((expires_at > created_at))
+Table: qr_tokens | Type: c | ck_qr_hash_len
+  Def: CHECK (((char_length(token_hash) >= 32) AND (char_length(token_hash) <= 128)))
+Table: qr_tokens | Type: c | ck_qr_max_uses
+  Def: CHECK (((max_uses IS NULL) OR (max_uses > 0)))
+Table: qr_tokens | Type: c | ck_qr_purpose
+  Def: CHECK ((purpose = ANY (ARRAY['walkin_registration'::text, 'checkin'::text, 'join_event'::text])))
+Table: qr_tokens | Type: c | ck_qr_revoked
+  Def: CHECK (((revoked_at IS NULL) OR (revoked_at >= created_at)))
+Table: qr_tokens | Type: c | ck_qr_used_count
+  Def: CHECK (((max_uses IS NULL) OR (used_count <= max_uses)))
+Table: qr_tokens | Type: c | ck_qr_used_count_nonnegative
+  Def: CHECK ((used_count >= 0))
+Table: qr_tokens | Type: n | qr_tokens_created_at_not_null
+  Def: NOT NULL created_at
+Table: qr_tokens | Type: f | qr_tokens_created_by_id_fkey
+  Def: FOREIGN KEY (created_by_id) REFERENCES users(id) ON DELETE RESTRICT
+Table: qr_tokens | Type: n | qr_tokens_created_by_id_not_null
+  Def: NOT NULL created_by_id
+Table: qr_tokens | Type: f | qr_tokens_event_id_fkey
+  Def: FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE RESTRICT
+Table: qr_tokens | Type: n | qr_tokens_event_id_not_null
+  Def: NOT NULL event_id
+Table: qr_tokens | Type: n | qr_tokens_expires_at_not_null
+  Def: NOT NULL expires_at
+Table: qr_tokens | Type: n | qr_tokens_id_not_null
+  Def: NOT NULL id
+Table: qr_tokens | Type: p | qr_tokens_pkey
+  Def: PRIMARY KEY (id)
+Table: qr_tokens | Type: n | qr_tokens_purpose_not_null
+  Def: NOT NULL purpose
+Table: qr_tokens | Type: n | qr_tokens_token_hash_not_null
+  Def: NOT NULL token_hash
+Table: qr_tokens | Type: n | qr_tokens_used_count_not_null
+  Def: NOT NULL used_count
+Table: qr_tokens | Type: u | uq_qr_tokens_id_event
+  Def: UNIQUE (id, event_id)
+Table: qr_tokens | Type: u | uq_qr_tokens_token_hash
+  Def: UNIQUE (token_hash)
+Table: event_applications | Type: c | ck_application_decided
+  Def: CHECK (((status <> ALL (ARRAY['accepted'::text, 'rejected'::text])) OR (decided_at IS NOT NULL)))
+Table: event_applications | Type: c | ck_application_decider
+  Def: CHECK (((decided_by_id IS NULL) OR (decided_at IS NOT NULL)))
+Table: event_applications | Type: c | ck_application_no_self_decision
+  Def: CHECK (((decided_by_id IS NULL) OR (decided_by_id <> user_id)))
+Table: event_applications | Type: c | ck_application_source
+  Def: CHECK ((source = ANY (ARRAY['browse'::text, 'qr_walkin'::text, 'invite'::text])))
+Table: event_applications | Type: c | ck_application_status
+  Def: CHECK ((status = ANY (ARRAY['pending'::text, 'accepted'::text, 'waitlisted'::text, 'rejected'::text, 'withdrawn'::text, 'expired'::text])))
+Table: event_applications | Type: c | ck_application_walkin_token
+  Def: CHECK (((source = 'qr_walkin'::text) = (qr_token_id IS NOT NULL)))
+Table: event_applications | Type: n | event_applications_applied_at_not_null
+  Def: NOT NULL applied_at
+Table: event_applications | Type: n | event_applications_created_at_not_null
+  Def: NOT NULL created_at
+Table: event_applications | Type: f | event_applications_decided_by_id_fkey
+  Def: FOREIGN KEY (decided_by_id) REFERENCES users(id) ON DELETE RESTRICT
+Table: event_applications | Type: f | event_applications_event_id_fkey
+  Def: FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE RESTRICT
+Table: event_applications | Type: n | event_applications_event_id_not_null
+  Def: NOT NULL event_id
+Table: event_applications | Type: n | event_applications_id_not_null
+  Def: NOT NULL id
+Table: event_applications | Type: p | event_applications_pkey
+  Def: PRIMARY KEY (id)
+Table: event_applications | Type: n | event_applications_source_not_null
+  Def: NOT NULL source
+Table: event_applications | Type: n | event_applications_status_not_null
+  Def: NOT NULL status
+Table: event_applications | Type: n | event_applications_updated_at_not_null
+  Def: NOT NULL updated_at
+Table: event_applications | Type: f | event_applications_user_id_fkey
+  Def: FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT
+Table: event_applications | Type: n | event_applications_user_id_not_null
+  Def: NOT NULL user_id
+Table: event_applications | Type: f | fk_applications_post_event
+  Def: FOREIGN KEY (post_id, event_id) REFERENCES event_posts(id, event_id) ON DELETE RESTRICT
+Table: event_applications | Type: f | fk_applications_qr_event
+  Def: FOREIGN KEY (qr_token_id, event_id) REFERENCES qr_tokens(id, event_id) ON DELETE RESTRICT
+Table: event_applications | Type: u | uq_event_applications_id_event_user
+  Def: UNIQUE (id, event_id, user_id)
+Table: assignments | Type: n | assignments_application_id_not_null
+  Def: NOT NULL application_id
+Table: assignments | Type: n | assignments_assigned_by_not_null
+  Def: NOT NULL assigned_by
+Table: assignments | Type: f | assignments_assigned_by_user_id_fkey
+  Def: FOREIGN KEY (assigned_by_user_id) REFERENCES users(id) ON DELETE RESTRICT
+Table: assignments | Type: n | assignments_created_at_not_null
+  Def: NOT NULL created_at
+Table: assignments | Type: n | assignments_event_id_not_null
+  Def: NOT NULL event_id
+Table: assignments | Type: n | assignments_id_not_null
+  Def: NOT NULL id
+Table: assignments | Type: n | assignments_is_group_leader_not_null
+  Def: NOT NULL is_group_leader
+Table: assignments | Type: p | assignments_pkey
+  Def: PRIMARY KEY (id)
+Table: assignments | Type: n | assignments_schedule_end_not_null
+  Def: NOT NULL schedule_end
+Table: assignments | Type: n | assignments_schedule_start_not_null
+  Def: NOT NULL schedule_start
+Table: assignments | Type: n | assignments_status_not_null
+  Def: NOT NULL status
+Table: assignments | Type: n | assignments_updated_at_not_null
+  Def: NOT NULL updated_at
+Table: assignments | Type: n | assignments_user_id_not_null
+  Def: NOT NULL user_id
+Table: assignments | Type: c | ck_assignment_actor
+  Def: CHECK (((assigned_by = 'auto'::text) = (assigned_by_user_id IS NULL)))
+Table: assignments | Type: c | ck_assignment_assigned_by
+  Def: CHECK ((assigned_by = ANY (ARRAY['auto'::text, 'coordinator'::text, 'admin'::text])))
+Table: assignments | Type: c | ck_assignment_cancelled_at
+  Def: CHECK (((status = 'cancelled'::text) = (cancelled_at IS NOT NULL)))
+Table: assignments | Type: c | ck_assignment_confirmed_at
+  Def: CHECK ((((status = ANY (ARRAY['confirmed'::text, 'completed'::text])) AND (confirmed_at IS NOT NULL)) OR (status = ANY (ARRAY['assigned'::text, 'cancelled'::text, 'completed'::text]))))
+Table: assignments | Type: c | ck_assignment_leader_group
+  Def: CHECK (((NOT is_group_leader) OR (group_code IS NOT NULL)))
+Table: assignments | Type: c | ck_assignment_schedule
+  Def: CHECK ((schedule_end > schedule_start))
+Table: assignments | Type: c | ck_assignment_status
+  Def: CHECK ((status = ANY (ARRAY['assigned'::text, 'confirmed'::text, 'completed'::text, 'cancelled'::text])))
+Table: assignments | Type: x | ex_assignments_no_overlap
+  Def: EXCLUDE USING gist (user_id WITH =, tstzrange(schedule_start, schedule_end, '[)'::text) WITH &&) WHERE ((status <> 'cancelled'::text))
+Table: assignments | Type: f | fk_assignments_application
+  Def: FOREIGN KEY (application_id, event_id, user_id) REFERENCES event_applications(id, event_id, user_id) ON DELETE RESTRICT
+Table: assignments | Type: f | fk_assignments_post_event
+  Def: FOREIGN KEY (post_id, event_id) REFERENCES event_posts(id, event_id) ON DELETE RESTRICT
+Table: assignments | Type: u | uq_assignments_id_event_user
+  Def: UNIQUE (id, event_id, user_id)
+Table: attendance | Type: n | attendance_assignment_id_not_null
+  Def: NOT NULL assignment_id
+Table: attendance | Type: n | attendance_confirmation_status_not_null
+  Def: NOT NULL confirmation_status
+Table: attendance | Type: f | attendance_confirmed_by_user_id_fkey
+  Def: FOREIGN KEY (confirmed_by_user_id) REFERENCES users(id) ON DELETE RESTRICT
+Table: attendance | Type: n | attendance_created_at_not_null
+  Def: NOT NULL created_at
+Table: attendance | Type: n | attendance_event_id_not_null
+  Def: NOT NULL event_id
+Table: attendance | Type: n | attendance_geo_verified_not_null
+  Def: NOT NULL geo_verified
+Table: attendance | Type: n | attendance_id_not_null
+  Def: NOT NULL id
+Table: attendance | Type: p | attendance_pkey
+  Def: PRIMARY KEY (id)
+Table: attendance | Type: f | attendance_recorded_by_user_id_fkey
+  Def: FOREIGN KEY (recorded_by_user_id) REFERENCES users(id) ON DELETE RESTRICT
+Table: attendance | Type: n | attendance_status_not_null
+  Def: NOT NULL status
+Table: attendance | Type: n | attendance_updated_at_not_null
+  Def: NOT NULL updated_at
+Table: attendance | Type: n | attendance_user_id_not_null
+  Def: NOT NULL user_id
+Table: attendance | Type: n | attendance_walk_in_flag_not_null
+  Def: NOT NULL walk_in_flag
+Table: attendance | Type: c | ck_attendance_checkin
+  Def: CHECK (((status <> ALL (ARRAY['checked_in'::text, 'completed'::text])) OR ((checkin_at IS NOT NULL) AND (method IS NOT NULL))))
+Table: attendance | Type: c | ck_attendance_checkout
+  Def: CHECK (((checkout_at IS NULL) OR ((checkin_at IS NOT NULL) AND (checkout_at >= checkin_at))))
+Table: attendance | Type: c | ck_attendance_confirmation_state
+  Def: CHECK (((confirmation_status = 'not_required'::text) OR ((confirmation_status = ANY (ARRAY['pending'::text, 'confirmed'::text])) AND (method = 'geo'::text) AND (status = ANY (ARRAY['checked_in'::text, 'completed'::text]))) OR ((confirmation_status = 'rejected'::text) AND (status = ANY (ARRAY['expected'::text, 'absent'::text, 'cancelled'::text])))))
+Table: attendance | Type: c | ck_attendance_confirmation_status
+  Def: CHECK ((confirmation_status = ANY (ARRAY['not_required'::text, 'pending'::text, 'confirmed'::text, 'rejected'::text])))
+Table: attendance | Type: c | ck_attendance_decision
+  Def: CHECK (((confirmation_status = ANY (ARRAY['confirmed'::text, 'rejected'::text])) = ((confirmed_by_user_id IS NOT NULL) AND (confirmed_at IS NOT NULL))))
+Table: attendance | Type: c | ck_attendance_geo_columns
+  Def: CHECK ((((method = 'geo'::text) AND geo_verified AND (checkin_accuracy_m IS NOT NULL) AND (checkin_distance_m IS NOT NULL)) OR ((method IS DISTINCT FROM 'geo'::text) AND (NOT geo_verified) AND (checkin_latitude IS NULL) AND (checkin_longitude IS NULL) AND (checkin_accuracy_m IS NULL) AND (checkin_distance_m IS NULL))))
+Table: attendance | Type: c | ck_attendance_geo_pair
+  Def: CHECK (((checkin_latitude IS NULL) = (checkin_longitude IS NULL)))
+Table: attendance | Type: c | ck_attendance_lat_range
+  Def: CHECK (((checkin_latitude IS NULL) OR ((checkin_latitude >= ('-90'::integer)::numeric) AND (checkin_latitude <= (90)::numeric))))
+Table: attendance | Type: c | ck_attendance_lng_range
+  Def: CHECK (((checkin_longitude IS NULL) OR ((checkin_longitude >= ('-180'::integer)::numeric) AND (checkin_longitude <= (180)::numeric))))
+Table: attendance | Type: c | ck_attendance_method
+  Def: CHECK (((method IS NULL) OR (method = ANY (ARRAY['qr_scan'::text, 'coordinator_manual'::text, 'geo'::text, 'system'::text]))))
+Table: attendance | Type: c | ck_attendance_method_manual
+  Def: CHECK (((method IS DISTINCT FROM 'coordinator_manual'::text) OR (recorded_by_user_id IS NOT NULL)))
+Table: attendance | Type: c | ck_attendance_method_qr
+  Def: CHECK (((method IS DISTINCT FROM 'qr_scan'::text) OR (qr_token_id IS NOT NULL)))
+Table: attendance | Type: c | ck_attendance_no_evidence_without_checkin
+  Def: CHECK (((status = ANY (ARRAY['checked_in'::text, 'completed'::text])) OR ((checkin_at IS NULL) AND (checkout_at IS NULL) AND (method IS NULL))))
+Table: attendance | Type: c | ck_attendance_no_self_confirm
+  Def: CHECK (((confirmed_by_user_id IS NULL) OR (confirmed_by_user_id <> user_id)))
+Table: attendance | Type: c | ck_attendance_status
+  Def: CHECK ((status = ANY (ARRAY['expected'::text, 'checked_in'::text, 'absent'::text, 'completed'::text, 'cancelled'::text])))
+Table: attendance | Type: c | ck_attendance_walkin_method
+  Def: CHECK (((NOT walk_in_flag) OR (method IS NULL) OR (method = ANY (ARRAY['qr_scan'::text, 'coordinator_manual'::text]))))
+Table: attendance | Type: f | fk_attendance_assignment
+  Def: FOREIGN KEY (assignment_id, event_id, user_id) REFERENCES assignments(id, event_id, user_id) ON DELETE RESTRICT
+Table: attendance | Type: f | fk_attendance_qr_event
+  Def: FOREIGN KEY (qr_token_id, event_id) REFERENCES qr_tokens(id, event_id) ON DELETE RESTRICT
+Table: attendance | Type: u | uq_attendance_event_user
+  Def: UNIQUE (event_id, user_id)
+Table: attendance_geo_attempts | Type: n | attendance_geo_attempts_attempted_at_not_null
+  Def: NOT NULL attempted_at
+Table: attendance_geo_attempts | Type: f | attendance_geo_attempts_attendance_id_fkey
+  Def: FOREIGN KEY (attendance_id) REFERENCES attendance(id) ON DELETE RESTRICT
+Table: attendance_geo_attempts | Type: n | attendance_geo_attempts_device_mocked_not_null
+  Def: NOT NULL device_mocked
+Table: attendance_geo_attempts | Type: f | attendance_geo_attempts_event_id_fkey
+  Def: FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE RESTRICT
+Table: attendance_geo_attempts | Type: n | attendance_geo_attempts_event_id_not_null
+  Def: NOT NULL event_id
+Table: attendance_geo_attempts | Type: n | attendance_geo_attempts_id_not_null
+  Def: NOT NULL id
+Table: attendance_geo_attempts | Type: p | attendance_geo_attempts_pkey
+  Def: PRIMARY KEY (id)
+Table: attendance_geo_attempts | Type: n | attendance_geo_attempts_result_not_null
+  Def: NOT NULL result
+Table: attendance_geo_attempts | Type: n | attendance_geo_attempts_review_status_not_null
+  Def: NOT NULL review_status
+Table: attendance_geo_attempts | Type: f | attendance_geo_attempts_reviewed_by_user_id_fkey
+  Def: FOREIGN KEY (reviewed_by_user_id) REFERENCES users(id) ON DELETE RESTRICT
+Table: attendance_geo_attempts | Type: f | attendance_geo_attempts_user_id_fkey
+  Def: FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT
+Table: attendance_geo_attempts | Type: n | attendance_geo_attempts_user_id_not_null
+  Def: NOT NULL user_id
+Table: attendance_geo_attempts | Type: c | ck_geo_attempt_lat
+  Def: CHECK (((latitude IS NULL) OR ((latitude >= ('-90'::integer)::numeric) AND (latitude <= (90)::numeric))))
+Table: attendance_geo_attempts | Type: c | ck_geo_attempt_lng
+  Def: CHECK (((longitude IS NULL) OR ((longitude >= ('-180'::integer)::numeric) AND (longitude <= (180)::numeric))))
+Table: attendance_geo_attempts | Type: c | ck_geo_attempt_result
+  Def: CHECK ((result = ANY (ARRAY['accepted'::text, 'already_checked_in'::text, 'invalid_fix'::text, 'low_accuracy'::text, 'stale_fix'::text, 'mock_location'::text, 'outside_geofence'::text, 'window_closed'::text, 'event_not_active'::text, 'geo_disabled'::text, 'not_assigned'::text, 'not_eligible'::text, 'onboarding_required'::text])))
+Table: attendance_geo_attempts | Type: c | ck_geo_attempt_review_status
+  Def: CHECK ((review_status = ANY (ARRAY['none'::text, 'pending'::text, 'confirmed'::text, 'rejected'::text])))
+Table: onboarding_acknowledgments | Type: c | ck_onboarding_ack_method
+  Def: CHECK ((method = 'app_tick'::text))
+Table: onboarding_acknowledgments | Type: c | ck_onboarding_ack_version
+  Def: CHECK ((onboarding_version >= 1))
+Table: onboarding_acknowledgments | Type: n | onboarding_acknowledgments_acknowledged_at_not_null
+  Def: NOT NULL acknowledged_at
+Table: onboarding_acknowledgments | Type: f | onboarding_acknowledgments_event_id_fkey
+  Def: FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE RESTRICT
+Table: onboarding_acknowledgments | Type: n | onboarding_acknowledgments_event_id_not_null
+  Def: NOT NULL event_id
+Table: onboarding_acknowledgments | Type: n | onboarding_acknowledgments_id_not_null
+  Def: NOT NULL id
+Table: onboarding_acknowledgments | Type: n | onboarding_acknowledgments_method_not_null
+  Def: NOT NULL method
+Table: onboarding_acknowledgments | Type: n | onboarding_acknowledgments_onboarding_version_not_null
+  Def: NOT NULL onboarding_version
+Table: onboarding_acknowledgments | Type: p | onboarding_acknowledgments_pkey
+  Def: PRIMARY KEY (id)
+Table: onboarding_acknowledgments | Type: f | onboarding_acknowledgments_user_id_fkey
+  Def: FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT
+Table: onboarding_acknowledgments | Type: n | onboarding_acknowledgments_user_id_not_null
+  Def: NOT NULL user_id
+Table: onboarding_acknowledgments | Type: u | uq_onboarding_ack_user_event_ver
+  Def: UNIQUE (user_id, event_id, onboarding_version)
+Table: feedback | Type: c | ck_feedback_direction
+  Def: CHECK ((direction = ANY (ARRAY['coordinator_to_volunteer'::text, 'volunteer_to_event'::text, 'volunteer_to_coordinator'::text])))
+Table: feedback | Type: c | ck_feedback_not_self
+  Def: CHECK (((target_user_id IS NULL) OR (target_user_id <> rater_user_id)))
+Table: feedback | Type: c | ck_feedback_score
+  Def: CHECK (((score >= 1) AND (score <= 5)))
+Table: feedback | Type: c | ck_feedback_status
+  Def: CHECK ((status = ANY (ARRAY['active'::text, 'hidden'::text])))
+Table: feedback | Type: c | ck_feedback_tags
+  Def: CHECK (tags_are_normalized(tags))
+Table: feedback | Type: c | ck_feedback_target
+  Def: CHECK ((((direction = 'volunteer_to_event'::text) AND (target_user_id IS NULL)) OR ((direction <> 'volunteer_to_event'::text) AND (target_user_id IS NOT NULL))))
+Table: feedback | Type: n | feedback_created_at_not_null
+  Def: NOT NULL created_at
+Table: feedback | Type: n | feedback_direction_not_null
+  Def: NOT NULL direction
+Table: feedback | Type: f | feedback_event_id_fkey
+  Def: FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE RESTRICT
+Table: feedback | Type: n | feedback_event_id_not_null
+  Def: NOT NULL event_id
+Table: feedback | Type: n | feedback_id_not_null
+  Def: NOT NULL id
+Table: feedback | Type: p | feedback_pkey
+  Def: PRIMARY KEY (id)
+Table: feedback | Type: f | feedback_rater_user_id_fkey
+  Def: FOREIGN KEY (rater_user_id) REFERENCES users(id) ON DELETE RESTRICT
+Table: feedback | Type: n | feedback_rater_user_id_not_null
+  Def: NOT NULL rater_user_id
+Table: feedback | Type: n | feedback_score_not_null
+  Def: NOT NULL score
+Table: feedback | Type: n | feedback_status_not_null
+  Def: NOT NULL status
+Table: feedback | Type: n | feedback_tags_not_null
+  Def: NOT NULL tags
+Table: feedback | Type: f | feedback_target_user_id_fkey
+  Def: FOREIGN KEY (target_user_id) REFERENCES users(id) ON DELETE RESTRICT
+Table: moderation_actions | Type: c | ck_moderation_action_type
+  Def: CHECK ((action_type = ANY (ARRAY['user_warning'::text, 'user_block'::text, 'user_unblock'::text, 'account_close'::text, 'account_reinstate'::text, 'event_delete'::text, 'event_restore'::text, 'event_cancel'::text, 'feedback_hide'::text])))
+Table: moderation_actions | Type: c | ck_moderation_expiry
+  Def: CHECK (((expires_at IS NULL) OR (action_type = 'user_block'::text)))
+Table: moderation_actions | Type: c | ck_moderation_no_self
+  Def: CHECK (((target_user_id IS NULL) OR (target_user_id <> admin_user_id)))
+Table: moderation_actions | Type: c | ck_moderation_reason
+  Def: CHECK (((action_type <> ALL (ARRAY['user_block'::text, 'account_close'::text, 'event_delete'::text, 'event_cancel'::text, 'feedback_hide'::text])) OR (char_length(btrim(COALESCE(reason, ''::text))) > 0)))
+Table: moderation_actions | Type: c | ck_moderation_subject
+  Def: CHECK ((((action_type = ANY (ARRAY['user_warning'::text, 'user_block'::text, 'user_unblock'::text, 'account_close'::text, 'account_reinstate'::text])) AND (target_user_id IS NOT NULL) AND (event_id IS NULL) AND (feedback_id IS NULL)) OR ((action_type = ANY (ARRAY['event_delete'::text, 'event_restore'::text, 'event_cancel'::text])) AND (event_id IS NOT NULL) AND (target_user_id IS NULL) AND (feedback_id IS NULL)) OR ((action_type = 'feedback_hide'::text) AND (feedback_id IS NOT NULL) AND (target_user_id IS NULL) AND (event_id IS NULL))))
+Table: moderation_actions | Type: n | moderation_actions_action_type_not_null
+  Def: NOT NULL action_type
+Table: moderation_actions | Type: f | moderation_actions_admin_user_id_fkey
+  Def: FOREIGN KEY (admin_user_id) REFERENCES users(id) ON DELETE RESTRICT
+Table: moderation_actions | Type: n | moderation_actions_admin_user_id_not_null
+  Def: NOT NULL admin_user_id
+Table: moderation_actions | Type: n | moderation_actions_created_at_not_null
+  Def: NOT NULL created_at
+Table: moderation_actions | Type: f | moderation_actions_event_id_fkey
+  Def: FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE RESTRICT
+Table: moderation_actions | Type: f | moderation_actions_feedback_id_fkey
+  Def: FOREIGN KEY (feedback_id) REFERENCES feedback(id) ON DELETE RESTRICT
+Table: moderation_actions | Type: n | moderation_actions_id_not_null
+  Def: NOT NULL id
+Table: moderation_actions | Type: p | moderation_actions_pkey
+  Def: PRIMARY KEY (id)
+Table: moderation_actions | Type: f | moderation_actions_target_user_id_fkey
+  Def: FOREIGN KEY (target_user_id) REFERENCES users(id) ON DELETE RESTRICT
+Table: audit_logs | Type: n | audit_logs_action_not_null
+  Def: NOT NULL action
+Table: audit_logs | Type: f | audit_logs_actor_user_id_fkey
+  Def: FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE RESTRICT
+Table: audit_logs | Type: n | audit_logs_created_at_not_null
+  Def: NOT NULL created_at
+Table: audit_logs | Type: n | audit_logs_entity_type_not_null
+  Def: NOT NULL entity_type
+Table: audit_logs | Type: n | audit_logs_id_not_null
+  Def: NOT NULL id
+Table: audit_logs | Type: p | audit_logs_pkey
+  Def: PRIMARY KEY (id)
+Table: django_migrations | Type: n | django_migrations_app_not_null
+  Def: NOT NULL app
+Table: django_migrations | Type: n | django_migrations_applied_not_null
+  Def: NOT NULL applied
+Table: django_migrations | Type: n | django_migrations_id_not_null
+  Def: NOT NULL id
+Table: django_migrations | Type: n | django_migrations_name_not_null
+  Def: NOT NULL name
+Table: django_migrations | Type: p | django_migrations_pkey
+  Def: PRIMARY KEY (id)
+Table: django_content_type | Type: u | django_content_type_app_label_model_76bd3d3b_uniq
+  Def: UNIQUE (app_label, model)
+Table: django_content_type | Type: n | django_content_type_app_label_not_null
+  Def: NOT NULL app_label
+Table: django_content_type | Type: n | django_content_type_id_not_null
+  Def: NOT NULL id
+Table: django_content_type | Type: n | django_content_type_model_not_null
+  Def: NOT NULL model
+Table: django_content_type | Type: p | django_content_type_pkey
+  Def: PRIMARY KEY (id)
+Table: django_admin_log | Type: c | django_admin_log_action_flag_check
+  Def: CHECK ((action_flag >= 0))
+Table: django_admin_log | Type: n | django_admin_log_action_flag_not_null
+  Def: NOT NULL action_flag
+Table: django_admin_log | Type: n | django_admin_log_action_time_not_null
+  Def: NOT NULL action_time
+Table: django_admin_log | Type: n | django_admin_log_change_message_not_null
+  Def: NOT NULL change_message
+Table: django_admin_log | Type: f | django_admin_log_content_type_id_c4bce8eb_fk_django_co
+  Def: FOREIGN KEY (content_type_id) REFERENCES django_content_type(id) DEFERRABLE INITIALLY DEFERRED
+Table: django_admin_log | Type: n | django_admin_log_id_not_null
+  Def: NOT NULL id
+Table: django_admin_log | Type: n | django_admin_log_object_repr_not_null
+  Def: NOT NULL object_repr
+Table: django_admin_log | Type: p | django_admin_log_pkey
+  Def: PRIMARY KEY (id)
+Table: django_admin_log | Type: f | django_admin_log_user_id_c564eba6_fk_users_id
+  Def: FOREIGN KEY (user_id) REFERENCES users(id) DEFERRABLE INITIALLY DEFERRED
+Table: django_admin_log | Type: n | django_admin_log_user_id_not_null
+  Def: NOT NULL user_id
+Table: auth_permission | Type: n | auth_permission_codename_not_null
+  Def: NOT NULL codename
+Table: auth_permission | Type: f | auth_permission_content_type_id_2f476e4b_fk_django_co
+  Def: FOREIGN KEY (content_type_id) REFERENCES django_content_type(id) DEFERRABLE INITIALLY DEFERRED
+Table: auth_permission | Type: u | auth_permission_content_type_id_codename_01ab375a_uniq
+  Def: UNIQUE (content_type_id, codename)
+Table: auth_permission | Type: n | auth_permission_content_type_id_not_null
+  Def: NOT NULL content_type_id
+Table: auth_permission | Type: n | auth_permission_id_not_null
+  Def: NOT NULL id
+Table: auth_permission | Type: n | auth_permission_name_not_null
+  Def: NOT NULL name
+Table: auth_permission | Type: p | auth_permission_pkey
+  Def: PRIMARY KEY (id)
+Table: auth_group | Type: n | auth_group_id_not_null
+  Def: NOT NULL id
+Table: auth_group | Type: u | auth_group_name_key
+  Def: UNIQUE (name)
+Table: auth_group | Type: n | auth_group_name_not_null
+  Def: NOT NULL name
+Table: auth_group | Type: p | auth_group_pkey
+  Def: PRIMARY KEY (id)
+Table: auth_group_permissions | Type: f | auth_group_permissio_permission_id_84c5c92e_fk_auth_perm
+  Def: FOREIGN KEY (permission_id) REFERENCES auth_permission(id) DEFERRABLE INITIALLY DEFERRED
+Table: auth_group_permissions | Type: f | auth_group_permissions_group_id_b120cbf9_fk_auth_group_id
+  Def: FOREIGN KEY (group_id) REFERENCES auth_group(id) DEFERRABLE INITIALLY DEFERRED
+Table: auth_group_permissions | Type: n | auth_group_permissions_group_id_not_null
+  Def: NOT NULL group_id
+Table: auth_group_permissions | Type: u | auth_group_permissions_group_id_permission_id_0cd325b0_uniq
+  Def: UNIQUE (group_id, permission_id)
+Table: auth_group_permissions | Type: n | auth_group_permissions_id_not_null
+  Def: NOT NULL id
+Table: auth_group_permissions | Type: n | auth_group_permissions_permission_id_not_null
+  Def: NOT NULL permission_id
+Table: auth_group_permissions | Type: p | auth_group_permissions_pkey
+  Def: PRIMARY KEY (id)
+Table: authtoken_token | Type: n | authtoken_token_created_not_null
+  Def: NOT NULL created
+Table: authtoken_token | Type: n | authtoken_token_key_not_null
+  Def: NOT NULL key
+Table: authtoken_token | Type: p | authtoken_token_pkey
+  Def: PRIMARY KEY (key)
+Table: authtoken_token | Type: f | authtoken_token_user_id_35299eff_fk_users_id
+  Def: FOREIGN KEY (user_id) REFERENCES users(id) DEFERRABLE INITIALLY DEFERRED
+Table: authtoken_token | Type: u | authtoken_token_user_id_key
+  Def: UNIQUE (user_id)
+Table: authtoken_token | Type: n | authtoken_token_user_id_not_null
+  Def: NOT NULL user_id
+Table: django_session | Type: n | django_session_expire_date_not_null
+  Def: NOT NULL expire_date
+Table: django_session | Type: p | django_session_pkey
+  Def: PRIMARY KEY (session_key)
+Table: django_session | Type: n | django_session_session_data_not_null
+  Def: NOT NULL session_data
+Table: django_session | Type: n | django_session_session_key_not_null
+  Def: NOT NULL session_key
+Table: auth_otp_challenge | Type: u | auth_otp_challenge_challenge_token_hash_key
+  Def: UNIQUE (challenge_token_hash)
+Table: auth_otp_challenge | Type: n | auth_otp_challenge_challenge_token_hash_not_null
+  Def: NOT NULL challenge_token_hash
+Table: auth_otp_challenge | Type: n | auth_otp_challenge_created_at_not_null
+  Def: NOT NULL created_at
+Table: auth_otp_challenge | Type: n | auth_otp_challenge_expires_at_not_null
+  Def: NOT NULL expires_at
+Table: auth_otp_challenge | Type: n | auth_otp_challenge_id_not_null
+  Def: NOT NULL id
+Table: auth_otp_challenge | Type: f | auth_otp_challenge_otp_id_fkey
+  Def: FOREIGN KEY (otp_id) REFERENCES auth_otp(id) ON DELETE CASCADE
+Table: auth_otp_challenge | Type: n | auth_otp_challenge_otp_id_not_null
+  Def: NOT NULL otp_id
+Table: auth_otp_challenge | Type: p | auth_otp_challenge_pkey
+  Def: PRIMARY KEY (id)
+Table: auth_otp_challenge | Type: n | auth_otp_challenge_purpose_not_null
+  Def: NOT NULL purpose
+Table: auth_otp_challenge | Type: c | ck_auth_otp_challenge_consumed
+  Def: CHECK (((consumed_at IS NULL) OR (consumed_at >= created_at)))
+Table: auth_otp_challenge | Type: c | ck_auth_otp_challenge_expiry
+  Def: CHECK ((expires_at > created_at))
+Table: auth_otp_challenge | Type: c | ck_auth_otp_challenge_purpose
+  Def: CHECK ((purpose = ANY (ARRAY['login'::text, 'qr_registration'::text])))
+Table: auth_otp_challenge | Type: c | ck_auth_otp_challenge_token_hash_len
+  Def: CHECK ((length(challenge_token_hash) = 64))
+
+--------------------------------------------------------------------------------
+5. ALL INDEXES
+--------------------------------------------------------------------------------
+Table: app_settings | Index: app_settings_pkey
+  SQL: CREATE UNIQUE INDEX app_settings_pkey ON public.app_settings USING btree (key)
+Table: assignments | Index: assignments_pkey
+  SQL: CREATE UNIQUE INDEX assignments_pkey ON public.assignments USING btree (id)
+Table: assignments | Index: ex_assignments_no_overlap
+  SQL: CREATE INDEX ex_assignments_no_overlap ON public.assignments USING gist (user_id, tstzrange(schedule_start, schedule_end, '[)'::text)) WHERE (status <> 'cancelled'::text)
+Table: assignments | Index: idx_assignments_event
+  SQL: CREATE INDEX idx_assignments_event ON public.assignments USING btree (event_id, status)
+Table: assignments | Index: idx_assignments_post
+  SQL: CREATE INDEX idx_assignments_post ON public.assignments USING btree (post_id) WHERE (post_id IS NOT NULL)
+Table: assignments | Index: idx_assignments_user
+  SQL: CREATE INDEX idx_assignments_user ON public.assignments USING btree (user_id)
+Table: assignments | Index: uq_assignment_active
+  SQL: CREATE UNIQUE INDEX uq_assignment_active ON public.assignments USING btree (event_id, user_id) WHERE (status <> 'cancelled'::text)
+Table: assignments | Index: uq_assignment_application
+  SQL: CREATE UNIQUE INDEX uq_assignment_application ON public.assignments USING btree (application_id) WHERE (status <> 'cancelled'::text)
+Table: assignments | Index: uq_assignment_group_leader
+  SQL: CREATE UNIQUE INDEX uq_assignment_group_leader ON public.assignments USING btree (event_id, group_code) WHERE (is_group_leader AND (status <> 'cancelled'::text))
+Table: assignments | Index: uq_assignments_id_event_user
+  SQL: CREATE UNIQUE INDEX uq_assignments_id_event_user ON public.assignments USING btree (id, event_id, user_id)
+Table: attendance | Index: attendance_pkey
+  SQL: CREATE UNIQUE INDEX attendance_pkey ON public.attendance USING btree (id)
+Table: attendance | Index: idx_attendance_event_status
+  SQL: CREATE INDEX idx_attendance_event_status ON public.attendance USING btree (event_id, status)
+Table: attendance | Index: idx_attendance_pending_confirmation
+  SQL: CREATE INDEX idx_attendance_pending_confirmation ON public.attendance USING btree (event_id) WHERE (confirmation_status = 'pending'::text)
+Table: attendance | Index: idx_attendance_user
+  SQL: CREATE INDEX idx_attendance_user ON public.attendance USING btree (user_id)
+Table: attendance | Index: uq_attendance_event_user
+  SQL: CREATE UNIQUE INDEX uq_attendance_event_user ON public.attendance USING btree (event_id, user_id)
+Table: attendance_geo_attempts | Index: attendance_geo_attempts_pkey
+  SQL: CREATE UNIQUE INDEX attendance_geo_attempts_pkey ON public.attendance_geo_attempts USING btree (id)
+Table: attendance_geo_attempts | Index: idx_geo_attempts_attendance
+  SQL: CREATE INDEX idx_geo_attempts_attendance ON public.attendance_geo_attempts USING btree (attendance_id) WHERE (attendance_id IS NOT NULL)
+Table: attendance_geo_attempts | Index: idx_geo_attempts_event_user
+  SQL: CREATE INDEX idx_geo_attempts_event_user ON public.attendance_geo_attempts USING btree (event_id, user_id, attempted_at DESC)
+Table: audit_logs | Index: audit_logs_pkey
+  SQL: CREATE UNIQUE INDEX audit_logs_pkey ON public.audit_logs USING btree (id)
+Table: audit_logs | Index: idx_audit_actor
+  SQL: CREATE INDEX idx_audit_actor ON public.audit_logs USING btree (actor_user_id) WHERE (actor_user_id IS NOT NULL)
+Table: audit_logs | Index: idx_audit_created
+  SQL: CREATE INDEX idx_audit_created ON public.audit_logs USING btree (created_at)
+Table: audit_logs | Index: idx_audit_entity
+  SQL: CREATE INDEX idx_audit_entity ON public.audit_logs USING btree (entity_type, entity_id)
+Table: auth_group | Index: auth_group_name_a6ea08ec_like
+  SQL: CREATE INDEX auth_group_name_a6ea08ec_like ON public.auth_group USING btree (name varchar_pattern_ops)
+Table: auth_group | Index: auth_group_name_key
+  SQL: CREATE UNIQUE INDEX auth_group_name_key ON public.auth_group USING btree (name)
+Table: auth_group | Index: auth_group_pkey
+  SQL: CREATE UNIQUE INDEX auth_group_pkey ON public.auth_group USING btree (id)
+Table: auth_group_permissions | Index: auth_group_permissions_group_id_b120cbf9
+  SQL: CREATE INDEX auth_group_permissions_group_id_b120cbf9 ON public.auth_group_permissions USING btree (group_id)
+Table: auth_group_permissions | Index: auth_group_permissions_group_id_permission_id_0cd325b0_uniq
+  SQL: CREATE UNIQUE INDEX auth_group_permissions_group_id_permission_id_0cd325b0_uniq ON public.auth_group_permissions USING btree (group_id, permission_id)
+Table: auth_group_permissions | Index: auth_group_permissions_permission_id_84c5c92e
+  SQL: CREATE INDEX auth_group_permissions_permission_id_84c5c92e ON public.auth_group_permissions USING btree (permission_id)
+Table: auth_group_permissions | Index: auth_group_permissions_pkey
+  SQL: CREATE UNIQUE INDEX auth_group_permissions_pkey ON public.auth_group_permissions USING btree (id)
+Table: auth_otp | Index: auth_otp_pkey
+  SQL: CREATE UNIQUE INDEX auth_otp_pkey ON public.auth_otp USING btree (id)
+Table: auth_otp | Index: idx_auth_otp_expires
+  SQL: CREATE INDEX idx_auth_otp_expires ON public.auth_otp USING btree (expires_at)
+Table: auth_otp | Index: idx_auth_otp_open
+  SQL: CREATE INDEX idx_auth_otp_open ON public.auth_otp USING btree (phone_hash, purpose) WHERE (consumed_at IS NULL)
+Table: auth_otp | Index: idx_auth_otp_phone_created
+  SQL: CREATE INDEX idx_auth_otp_phone_created ON public.auth_otp USING btree (phone_hash, created_at DESC)
+Table: auth_otp_challenge | Index: auth_otp_challenge_challenge_token_hash_key
+  SQL: CREATE UNIQUE INDEX auth_otp_challenge_challenge_token_hash_key ON public.auth_otp_challenge USING btree (challenge_token_hash)
+Table: auth_otp_challenge | Index: auth_otp_challenge_pkey
+  SQL: CREATE UNIQUE INDEX auth_otp_challenge_pkey ON public.auth_otp_challenge USING btree (id)
+Table: auth_otp_challenge | Index: idx_auth_otp_challenge_expires
+  SQL: CREATE INDEX idx_auth_otp_challenge_expires ON public.auth_otp_challenge USING btree (expires_at) WHERE (consumed_at IS NULL)
+Table: auth_otp_challenge | Index: idx_auth_otp_challenge_nonce
+  SQL: CREATE UNIQUE INDEX idx_auth_otp_challenge_nonce ON public.auth_otp_challenge USING btree (identity_nonce_hash) WHERE (identity_nonce_hash IS NOT NULL)
+Table: auth_otp_challenge | Index: idx_auth_otp_challenge_otp_id
+  SQL: CREATE INDEX idx_auth_otp_challenge_otp_id ON public.auth_otp_challenge USING btree (otp_id)
+Table: auth_permission | Index: auth_permission_content_type_id_2f476e4b
+  SQL: CREATE INDEX auth_permission_content_type_id_2f476e4b ON public.auth_permission USING btree (content_type_id)
+Table: auth_permission | Index: auth_permission_content_type_id_codename_01ab375a_uniq
+  SQL: CREATE UNIQUE INDEX auth_permission_content_type_id_codename_01ab375a_uniq ON public.auth_permission USING btree (content_type_id, codename)
+Table: auth_permission | Index: auth_permission_pkey
+  SQL: CREATE UNIQUE INDEX auth_permission_pkey ON public.auth_permission USING btree (id)
+Table: authtoken_token | Index: authtoken_token_key_10f0b77e_like
+  SQL: CREATE INDEX authtoken_token_key_10f0b77e_like ON public.authtoken_token USING btree (key varchar_pattern_ops)
+Table: authtoken_token | Index: authtoken_token_pkey
+  SQL: CREATE UNIQUE INDEX authtoken_token_pkey ON public.authtoken_token USING btree (key)
+Table: authtoken_token | Index: authtoken_token_user_id_key
+  SQL: CREATE UNIQUE INDEX authtoken_token_user_id_key ON public.authtoken_token USING btree (user_id)
+Table: charity_fields | Index: charity_fields_pkey
+  SQL: CREATE UNIQUE INDEX charity_fields_pkey ON public.charity_fields USING btree (code)
+Table: coordinator_profiles | Index: coordinator_profiles_pkey
+  SQL: CREATE UNIQUE INDEX coordinator_profiles_pkey ON public.coordinator_profiles USING btree (user_id)
+Table: coordinator_profiles | Index: idx_coordinator_profiles_approved_by
+  SQL: CREATE INDEX idx_coordinator_profiles_approved_by ON public.coordinator_profiles USING btree (approved_by_id)
+Table: coordinator_profiles | Index: idx_coordinator_profiles_status
+  SQL: CREATE INDEX idx_coordinator_profiles_status ON public.coordinator_profiles USING btree (status)
+Table: django_admin_log | Index: django_admin_log_content_type_id_c4bce8eb
+  SQL: CREATE INDEX django_admin_log_content_type_id_c4bce8eb ON public.django_admin_log USING btree (content_type_id)
+Table: django_admin_log | Index: django_admin_log_pkey
+  SQL: CREATE UNIQUE INDEX django_admin_log_pkey ON public.django_admin_log USING btree (id)
+Table: django_admin_log | Index: django_admin_log_user_id_c564eba6
+  SQL: CREATE INDEX django_admin_log_user_id_c564eba6 ON public.django_admin_log USING btree (user_id)
+Table: django_content_type | Index: django_content_type_app_label_model_76bd3d3b_uniq
+  SQL: CREATE UNIQUE INDEX django_content_type_app_label_model_76bd3d3b_uniq ON public.django_content_type USING btree (app_label, model)
+Table: django_content_type | Index: django_content_type_pkey
+  SQL: CREATE UNIQUE INDEX django_content_type_pkey ON public.django_content_type USING btree (id)
+Table: django_migrations | Index: django_migrations_pkey
+  SQL: CREATE UNIQUE INDEX django_migrations_pkey ON public.django_migrations USING btree (id)
+Table: django_session | Index: django_session_expire_date_a5c62663
+  SQL: CREATE INDEX django_session_expire_date_a5c62663 ON public.django_session USING btree (expire_date)
+Table: django_session | Index: django_session_pkey
+  SQL: CREATE UNIQUE INDEX django_session_pkey ON public.django_session USING btree (session_key)
+Table: django_session | Index: django_session_session_key_c0390e0f_like
+  SQL: CREATE INDEX django_session_session_key_c0390e0f_like ON public.django_session USING btree (session_key varchar_pattern_ops)
+Table: event_applications | Index: event_applications_pkey
+  SQL: CREATE UNIQUE INDEX event_applications_pkey ON public.event_applications USING btree (id)
+Table: event_applications | Index: idx_event_applications_event
+  SQL: CREATE INDEX idx_event_applications_event ON public.event_applications USING btree (event_id, status)
+Table: event_applications | Index: idx_event_applications_post
+  SQL: CREATE INDEX idx_event_applications_post ON public.event_applications USING btree (post_id) WHERE (post_id IS NOT NULL)
+Table: event_applications | Index: idx_event_applications_user
+  SQL: CREATE INDEX idx_event_applications_user ON public.event_applications USING btree (user_id)
+Table: event_applications | Index: uq_event_application_active
+  SQL: CREATE UNIQUE INDEX uq_event_application_active ON public.event_applications USING btree (event_id, user_id) WHERE (status = ANY (ARRAY['pending'::text, 'accepted'::text, 'waitlisted'::text]))
+Table: event_applications | Index: uq_event_applications_id_event_user
+  SQL: CREATE UNIQUE INDEX uq_event_applications_id_event_user ON public.event_applications USING btree (id, event_id, user_id)
+Table: event_charity_fields | Index: event_charity_fields_pkey
+  SQL: CREATE UNIQUE INDEX event_charity_fields_pkey ON public.event_charity_fields USING btree (id)
+Table: event_charity_fields | Index: idx_event_charity_fields_event
+  SQL: CREATE INDEX idx_event_charity_fields_event ON public.event_charity_fields USING btree (event_id)
+Table: event_charity_fields | Index: idx_event_charity_fields_field
+  SQL: CREATE INDEX idx_event_charity_fields_field ON public.event_charity_fields USING btree (field_code)
+Table: event_charity_fields | Index: uq_event_charity_field
+  SQL: CREATE UNIQUE INDEX uq_event_charity_field ON public.event_charity_fields USING btree (event_id, field_code)
+Table: event_coordinator_history | Index: event_coordinator_history_pkey
+  SQL: CREATE UNIQUE INDEX event_coordinator_history_pkey ON public.event_coordinator_history USING btree (id)
+Table: event_coordinator_history | Index: idx_coord_history_event
+  SQL: CREATE INDEX idx_coord_history_event ON public.event_coordinator_history USING btree (event_id, changed_at)
+Table: event_posts | Index: event_posts_pkey
+  SQL: CREATE UNIQUE INDEX event_posts_pkey ON public.event_posts USING btree (id)
+Table: event_posts | Index: idx_event_posts_event
+  SQL: CREATE INDEX idx_event_posts_event ON public.event_posts USING btree (event_id)
+Table: event_posts | Index: idx_event_posts_skills_gin
+  SQL: CREATE INDEX idx_event_posts_skills_gin ON public.event_posts USING gin (required_skills)
+Table: event_posts | Index: uq_event_posts_event_title
+  SQL: CREATE UNIQUE INDEX uq_event_posts_event_title ON public.event_posts USING btree (event_id, title)
+Table: event_posts | Index: uq_event_posts_id_event
+  SQL: CREATE UNIQUE INDEX uq_event_posts_id_event ON public.event_posts USING btree (id, event_id)
+Table: events | Index: events_pkey
+  SQL: CREATE UNIQUE INDEX events_pkey ON public.events USING btree (id)
+Table: events | Index: idx_events_coordinator
+  SQL: CREATE INDEX idx_events_coordinator ON public.events USING btree (current_coordinator_id)
+Table: events | Index: idx_events_owner
+  SQL: CREATE INDEX idx_events_owner ON public.events USING btree (owner_id)
+Table: events | Index: idx_events_start_at
+  SQL: CREATE INDEX idx_events_start_at ON public.events USING btree (start_at)
+Table: events | Index: idx_events_visible
+  SQL: CREATE INDEX idx_events_visible ON public.events USING btree (status, start_at) WHERE (deleted_at IS NULL)
+Table: feedback | Index: feedback_pkey
+  SQL: CREATE UNIQUE INDEX feedback_pkey ON public.feedback USING btree (id)
+Table: feedback | Index: idx_feedback_event
+  SQL: CREATE INDEX idx_feedback_event ON public.feedback USING btree (event_id)
+Table: feedback | Index: idx_feedback_rater
+  SQL: CREATE INDEX idx_feedback_rater ON public.feedback USING btree (rater_user_id)
+Table: feedback | Index: idx_feedback_tags_gin
+  SQL: CREATE INDEX idx_feedback_tags_gin ON public.feedback USING gin (tags)
+Table: feedback | Index: idx_feedback_target
+  SQL: CREATE INDEX idx_feedback_target ON public.feedback USING btree (target_user_id) WHERE (target_user_id IS NOT NULL)
+Table: feedback | Index: uq_feedback_event_once
+  SQL: CREATE UNIQUE INDEX uq_feedback_event_once ON public.feedback USING btree (event_id, rater_user_id, direction) WHERE (target_user_id IS NULL)
+Table: feedback | Index: uq_feedback_user_once
+  SQL: CREATE UNIQUE INDEX uq_feedback_user_once ON public.feedback USING btree (event_id, rater_user_id, direction, target_user_id) WHERE (target_user_id IS NOT NULL)
+Table: moderation_actions | Index: idx_moderation_admin
+  SQL: CREATE INDEX idx_moderation_admin ON public.moderation_actions USING btree (admin_user_id)
+Table: moderation_actions | Index: idx_moderation_event
+  SQL: CREATE INDEX idx_moderation_event ON public.moderation_actions USING btree (event_id) WHERE (event_id IS NOT NULL)
+Table: moderation_actions | Index: idx_moderation_target
+  SQL: CREATE INDEX idx_moderation_target ON public.moderation_actions USING btree (target_user_id, action_type) WHERE (target_user_id IS NOT NULL)
+Table: moderation_actions | Index: moderation_actions_pkey
+  SQL: CREATE UNIQUE INDEX moderation_actions_pkey ON public.moderation_actions USING btree (id)
+Table: onboarding_acknowledgments | Index: idx_onboarding_ack_event
+  SQL: CREATE INDEX idx_onboarding_ack_event ON public.onboarding_acknowledgments USING btree (event_id)
+Table: onboarding_acknowledgments | Index: onboarding_acknowledgments_pkey
+  SQL: CREATE UNIQUE INDEX onboarding_acknowledgments_pkey ON public.onboarding_acknowledgments USING btree (id)
+Table: onboarding_acknowledgments | Index: uq_onboarding_ack_user_event_ver
+  SQL: CREATE UNIQUE INDEX uq_onboarding_ack_user_event_ver ON public.onboarding_acknowledgments USING btree (user_id, event_id, onboarding_version)
+Table: qr_tokens | Index: idx_qr_tokens_event_purpose
+  SQL: CREATE INDEX idx_qr_tokens_event_purpose ON public.qr_tokens USING btree (event_id, purpose)
+Table: qr_tokens | Index: qr_tokens_pkey
+  SQL: CREATE UNIQUE INDEX qr_tokens_pkey ON public.qr_tokens USING btree (id)
+Table: qr_tokens | Index: uq_qr_tokens_id_event
+  SQL: CREATE UNIQUE INDEX uq_qr_tokens_id_event ON public.qr_tokens USING btree (id, event_id)
+Table: qr_tokens | Index: uq_qr_tokens_token_hash
+  SQL: CREATE UNIQUE INDEX uq_qr_tokens_token_hash ON public.qr_tokens USING btree (token_hash)
+Table: user_charity_interests | Index: idx_user_charity_interests_field
+  SQL: CREATE INDEX idx_user_charity_interests_field ON public.user_charity_interests USING btree (field_code)
+Table: user_charity_interests | Index: idx_user_charity_interests_user
+  SQL: CREATE INDEX idx_user_charity_interests_user ON public.user_charity_interests USING btree (user_id)
+Table: user_charity_interests | Index: uq_user_charity_interest
+  SQL: CREATE UNIQUE INDEX uq_user_charity_interest ON public.user_charity_interests USING btree (user_id, field_code)
+Table: user_charity_interests | Index: user_charity_interests_pkey
+  SQL: CREATE UNIQUE INDEX user_charity_interests_pkey ON public.user_charity_interests USING btree (id)
+Table: user_verification_images | Index: idx_verification_images_pending
+  SQL: CREATE INDEX idx_verification_images_pending ON public.user_verification_images USING btree (id) WHERE ((status = 'pending'::text) AND is_current)
+Table: user_verification_images | Index: idx_verification_images_user
+  SQL: CREATE INDEX idx_verification_images_user ON public.user_verification_images USING btree (user_id)
+Table: user_verification_images | Index: uq_current_verification_image
+  SQL: CREATE UNIQUE INDEX uq_current_verification_image ON public.user_verification_images USING btree (user_id, image_type) WHERE is_current
+Table: user_verification_images | Index: user_verification_images_pkey
+  SQL: CREATE UNIQUE INDEX user_verification_images_pkey ON public.user_verification_images USING btree (id)
+Table: users | Index: idx_users_account_status
+  SQL: CREATE INDEX idx_users_account_status ON public.users USING btree (account_status)
+Table: users | Index: idx_users_blocked_until
+  SQL: CREATE INDEX idx_users_blocked_until ON public.users USING btree (blocked_until) WHERE (account_status = 'blocked'::text)
+Table: users | Index: idx_users_blood_donors
+  SQL: CREATE INDEX idx_users_blood_donors ON public.users USING btree (blood_type) WHERE is_willing_to_donate_blood
+Table: users | Index: idx_users_is_admin
+  SQL: CREATE INDEX idx_users_is_admin ON public.users USING btree (id) WHERE is_admin
+Table: users | Index: idx_users_skills_gin
+  SQL: CREATE INDEX idx_users_skills_gin ON public.users USING gin (skills)
+Table: users | Index: idx_users_verification_status
+  SQL: CREATE INDEX idx_users_verification_status ON public.users USING btree (verification_status)
+Table: users | Index: uq_users_phone_hash
+  SQL: CREATE UNIQUE INDEX uq_users_phone_hash ON public.users USING btree (phone_hash)
+Table: users | Index: uq_users_uuid
+  SQL: CREATE UNIQUE INDEX uq_users_uuid ON public.users USING btree (uuid)
+Table: users | Index: users_pkey
+  SQL: CREATE UNIQUE INDEX users_pkey ON public.users USING btree (id)
+Table: volunteer_availability_exceptions | Index: idx_availability_exceptions_user_date
+  SQL: CREATE INDEX idx_availability_exceptions_user_date ON public.volunteer_availability_exceptions USING btree (user_id, date)
+Table: volunteer_availability_exceptions | Index: uq_availability_exception
+  SQL: CREATE UNIQUE INDEX uq_availability_exception ON public.volunteer_availability_exceptions USING btree (user_id, date)
+Table: volunteer_availability_exceptions | Index: volunteer_availability_exceptions_pkey
+  SQL: CREATE UNIQUE INDEX volunteer_availability_exceptions_pkey ON public.volunteer_availability_exceptions USING btree (id)
+Table: volunteer_availability_rules | Index: idx_availability_rules_user
+  SQL: CREATE INDEX idx_availability_rules_user ON public.volunteer_availability_rules USING btree (user_id, weekday)
+Table: volunteer_availability_rules | Index: uq_availability_rule
+  SQL: CREATE UNIQUE INDEX uq_availability_rule ON public.volunteer_availability_rules USING btree (user_id, weekday, start_time)
+Table: volunteer_availability_rules | Index: volunteer_availability_rules_pkey
+  SQL: CREATE UNIQUE INDEX volunteer_availability_rules_pkey ON public.volunteer_availability_rules USING btree (id)
+
+--------------------------------------------------------------------------------
+6. ALL DATABASE TRIGGERS
+--------------------------------------------------------------------------------
+Table: assignments | Trigger: trg_01_assignments_before_insert | BEFORE INSERT
+  Action: EXECUTE FUNCTION trg_assignments_before_insert()
+Table: assignments | Trigger: trg_01_assignments_before_update | BEFORE UPDATE
+  Action: EXECUTE FUNCTION trg_assignments_before_update()
+Table: assignments | Trigger: trg_50_assignments_after_insert | AFTER INSERT
+  Action: EXECUTE FUNCTION trg_assignments_after_insert()
+Table: assignments | Trigger: trg_50_assignments_after_update | AFTER UPDATE
+  Action: EXECUTE FUNCTION trg_assignments_after_update()
+Table: assignments | Trigger: trg_90_assignments_updated_at | BEFORE UPDATE
+  Action: EXECUTE FUNCTION set_updated_at()
+Table: assignments | Trigger: trg_95_assignments_audit | AFTER INSERT
+  Action: EXECUTE FUNCTION trg_audit_row()
+Table: assignments | Trigger: trg_95_assignments_audit | AFTER UPDATE
+  Action: EXECUTE FUNCTION trg_audit_row()
+Table: attendance | Trigger: trg_01_attendance_before_insert | BEFORE INSERT
+  Action: EXECUTE FUNCTION trg_attendance_before_insert()
+Table: attendance | Trigger: trg_01_attendance_guard | BEFORE UPDATE
+  Action: EXECUTE FUNCTION trg_attendance_guard()
+Table: attendance | Trigger: trg_90_attendance_updated_at | BEFORE UPDATE
+  Action: EXECUTE FUNCTION set_updated_at()
+Table: attendance | Trigger: trg_95_attendance_audit | AFTER INSERT
+  Action: EXECUTE FUNCTION trg_audit_row('checkin_latitude', 'checkin_longitude')
+Table: attendance | Trigger: trg_95_attendance_audit | AFTER UPDATE
+  Action: EXECUTE FUNCTION trg_audit_row('checkin_latitude', 'checkin_longitude')
+Table: attendance_geo_attempts | Trigger: trg_01_geo_attempts_guard | BEFORE UPDATE
+  Action: EXECUTE FUNCTION trg_geo_attempts_guard()
+Table: attendance_geo_attempts | Trigger: trg_01_geo_attempts_no_delete | BEFORE DELETE
+  Action: EXECUTE FUNCTION trg_block_mutation()
+Table: audit_logs | Trigger: trg_01_audit_append_only | BEFORE UPDATE
+  Action: EXECUTE FUNCTION trg_block_mutation()
+Table: audit_logs | Trigger: trg_01_audit_append_only | BEFORE DELETE
+  Action: EXECUTE FUNCTION trg_block_mutation()
+Table: auth_otp | Trigger: trg_01_otp_rate_limit | BEFORE INSERT
+  Action: EXECUTE FUNCTION trg_otp_rate_limit()
+Table: auth_otp_challenge | Trigger: trg_01_auth_otp_challenge_guard | BEFORE UPDATE
+  Action: EXECUTE FUNCTION trg_auth_otp_challenge_before()
+Table: auth_otp_challenge | Trigger: trg_01_auth_otp_challenge_guard | BEFORE INSERT
+  Action: EXECUTE FUNCTION trg_auth_otp_challenge_before()
+Table: coordinator_profiles | Trigger: trg_01_coordinator_guard | BEFORE UPDATE
+  Action: EXECUTE FUNCTION trg_coordinator_guard()
+Table: coordinator_profiles | Trigger: trg_01_coordinator_guard | BEFORE INSERT
+  Action: EXECUTE FUNCTION trg_coordinator_guard()
+Table: coordinator_profiles | Trigger: trg_90_coordinator_profiles_updated_at | BEFORE UPDATE
+  Action: EXECUTE FUNCTION set_updated_at()
+Table: coordinator_profiles | Trigger: trg_95_coordinator_profiles_audit | AFTER INSERT
+  Action: EXECUTE FUNCTION trg_audit_row()
+Table: coordinator_profiles | Trigger: trg_95_coordinator_profiles_audit | AFTER UPDATE
+  Action: EXECUTE FUNCTION trg_audit_row()
+Table: event_applications | Trigger: trg_01_applications_before_insert | BEFORE INSERT
+  Action: EXECUTE FUNCTION trg_applications_before_insert()
+Table: event_applications | Trigger: trg_01_applications_before_update | BEFORE UPDATE
+  Action: EXECUTE FUNCTION trg_applications_before_update()
+Table: event_applications | Trigger: trg_50_applications_after | AFTER UPDATE
+  Action: EXECUTE FUNCTION trg_applications_after()
+Table: event_applications | Trigger: trg_50_applications_after | AFTER INSERT
+  Action: EXECUTE FUNCTION trg_applications_after()
+Table: event_applications | Trigger: trg_90_event_applications_updated_at | BEFORE UPDATE
+  Action: EXECUTE FUNCTION set_updated_at()
+Table: event_applications | Trigger: trg_95_applications_audit | AFTER UPDATE
+  Action: EXECUTE FUNCTION trg_audit_row()
+Table: event_applications | Trigger: trg_95_applications_audit | AFTER INSERT
+  Action: EXECUTE FUNCTION trg_audit_row()
+Table: event_coordinator_history | Trigger: trg_01_coord_history_append_only | BEFORE UPDATE
+  Action: EXECUTE FUNCTION trg_block_mutation()
+Table: event_coordinator_history | Trigger: trg_01_coord_history_append_only | BEFORE DELETE
+  Action: EXECUTE FUNCTION trg_block_mutation()
+Table: event_posts | Trigger: trg_01_posts_guard | BEFORE INSERT
+  Action: EXECUTE FUNCTION trg_posts_guard()
+Table: event_posts | Trigger: trg_01_posts_guard | BEFORE UPDATE
+  Action: EXECUTE FUNCTION trg_posts_guard()
+Table: event_posts | Trigger: trg_90_event_posts_updated_at | BEFORE UPDATE
+  Action: EXECUTE FUNCTION set_updated_at()
+Table: event_posts | Trigger: trg_95_event_posts_audit | AFTER INSERT
+  Action: EXECUTE FUNCTION trg_audit_row()
+Table: event_posts | Trigger: trg_95_event_posts_audit | AFTER UPDATE
+  Action: EXECUTE FUNCTION trg_audit_row()
+Table: events | Trigger: trg_01_events_before_insert | BEFORE INSERT
+  Action: EXECUTE FUNCTION trg_events_before_insert()
+Table: events | Trigger: trg_01_events_before_update | BEFORE UPDATE
+  Action: EXECUTE FUNCTION trg_events_before_update()
+Table: events | Trigger: trg_50_events_after_insert | AFTER INSERT
+  Action: EXECUTE FUNCTION trg_events_after_insert()
+Table: events | Trigger: trg_50_events_after_update | AFTER UPDATE
+  Action: EXECUTE FUNCTION trg_events_after_update()
+Table: events | Trigger: trg_90_events_updated_at | BEFORE UPDATE
+  Action: EXECUTE FUNCTION set_updated_at()
+Table: events | Trigger: trg_95_events_audit | AFTER INSERT
+  Action: EXECUTE FUNCTION trg_audit_row()
+Table: events | Trigger: trg_95_events_audit | AFTER UPDATE
+  Action: EXECUTE FUNCTION trg_audit_row()
+Table: feedback | Trigger: trg_01_feedback_guard | BEFORE INSERT
+  Action: EXECUTE FUNCTION trg_feedback_guard()
+Table: feedback | Trigger: trg_01_feedback_guard | BEFORE UPDATE
+  Action: EXECUTE FUNCTION trg_feedback_guard()
+Table: feedback | Trigger: trg_95_feedback_audit | AFTER INSERT
+  Action: EXECUTE FUNCTION trg_audit_row()
+Table: feedback | Trigger: trg_95_feedback_audit | AFTER UPDATE
+  Action: EXECUTE FUNCTION trg_audit_row()
+Table: moderation_actions | Trigger: trg_01_moderation_append_only | BEFORE UPDATE
+  Action: EXECUTE FUNCTION trg_block_mutation()
+Table: moderation_actions | Trigger: trg_01_moderation_append_only | BEFORE DELETE
+  Action: EXECUTE FUNCTION trg_block_mutation()
+Table: moderation_actions | Trigger: trg_01_moderation_before_insert | BEFORE INSERT
+  Action: EXECUTE FUNCTION trg_moderation_before_insert()
+Table: moderation_actions | Trigger: trg_50_moderation_after_insert | AFTER INSERT
+  Action: EXECUTE FUNCTION trg_moderation_after_insert()
+Table: moderation_actions | Trigger: trg_95_moderation_audit | AFTER INSERT
+  Action: EXECUTE FUNCTION trg_audit_row()
+Table: onboarding_acknowledgments | Trigger: trg_01_onboarding_append_only | BEFORE UPDATE
+  Action: EXECUTE FUNCTION trg_block_mutation()
+Table: onboarding_acknowledgments | Trigger: trg_01_onboarding_append_only | BEFORE DELETE
+  Action: EXECUTE FUNCTION trg_block_mutation()
+Table: onboarding_acknowledgments | Trigger: trg_01_onboarding_before_insert | BEFORE INSERT
+  Action: EXECUTE FUNCTION trg_onboarding_before_insert()
+Table: qr_tokens | Trigger: trg_01_qr_guard | BEFORE UPDATE
+  Action: EXECUTE FUNCTION trg_qr_guard()
+Table: qr_tokens | Trigger: trg_01_qr_guard | BEFORE INSERT
+  Action: EXECUTE FUNCTION trg_qr_guard()
+Table: qr_tokens | Trigger: trg_95_qr_tokens_audit | AFTER UPDATE
+  Action: EXECUTE FUNCTION trg_audit_row()
+Table: qr_tokens | Trigger: trg_95_qr_tokens_audit | AFTER INSERT
+  Action: EXECUTE FUNCTION trg_audit_row()
+Table: user_verification_images | Trigger: trg_01_vimg_guard | BEFORE UPDATE
+  Action: EXECUTE FUNCTION trg_vimg_guard()
+Table: user_verification_images | Trigger: trg_01_vimg_guard | BEFORE INSERT
+  Action: EXECUTE FUNCTION trg_vimg_guard()
+Table: user_verification_images | Trigger: trg_50_vimg_after | AFTER UPDATE
+  Action: EXECUTE FUNCTION trg_vimg_after()
+Table: user_verification_images | Trigger: trg_50_vimg_after | AFTER INSERT
+  Action: EXECUTE FUNCTION trg_vimg_after()
+Table: user_verification_images | Trigger: trg_90_user_verification_images_updated_at | BEFORE UPDATE
+  Action: EXECUTE FUNCTION set_updated_at()
+Table: user_verification_images | Trigger: trg_95_verification_images_audit | AFTER INSERT
+  Action: EXECUTE FUNCTION trg_audit_row()
+Table: user_verification_images | Trigger: trg_95_verification_images_audit | AFTER UPDATE
+  Action: EXECUTE FUNCTION trg_audit_row()
+Table: users | Trigger: trg_01_users_guard | BEFORE INSERT
+  Action: EXECUTE FUNCTION trg_users_guard()
+Table: users | Trigger: trg_01_users_guard | BEFORE UPDATE
+  Action: EXECUTE FUNCTION trg_users_guard()
+Table: users | Trigger: trg_90_users_updated_at | BEFORE UPDATE
+  Action: EXECUTE FUNCTION set_updated_at()
+Table: users | Trigger: trg_95_users_audit | AFTER INSERT
+  Action: EXECUTE FUNCTION trg_audit_row()
+Table: users | Trigger: trg_95_users_audit | AFTER UPDATE
+  Action: EXECUTE FUNCTION trg_audit_row()
+Table: volunteer_availability_exceptions | Trigger: trg_95_availability_exceptions_audit | AFTER INSERT
+  Action: EXECUTE FUNCTION trg_audit_row()
+Table: volunteer_availability_exceptions | Trigger: trg_95_availability_exceptions_audit | AFTER UPDATE
+  Action: EXECUTE FUNCTION trg_audit_row()
+Table: volunteer_availability_rules | Trigger: trg_95_availability_rules_audit | AFTER UPDATE
+  Action: EXECUTE FUNCTION trg_audit_row()
+Table: volunteer_availability_rules | Trigger: trg_95_availability_rules_audit | AFTER INSERT
+  Action: EXECUTE FUNCTION trg_audit_row()
+
+--------------------------------------------------------------------------------
+7. STORED PROCEDURES & FUNCTIONS
+--------------------------------------------------------------------------------
+Function: app_ip() -> inet
+Function: app_user_id() -> bigint
+Function: application_remaining_capacity(p_event bigint, p_post bigint) -> integer
+Function: assert_actor(p_actor bigint) -> void
+Function: assign_manually(p_application bigint, p_post bigint, p_actor bigint, p_group_code text DEFAULT NULL::text, p_leader boolean DEFAULT false) -> bigint
+Function: cash_dist(money, money) -> money
+Function: change_event_coordinator(p_event bigint, p_new_coordinator bigint, p_actor bigint, p_reason text DEFAULT NULL::text) -> void
+Function: confirm_attendance(p_attendance bigint, p_actor bigint, p_note text DEFAULT NULL::text) -> void
+Function: consume_qr_token(p_token bigint, p_purpose text) -> void
+Function: create_assignment_from_application(p_application bigint, p_actor bigint DEFAULT NULL::bigint) -> bigint
+Function: create_otp_challenge(p_otp_id bigint, p_challenge_token_hash text, p_ttl_seconds integer DEFAULT 180, p_purpose text DEFAULT 'login'::text, p_request_id text DEFAULT NULL::text, p_identity_nonce_hash text DEFAULT NULL::text) -> bigint
+Function: date_dist(date, date) -> integer
+Function: expire_stale_applications() -> integer
+Function: float4_dist(real, real) -> real
+Function: float8_dist(double precision, double precision) -> double precision
+Function: gbt_bit_compress(internal) -> internal
+Function: gbt_bit_consistent(internal, bit, smallint, oid, internal) -> boolean
+Function: gbt_bit_penalty(internal, internal, internal) -> internal
+Function: gbt_bit_picksplit(internal, internal) -> internal
+Function: gbt_bit_same(gbtreekey_var, gbtreekey_var, internal) -> internal
+Function: gbt_bit_sortsupport(internal) -> void
+Function: gbt_bit_union(internal, internal) -> gbtreekey_var
+Function: gbt_bool_compress(internal) -> internal
+Function: gbt_bool_consistent(internal, boolean, smallint, oid, internal) -> boolean
+Function: gbt_bool_fetch(internal) -> internal
+Function: gbt_bool_penalty(internal, internal, internal) -> internal
+Function: gbt_bool_picksplit(internal, internal) -> internal
+Function: gbt_bool_same(gbtreekey2, gbtreekey2, internal) -> internal
+Function: gbt_bool_sortsupport(internal) -> void
+Function: gbt_bool_union(internal, internal) -> gbtreekey2
+Function: gbt_bpchar_compress(internal) -> internal
+Function: gbt_bpchar_consistent(internal, character, smallint, oid, internal) -> boolean
+Function: gbt_bpchar_sortsupport(internal) -> void
+Function: gbt_bytea_compress(internal) -> internal
+Function: gbt_bytea_consistent(internal, bytea, smallint, oid, internal) -> boolean
+Function: gbt_bytea_penalty(internal, internal, internal) -> internal
+Function: gbt_bytea_picksplit(internal, internal) -> internal
+Function: gbt_bytea_same(gbtreekey_var, gbtreekey_var, internal) -> internal
+Function: gbt_bytea_sortsupport(internal) -> void
+Function: gbt_bytea_union(internal, internal) -> gbtreekey_var
+Function: gbt_cash_compress(internal) -> internal
+Function: gbt_cash_consistent(internal, money, smallint, oid, internal) -> boolean
+Function: gbt_cash_distance(internal, money, smallint, oid, internal) -> double precision
+Function: gbt_cash_fetch(internal) -> internal
+Function: gbt_cash_penalty(internal, internal, internal) -> internal
+Function: gbt_cash_picksplit(internal, internal) -> internal
+Function: gbt_cash_same(gbtreekey16, gbtreekey16, internal) -> internal
+Function: gbt_cash_sortsupport(internal) -> void
+Function: gbt_cash_union(internal, internal) -> gbtreekey16
+Function: gbt_date_compress(internal) -> internal
+Function: gbt_date_consistent(internal, date, smallint, oid, internal) -> boolean
+Function: gbt_date_distance(internal, date, smallint, oid, internal) -> double precision
+Function: gbt_date_fetch(internal) -> internal
+Function: gbt_date_penalty(internal, internal, internal) -> internal
+Function: gbt_date_picksplit(internal, internal) -> internal
+Function: gbt_date_same(gbtreekey8, gbtreekey8, internal) -> internal
+Function: gbt_date_sortsupport(internal) -> void
+Function: gbt_date_union(internal, internal) -> gbtreekey8
+Function: gbt_decompress(internal) -> internal
+Function: gbt_enum_compress(internal) -> internal
+Function: gbt_enum_consistent(internal, anyenum, smallint, oid, internal) -> boolean
+Function: gbt_enum_fetch(internal) -> internal
+Function: gbt_enum_penalty(internal, internal, internal) -> internal
+Function: gbt_enum_picksplit(internal, internal) -> internal
+Function: gbt_enum_same(gbtreekey8, gbtreekey8, internal) -> internal
+Function: gbt_enum_sortsupport(internal) -> void
+Function: gbt_enum_union(internal, internal) -> gbtreekey8
+Function: gbt_float4_compress(internal) -> internal
+Function: gbt_float4_consistent(internal, real, smallint, oid, internal) -> boolean
+Function: gbt_float4_distance(internal, real, smallint, oid, internal) -> double precision
+Function: gbt_float4_fetch(internal) -> internal
+Function: gbt_float4_penalty(internal, internal, internal) -> internal
+Function: gbt_float4_picksplit(internal, internal) -> internal
+Function: gbt_float4_same(gbtreekey8, gbtreekey8, internal) -> internal
+Function: gbt_float4_sortsupport(internal) -> void
+Function: gbt_float4_union(internal, internal) -> gbtreekey8
+Function: gbt_float8_compress(internal) -> internal
+Function: gbt_float8_consistent(internal, double precision, smallint, oid, internal) -> boolean
+Function: gbt_float8_distance(internal, double precision, smallint, oid, internal) -> double precision
+Function: gbt_float8_fetch(internal) -> internal
+Function: gbt_float8_penalty(internal, internal, internal) -> internal
+Function: gbt_float8_picksplit(internal, internal) -> internal
+Function: gbt_float8_same(gbtreekey16, gbtreekey16, internal) -> internal
+Function: gbt_float8_sortsupport(internal) -> void
+Function: gbt_float8_union(internal, internal) -> gbtreekey16
+Function: gbt_inet_compress(internal) -> internal
+Function: gbt_inet_consistent(internal, inet, smallint, oid, internal) -> boolean
+Function: gbt_inet_penalty(internal, internal, internal) -> internal
+Function: gbt_inet_picksplit(internal, internal) -> internal
+Function: gbt_inet_same(gbtreekey16, gbtreekey16, internal) -> internal
+Function: gbt_inet_sortsupport(internal) -> void
+Function: gbt_inet_union(internal, internal) -> gbtreekey16
+Function: gbt_int2_compress(internal) -> internal
+Function: gbt_int2_consistent(internal, smallint, smallint, oid, internal) -> boolean
+Function: gbt_int2_distance(internal, smallint, smallint, oid, internal) -> double precision
+Function: gbt_int2_fetch(internal) -> internal
+Function: gbt_int2_penalty(internal, internal, internal) -> internal
+Function: gbt_int2_picksplit(internal, internal) -> internal
+Function: gbt_int2_same(gbtreekey4, gbtreekey4, internal) -> internal
+Function: gbt_int2_sortsupport(internal) -> void
+Function: gbt_int2_union(internal, internal) -> gbtreekey4
+Function: gbt_int4_compress(internal) -> internal
+Function: gbt_int4_consistent(internal, integer, smallint, oid, internal) -> boolean
+Function: gbt_int4_distance(internal, integer, smallint, oid, internal) -> double precision
+Function: gbt_int4_fetch(internal) -> internal
+Function: gbt_int4_penalty(internal, internal, internal) -> internal
+Function: gbt_int4_picksplit(internal, internal) -> internal
+Function: gbt_int4_same(gbtreekey8, gbtreekey8, internal) -> internal
+Function: gbt_int4_sortsupport(internal) -> void
+Function: gbt_int4_union(internal, internal) -> gbtreekey8
+Function: gbt_int8_compress(internal) -> internal
+Function: gbt_int8_consistent(internal, bigint, smallint, oid, internal) -> boolean
+Function: gbt_int8_distance(internal, bigint, smallint, oid, internal) -> double precision
+Function: gbt_int8_fetch(internal) -> internal
+Function: gbt_int8_penalty(internal, internal, internal) -> internal
+Function: gbt_int8_picksplit(internal, internal) -> internal
+Function: gbt_int8_same(gbtreekey16, gbtreekey16, internal) -> internal
+Function: gbt_int8_sortsupport(internal) -> void
+Function: gbt_int8_union(internal, internal) -> gbtreekey16
+Function: gbt_intv_compress(internal) -> internal
+Function: gbt_intv_consistent(internal, interval, smallint, oid, internal) -> boolean
+Function: gbt_intv_decompress(internal) -> internal
+Function: gbt_intv_distance(internal, interval, smallint, oid, internal) -> double precision
+Function: gbt_intv_fetch(internal) -> internal
+Function: gbt_intv_penalty(internal, internal, internal) -> internal
+Function: gbt_intv_picksplit(internal, internal) -> internal
+Function: gbt_intv_same(gbtreekey32, gbtreekey32, internal) -> internal
+Function: gbt_intv_sortsupport(internal) -> void
+Function: gbt_intv_union(internal, internal) -> gbtreekey32
+Function: gbt_macad8_compress(internal) -> internal
+Function: gbt_macad8_consistent(internal, macaddr8, smallint, oid, internal) -> boolean
+Function: gbt_macad8_fetch(internal) -> internal
+Function: gbt_macad8_penalty(internal, internal, internal) -> internal
+Function: gbt_macad8_picksplit(internal, internal) -> internal
+Function: gbt_macad8_same(gbtreekey16, gbtreekey16, internal) -> internal
+Function: gbt_macad8_sortsupport(internal) -> void
+Function: gbt_macad8_union(internal, internal) -> gbtreekey16
+Function: gbt_macad_compress(internal) -> internal
+Function: gbt_macad_consistent(internal, macaddr, smallint, oid, internal) -> boolean
+Function: gbt_macad_fetch(internal) -> internal
+Function: gbt_macad_penalty(internal, internal, internal) -> internal
+Function: gbt_macad_picksplit(internal, internal) -> internal
+Function: gbt_macad_same(gbtreekey16, gbtreekey16, internal) -> internal
+Function: gbt_macad_union(internal, internal) -> gbtreekey16
+Function: gbt_macaddr_sortsupport(internal) -> void
+Function: gbt_numeric_compress(internal) -> internal
+Function: gbt_numeric_consistent(internal, numeric, smallint, oid, internal) -> boolean
+Function: gbt_numeric_penalty(internal, internal, internal) -> internal
+Function: gbt_numeric_picksplit(internal, internal) -> internal
+Function: gbt_numeric_same(gbtreekey_var, gbtreekey_var, internal) -> internal
+Function: gbt_numeric_sortsupport(internal) -> void
+Function: gbt_numeric_union(internal, internal) -> gbtreekey_var
+Function: gbt_oid_compress(internal) -> internal
+Function: gbt_oid_consistent(internal, oid, smallint, oid, internal) -> boolean
+Function: gbt_oid_distance(internal, oid, smallint, oid, internal) -> double precision
+Function: gbt_oid_fetch(internal) -> internal
+Function: gbt_oid_penalty(internal, internal, internal) -> internal
+Function: gbt_oid_picksplit(internal, internal) -> internal
+Function: gbt_oid_same(gbtreekey8, gbtreekey8, internal) -> internal
+Function: gbt_oid_sortsupport(internal) -> void
+Function: gbt_oid_union(internal, internal) -> gbtreekey8
+Function: gbt_text_compress(internal) -> internal
+Function: gbt_text_consistent(internal, text, smallint, oid, internal) -> boolean
+Function: gbt_text_penalty(internal, internal, internal) -> internal
+Function: gbt_text_picksplit(internal, internal) -> internal
+Function: gbt_text_same(gbtreekey_var, gbtreekey_var, internal) -> internal
+Function: gbt_text_sortsupport(internal) -> void
+Function: gbt_text_union(internal, internal) -> gbtreekey_var
+Function: gbt_time_compress(internal) -> internal
+Function: gbt_time_consistent(internal, time without time zone, smallint, oid, internal) -> boolean
+Function: gbt_time_distance(internal, time without time zone, smallint, oid, internal) -> double precision
+Function: gbt_time_fetch(internal) -> internal
+Function: gbt_time_penalty(internal, internal, internal) -> internal
+Function: gbt_time_picksplit(internal, internal) -> internal
+Function: gbt_time_same(gbtreekey16, gbtreekey16, internal) -> internal
+Function: gbt_time_sortsupport(internal) -> void
+Function: gbt_time_union(internal, internal) -> gbtreekey16
+Function: gbt_timetz_compress(internal) -> internal
+Function: gbt_timetz_consistent(internal, time with time zone, smallint, oid, internal) -> boolean
+Function: gbt_ts_compress(internal) -> internal
+Function: gbt_ts_consistent(internal, timestamp without time zone, smallint, oid, internal) -> boolean
+Function: gbt_ts_distance(internal, timestamp without time zone, smallint, oid, internal) -> double precision
+Function: gbt_ts_fetch(internal) -> internal
+Function: gbt_ts_penalty(internal, internal, internal) -> internal
+Function: gbt_ts_picksplit(internal, internal) -> internal
+Function: gbt_ts_same(gbtreekey16, gbtreekey16, internal) -> internal
+Function: gbt_ts_sortsupport(internal) -> void
+Function: gbt_ts_union(internal, internal) -> gbtreekey16
+Function: gbt_tstz_compress(internal) -> internal
+Function: gbt_tstz_consistent(internal, timestamp with time zone, smallint, oid, internal) -> boolean
+Function: gbt_tstz_distance(internal, timestamp with time zone, smallint, oid, internal) -> double precision
+Function: gbt_uuid_compress(internal) -> internal
+Function: gbt_uuid_consistent(internal, uuid, smallint, oid, internal) -> boolean
+Function: gbt_uuid_fetch(internal) -> internal
+Function: gbt_uuid_penalty(internal, internal, internal) -> internal
+Function: gbt_uuid_picksplit(internal, internal) -> internal
+Function: gbt_uuid_same(gbtreekey32, gbtreekey32, internal) -> internal
+Function: gbt_uuid_sortsupport(internal) -> void
+Function: gbt_uuid_union(internal, internal) -> gbtreekey32
+Function: gbt_var_decompress(internal) -> internal
+Function: gbt_var_fetch(internal) -> internal
+Function: gbt_varbit_sortsupport(internal) -> void
+Function: gbtreekey16_in(cstring) -> gbtreekey16
+Function: gbtreekey16_out(gbtreekey16) -> cstring
+Function: gbtreekey2_in(cstring) -> gbtreekey2
+Function: gbtreekey2_out(gbtreekey2) -> cstring
+Function: gbtreekey32_in(cstring) -> gbtreekey32
+Function: gbtreekey32_out(gbtreekey32) -> cstring
+Function: gbtreekey4_in(cstring) -> gbtreekey4
+Function: gbtreekey4_out(gbtreekey4) -> cstring
+Function: gbtreekey8_in(cstring) -> gbtreekey8
+Function: gbtreekey8_out(gbtreekey8) -> cstring
+Function: gbtreekey_var_in(cstring) -> gbtreekey_var
+Function: gbtreekey_var_out(gbtreekey_var) -> cstring
+Function: geo_check_in(p_event bigint, p_user bigint, p_lat double precision, p_lon double precision, p_accuracy_m double precision, p_captured_at timestamp with time zone DEFAULT NULL::timestamp with time zone, p_is_mocked boolean DEFAULT false) -> record
+Function: geo_distance_m(lat1 double precision, lon1 double precision, lat2 double precision, lon2 double precision) -> double precision
+Function: gist_translate_cmptype_btree(integer) -> smallint
+Function: int2_dist(smallint, smallint) -> smallint
+Function: int4_dist(integer, integer) -> integer
+Function: int8_dist(bigint, bigint) -> bigint
+Function: interval_dist(interval, interval) -> interval
+Function: is_admin_user(p_user bigint) -> boolean
+Function: is_approved_coordinator(p_user bigint) -> boolean
+Function: is_event_manager(p_event bigint, p_user bigint) -> boolean
+Function: is_user_available(p_user bigint, p_start timestamp with time zone, p_end timestamp with time zone) -> boolean
+Function: oid_dist(oid, oid) -> oid
+Function: purge_expired_otp_challenges(p_retention interval DEFAULT '1 day'::interval) -> integer
+Function: purge_expired_otps() -> integer
+Function: purge_geo_evidence(p_older_than interval DEFAULT '90 days'::interval) -> integer
+Function: qr_check_in(p_token_hash text, p_user bigint) -> bigint
+Function: qr_token_status(p_token_hash text) -> record
+Function: qr_walkin_apply(p_token_hash text, p_user bigint) -> bigint
+Function: recompute_user_verification(p_user bigint) -> void
+Function: reject_attendance(p_attendance bigint, p_actor bigint, p_reason text) -> void
+Function: release_expired_blocks() -> integer
+Function: request_otp(p_phone_hash text, p_code_hash text, p_purpose text DEFAULT 'login'::text) -> bigint
+Function: run_auto_assignment(p_event bigint, p_actor bigint DEFAULT NULL::bigint) -> integer
+Function: self_test() -> record
+Function: set_updated_at() -> trigger
+Function: setting_int(p_key text) -> integer
+Function: tags_are_normalized(tags text[]) -> boolean
+Function: time_dist(time without time zone, time without time zone) -> interval
+Function: trg_applications_after() -> trigger
+Function: trg_applications_before_insert() -> trigger
+Function: trg_applications_before_update() -> trigger
+Function: trg_assignments_after_insert() -> trigger
+Function: trg_assignments_after_update() -> trigger
+Function: trg_assignments_before_insert() -> trigger
+Function: trg_assignments_before_update() -> trigger
+Function: trg_attendance_before_insert() -> trigger
+Function: trg_attendance_guard() -> trigger
+Function: trg_audit_row() -> trigger
+Function: trg_auth_otp_challenge_before() -> trigger
+Function: trg_block_mutation() -> trigger
+Function: trg_coordinator_guard() -> trigger
+Function: trg_events_after_insert() -> trigger
+Function: trg_events_after_update() -> trigger
+Function: trg_events_before_insert() -> trigger
+Function: trg_events_before_update() -> trigger
+Function: trg_feedback_guard() -> trigger
+Function: trg_geo_attempts_guard() -> trigger
+Function: trg_moderation_after_insert() -> trigger
+Function: trg_moderation_before_insert() -> trigger
+Function: trg_onboarding_before_insert() -> trigger
+Function: trg_otp_rate_limit() -> trigger
+Function: trg_posts_guard() -> trigger
+Function: trg_qr_guard() -> trigger
+Function: trg_users_guard() -> trigger
+Function: trg_vimg_after() -> trigger
+Function: trg_vimg_guard() -> trigger
+Function: ts_dist(timestamp without time zone, timestamp without time zone) -> interval
+Function: tstz_dist(timestamp with time zone, timestamp with time zone) -> interval
+Function: user_has_schedule_conflict(p_user bigint, p_start timestamp with time zone, p_end timestamp with time zone, p_except_event bigint DEFAULT NULL::bigint) -> boolean
+Function: verify_otp(p_phone_hash text, p_code_hash text, p_purpose text DEFAULT 'login'::text) -> text
+Function: verify_otp_challenge(p_challenge_token_hash text, p_code_hash text, p_purpose text DEFAULT 'login'::text) -> record
+

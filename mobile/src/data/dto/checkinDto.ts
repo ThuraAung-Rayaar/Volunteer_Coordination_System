@@ -127,12 +127,20 @@ export interface ManualCheckinRequestDto {
 }
 
 /**
- * Response payload returned by `POST /api/v1/attendance/manual-checkin/`.
+ * Response payload returned by `POST /api/v1/attendance/manual-checkin/`
+ * and canonical `POST /api/v1/checkin/attendance/manual-checkin/`.
+ * Matches Phase 3 ManualCheckinResponseSerializer.
  */
 export interface ManualCheckinResponseDto {
-  id: number;
+  attendance_id: number;
+  event_id: number;
+  user_id: number;
   status: string;
   method: string;
+  checkin_at: string;
+  recorded_by_user_id: number | null;
+  already_checked_in: boolean;
+  id?: number;
 }
 
 /**

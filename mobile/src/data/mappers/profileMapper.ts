@@ -69,7 +69,7 @@ export function formatToTimeWithSeconds(timeStr: string): string {
 
 /**
  * Maps UserProfileDto composite into domain VolunteerProfile.
- * Note: Backwards compatibility - maps phone into email property so UI displays without change.
+ * P1-01 / MAP-01: phone maps strictly to phone; absent email remains null/undefined (no fallback).
  */
 export function mapUserProfile(
   userDto: UserProfileDto,
@@ -101,7 +101,7 @@ export function mapUserProfile(
   return {
     id: String(userDto.id),
     phone: userDto.phone ?? null,
-    email: userDto.phone ? userDto.phone : undefined,
+    email: (userDto as { email?: string | null }).email ?? undefined,
     accountStatus: acctStatus,
     verificationStatus: verifStatus,
     coordinatorStatus: coordStatus,
@@ -217,30 +217,42 @@ export function mapProfileUpdateRequest(
       payload.blood_type = updates.donationPreferences.bloodType;
     }
 
-    const currentDonateBlood = currentProfile?.donationPreferences?.isWillingToDonateBlood;
-    const currentDonateItems = currentProfile?.donationPreferences?.isWillingToDonateItems;
+    if (updates.donationPreferences.isWillingToDonate === false) {
+      // P1-02: Setting master donation flag to false cascades both sub-flags to false
+      // to avoid DB constraint violation and keep consistency with backend PATCH rules.
+      payload.is_willing_to_donate = false;
+      payload.is_willing_to_donate_blood =
+        updates.donationPreferences.isWillingToDonateBlood ?? false;
+      payload.is_willing_to_donate_items =
+        updates.donationPreferences.isWillingToDonateItems ?? false;
+    } else {
+      const currentDonateBlood =
+        currentProfile?.donationPreferences?.isWillingToDonateBlood;
+      const currentDonateItems =
+        currentProfile?.donationPreferences?.isWillingToDonateItems;
 
-    const donateBlood =
-      updates.donationPreferences.isWillingToDonateBlood !== undefined
-        ? updates.donationPreferences.isWillingToDonateBlood
-        : currentDonateBlood;
+      const donateBlood =
+        updates.donationPreferences.isWillingToDonateBlood !== undefined
+          ? updates.donationPreferences.isWillingToDonateBlood
+          : currentDonateBlood;
 
-    const donateItems =
-      updates.donationPreferences.isWillingToDonateItems !== undefined
-        ? updates.donationPreferences.isWillingToDonateItems
-        : currentDonateItems;
+      const donateItems =
+        updates.donationPreferences.isWillingToDonateItems !== undefined
+          ? updates.donationPreferences.isWillingToDonateItems
+          : currentDonateItems;
 
-    if (donateBlood !== undefined) {
-      payload.is_willing_to_donate_blood = donateBlood;
-    }
-    if (donateItems !== undefined) {
-      payload.is_willing_to_donate_items = donateItems;
-    }
+      if (donateBlood !== undefined) {
+        payload.is_willing_to_donate_blood = donateBlood;
+      }
+      if (donateItems !== undefined) {
+        payload.is_willing_to_donate_items = donateItems;
+      }
 
-    if (updates.donationPreferences.isWillingToDonate !== undefined) {
-      payload.is_willing_to_donate = updates.donationPreferences.isWillingToDonate;
-    } else if (donateBlood !== undefined || donateItems !== undefined) {
-      payload.is_willing_to_donate = Boolean(donateBlood || donateItems);
+      if (updates.donationPreferences.isWillingToDonate !== undefined) {
+        payload.is_willing_to_donate = updates.donationPreferences.isWillingToDonate;
+      } else if (donateBlood !== undefined || donateItems !== undefined) {
+        payload.is_willing_to_donate = Boolean(donateBlood || donateItems);
+      }
     }
   }
 

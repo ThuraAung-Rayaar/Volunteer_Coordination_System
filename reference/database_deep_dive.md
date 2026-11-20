@@ -1,12 +1,13 @@
 # Volunteer HR Management — Full Database Reference
 
-> **Schema version:** v0.5.2 (Unified PostgreSQL, database-first)  
-> **Target engine:** PostgreSQL 14+ with `btree_gist`  
+> **Schema version:** v0.11.1 (Unified PostgreSQL, Database-First Engine)  
+> **Updated:** 2026-11-19 | **Target engine:** PostgreSQL 14+ with `btree_gist`  
 > **Source files:**
 > - [updated_volunteer_coordination_system_Database.sql](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/postgres_sql/updated_volunteer_coordination_system_Database.sql)
 > - [self_test.sql](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/postgres_sql/self_test.sql)
 > - [seed_data.sql](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/seeding/seed_data.sql)
 > - [Qwen_sql_20261106_cf1i1orzq.sql](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/seeding/Qwen_sql_20261106_cf1i1orzq.sql)
+> - [tokenization_login_architecture.md](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/docs/tokenization_login_architecture.md)
 
 ---
 
@@ -289,12 +290,26 @@ Trigger `trg_50_vimg_after` calls `recompute_user_verification()` on every chang
 
 ### 2.9 `auth_otp`
 
-Short-lived OTP tokens. Only the **hash** is stored. Rate-limited (5/hr per phone, 5 attempts per OTP) by trigger.
+Short-lived OTP tokens. Only cryptographic **hashes** are stored (`phone_hash` and `code_hash`). The database enforces strict rate limits (`trg_01_otp_rate_limit`: max 5 requests/hr per `phone_hash`) and attempt limits (max 3-5 verification attempts before invalidation).
 
-| Field | Notes |
-|-------|-------|
-| `purpose` | `login` or `qr_registration` |
-| `consumed_at` | NULL = not yet used |
+| Field | Type | Constraints & Notes |
+|-------|------|-------------------|
+| `id` | `BIGINT GENERATED ALWAYS AS IDENTITY` | Primary key |
+| `phone_hash` | `TEXT NOT NULL` | HMAC-SHA256 of normalized E.164 phone |
+| `code_hash` | `TEXT NOT NULL` | HMAC-SHA256 of raw OTP code (never plaintext) |
+| `purpose` | `TEXT NOT NULL DEFAULT 'login'` | Check: `'login'` or `'qr_registration'` |
+| `attempt_count` | `INTEGER NOT NULL DEFAULT 0` | Check: between `0` and `100` |
+| `expires_at` | `TIMESTAMPTZ NOT NULL` | Check: `expires_at > created_at` (default `now() + 5m`) |
+| `consumed_at` | `TIMESTAMPTZ` | NULL = unconsumed; Check: `consumed_at >= created_at` |
+| `created_at` | `TIMESTAMPTZ NOT NULL DEFAULT now()` | Insertion timestamp |
+
+**Indexes:**
+- `idx_auth_otp_phone_created`: `(phone_hash, created_at DESC)`
+- `idx_auth_otp_open`: `(phone_hash, purpose) WHERE consumed_at IS NULL`
+- `idx_auth_otp_expires`: `(expires_at)`
+
+> [!NOTE]
+> **Tokenization Architecture Compatibility:** Under the new Tokenization Login architecture (`docs/tokenization_login_architecture.md`), this table and its triggers require **zero schema changes**. The Django BFF detokenizes the incoming Client Identity Token (CIT) into `phone_hash`, issues an ephemeral `auth_session_token` in application cache, and invokes `request_otp()` and `verify_otp()` against this authoritative table.
 
 ---
 
@@ -650,21 +665,23 @@ SET app.ip = '<client_ip>';
 
 ---
 
-## 4. Views
+## 4. Views (11 Production Views)
 
-| View | Purpose |
-|------|---------|
-| `v_event_post_capacity` | Remaining headcount per post |
-| `v_public_events` | Published/active events for volunteer browse (hides deleted) |
-| `v_event_summary` | Coordinator board: application counts, assignment counts, pending confirmations |
-| `v_accepted_unassigned` | Accepted applications with no assignment yet |
-| `v_volunteer_schedule` | A volunteer's upcoming assignments |
-| `v_pending_verification` | Admin queue of pending identity images |
-| `v_blood_donors` | Active verified blood-donation volunteers |
-| `v_coordinator_stats` | Per-coordinator event and volunteer counts |
-| `v_event_feedback_summary` | Average score and count per event |
-| `v_moderation_summary` | Per-user warning/block history |
-| `v_geo_fraud_suspects` | Geo attempt records with device-mocked or repeated outside-geofence results |
+The production database schema declares 11 authoritative SQL views supporting real-time coordinator operations, volunteer browsing, attendance dashboards, and administrative oversight:
+
+| View Name | Source Tables | Key Operational Purpose |
+|---|---|---|
+| `v_event_post_capacity` | `event_posts`, `assignments` | Calculates total capacity, active assignments, and remaining headcount slots per post |
+| `v_public_events` | `events`, `users`, `charity_fields` | Publicly browsable published/active events for volunteers; filters out draft and cancelled events |
+| `v_event_summary` | `events`, `event_applications`, `assignments`, `attendance_records` | Coordinator dashboard: aggregate application counts, approved assignments, and pending confirmations |
+| `v_accepted_unassigned` | `event_applications`, `users`, `events` | Actionable queue of accepted volunteer applicants awaiting shift assignments |
+| `v_event_checkin_board` | `assignments`, `attendance_records`, `users`, `event_posts` | Live attendance tracking board for event coordinators during an active event |
+| `v_event_checkin_status` | `events`, `assignments`, `attendance_records` | Real-time check-in state (`not_checked_in`, `checked_in`, `checked_out`, `unconfirmed`) per volunteer |
+| `v_pending_confirmations` | `attendance_records`, `assignments`, `users` | Unconfirmed attendance entries requiring coordinator approval or rejection |
+| `v_geo_attempts_review` | `geo_checkin_attempts`, `users`, `events` | Detailed log of geolocation attempts including calculated distance, geofence radius, and result codes |
+| `v_event_coordinator_history` | `event_coordinator_history`, `users`, `events` | Complete immutable audit log of coordinator handovers, retakes, and transitions |
+| `v_user_moderation_summary` | `moderation_actions`, `users` | Historical moderation record per user (warnings, temporary blocks, permanent bans) |
+| `v_admin_dashboard` | `users`, `events`, `assignments`, `attendance_records` | High-level system health metrics and KPI counters for administrators |
 
 ---
 

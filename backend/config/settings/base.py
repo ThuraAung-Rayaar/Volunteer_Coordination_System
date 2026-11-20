@@ -16,6 +16,14 @@ PHONE_HASH_HMAC_SECRET = os.getenv(
     'PHONE_HASH_HMAC_SECRET',
     'dev-hmac-secret-at-least-32-chars-long-abcdef'
 )
+OTP_CODE_HMAC_SECRET = os.getenv(
+    'OTP_CODE_HMAC_SECRET',
+    'dev-otp-code-hmac-secret-at-least-32-chars-long-distinct'
+)
+AUTH_SESSION_TOKEN_SECRET = os.getenv(
+    'AUTH_SESSION_TOKEN_SECRET',
+    'dev-auth-session-token-secret-at-least-32-chars-distinct'
+)
 PHONE_ENCRYPTION_KEY = os.getenv(
     'PHONE_ENCRYPTION_KEY',
     'IcY3lXCl1k0P1NawgjDSeCYOqcNRWJStRaqbWN21nGs='
@@ -24,6 +32,12 @@ CARTO_API_KEY = os.getenv(
     'CARTO_API_KEY',
     'cb1_5490_1_395a9eafc491da9c508bf094'
 )
+
+# Dedicated feature flag to gate dev_code exposure in auth responses (local/test only)
+ALLOW_DEV_CODE_IN_AUTH_RESPONSE = os.getenv(
+    'ALLOW_DEV_CODE_IN_AUTH_RESPONSE',
+    'true' if os.getenv('DEBUG', 'false').lower() == 'true' else 'false'
+).lower() in ('true', '1')
 
 DEBUG = os.getenv('DEBUG', 'false').lower() == 'true'
 

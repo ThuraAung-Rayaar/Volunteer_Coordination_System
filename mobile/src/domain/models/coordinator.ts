@@ -240,3 +240,73 @@ export interface CoordinatorAttendanceItem {
   geoAttempt?: CoordinatorGeoAttemptReview;
 }
 
+/**
+ * Audit record domain model from v_event_coordinator_history (C-18 / P1-05).
+ */
+export interface CoordinatorHistoryItem {
+  id: string;
+  eventId: string;
+  eventTitle?: string;
+  changeType: string;
+  previousCoordinatorId: string | null;
+  previousCoordinatorName: string | null;
+  newCoordinatorId: string;
+  newCoordinatorName: string | null;
+  changedById: string;
+  changedByName: string | null;
+  reason: string | null;
+  changedAt: string;
+}
+
+/**
+ * Post capacity breakdown domain model matching v_event_post_capacity (C-28 / P1-05).
+ */
+export interface EventPostCapacity {
+  postId: string;
+  title: string;
+  status: string;
+  requiredHeadcount: number;
+  assignedCount: number;
+  remainingCapacity: number;
+}
+
+/**
+ * Volunteer identity and capabilities lookup domain model by UUID (V-18 / C-29 / P1-05).
+ */
+export interface VolunteerUuidLookup {
+  userId?: string;
+  uuid: string;
+  displayName: string;
+  display_name?: string;
+  skills?: string[];
+  physicalOk?: boolean;
+  goodEyesight?: boolean;
+  needsGlasses?: boolean;
+  canLiftHeavy?: boolean;
+  canWorkOutdoor?: boolean;
+  hasLeaderExperience?: boolean;
+  newToVolunteer?: boolean;
+  preferredLanguage?: string;
+  homeArea?: string | null;
+  needsMealSupport?: boolean;
+  needsTravelSupport?: boolean;
+  acceptsUnpaid?: boolean;
+  verificationStatus?: string;
+}
+
+/**
+ * Geo check-in attempt review domain model matching v_geo_attempts_review (C-35 / P1-05).
+ */
+export interface GeoAttemptReview {
+  attemptId: string;
+  eventId: string;
+  userId: string;
+  displayName: string;
+  attemptedAt: string;
+  distanceMeters: number | null;
+  effectiveRadiusMeters: number | null;
+  accuracyMeters: number | null;
+  isMocked: boolean;
+  resultCode: string;
+}
+

@@ -176,9 +176,9 @@ class BffCheckinPhase7ApiTests(TestCase):
         self.assertEqual(res_flat.status_code, status.HTTP_200_OK)
         self.assertEqual(res_flat.data["result"], "already_checked_in")
 
-    # --- Manual Check-In URL Parity ---
+    # --- Manual Check-In URL Parity & Canonical Authoritative Payload (ATT-01) ---
 
-    def test_manual_checkin_flat_and_event_scoped_url_parity(self):
+    def test_manual_checkin_canonical_and_aliased_authoritative_payload(self):
         vol_c = _make_api_user("Volunteer C")
         EventApplications.objects.create(
             event=self.event,
@@ -190,14 +190,91 @@ class BffCheckinPhase7ApiTests(TestCase):
 
         self.client.force_authenticate(user=self.coord)
 
-        # Event-scoped check-in
+        # 1. Canonical route: POST /api/v1/checkin/attendance/manual-checkin/
         res = self.client.post(
-            f"/api/v1/events/{self.event.id}/check-in/",
-            {"user_id": vol_c.id, "note": "Checked in via event route"},
+            "/api/v1/checkin/attendance/manual-checkin/",
+            {"event_id": self.event.id, "user_id": vol_c.id, "note": "Checked in via canonical route"},
             format="json",
         )
         self.assertEqual(res.status_code, status.HTTP_200_OK)
+        # Assert full authoritative mutation response shape
+        self.assertIn("attendance_id", res.data)
+        self.assertEqual(res.data["event_id"], self.event.id)
+        self.assertEqual(res.data["user_id"], vol_c.id)
         self.assertEqual(res.data["status"], "checked_in")
+        self.assertEqual(res.data["method"], "coordinator_manual")
+        self.assertIsNotNone(res.data["checkin_at"])
+        self.assertEqual(res.data["recorded_by_user_id"], self.coord.id)
+        self.assertFalse(res.data["already_checked_in"])
+
+        # 2. Idempotent repeat: same route returns already_checked_in=True
+        repeat_res = self.client.post(
+            "/api/v1/checkin/attendance/manual-checkin/",
+            {"event_id": self.event.id, "user_id": vol_c.id},
+            format="json",
+        )
+        self.assertEqual(repeat_res.status_code, status.HTTP_200_OK)
+        self.assertTrue(repeat_res.data["already_checked_in"])
+        self.assertEqual(repeat_res.data["attendance_id"], res.data["attendance_id"])
+
+        # 3. Flat compatibility alias: /api/v1/attendance/manual-checkin/
+        vol_d = _make_api_user("Volunteer D")
+        EventApplications.objects.create(
+            event=self.event,
+            user=vol_d,
+            source="browse",
+            conditions_acknowledged_at=timezone.now(),
+        )
+        onboarding_service.acknowledge_event_onboarding(vol_d, self.event.id)
+        alias_res = self.client.post(
+            "/api/v1/attendance/manual-checkin/",
+            {"event_id": self.event.id, "user_id": vol_d.id},
+            format="json",
+        )
+        self.assertEqual(alias_res.status_code, status.HTTP_200_OK)
+        self.assertEqual(alias_res.data["status"], "checked_in")
+        self.assertFalse(alias_res.data["already_checked_in"])
+
+        # 4. Event-scoped alias: /api/v1/events/{event_id}/check-in/
+        vol_e = _make_api_user("Volunteer E")
+        EventApplications.objects.create(
+            event=self.event,
+            user=vol_e,
+            source="browse",
+            conditions_acknowledged_at=timezone.now(),
+        )
+        onboarding_service.acknowledge_event_onboarding(vol_e, self.event.id)
+        scoped_res = self.client.post(
+            f"/api/v1/events/{self.event.id}/check-in/",
+            {"user_id": vol_e.id},
+            format="json",
+        )
+        self.assertEqual(scoped_res.status_code, status.HTTP_200_OK)
+        self.assertEqual(scoped_res.data["status"], "checked_in")
+        self.assertFalse(scoped_res.data["already_checked_in"])
+
+    def test_manual_checkin_cancelled_row_returns_409_conflict(self):
+        vol_f = _make_api_user("Volunteer F")
+        EventApplications.objects.create(
+            event=self.event,
+            user=vol_f,
+            source="browse",
+            conditions_acknowledged_at=timezone.now(),
+        )
+        onboarding_service.acknowledge_event_onboarding(vol_f, self.event.id)
+
+        att = Attendance.objects.get(event=self.event, user=vol_f)
+        att.status = "cancelled"
+        att.save(update_fields=["status"])
+
+        self.client.force_authenticate(user=self.coord)
+        res = self.client.post(
+            "/api/v1/checkin/attendance/manual-checkin/",
+            {"event_id": self.event.id, "user_id": vol_f.id},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(res.data.get("error", {}).get("code"), "invalid_state")
 
     # --- Volunteer Self-Checkout and History Privacy (BR-PRIV-T4) ---
 

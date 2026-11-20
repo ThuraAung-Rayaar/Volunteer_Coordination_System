@@ -49,6 +49,19 @@ class ManualCheckinSerializer(AllowListSerializerMixin, serializers.Serializer):
 ManualCheckInSerializer = ManualCheckinSerializer
 
 
+class ManualCheckinResponseSerializer(AllowListSerializerMixin, serializers.Serializer):
+    """Authoritative response payload for manual on-site check-in."""
+    attendance_id = serializers.IntegerField()
+    event_id = serializers.IntegerField()
+    user_id = serializers.IntegerField()
+    status = serializers.CharField()
+    method = serializers.CharField()
+    checkin_at = serializers.DateTimeField()
+    recorded_by_user_id = serializers.IntegerField(allow_null=True)
+    already_checked_in = serializers.BooleanField()
+    id = serializers.IntegerField()
+
+
 class GeoCheckinSerializer(AllowListSerializerMixin, serializers.Serializer):
     event_id = serializers.IntegerField(required=False)
     latitude = serializers.FloatField(min_value=-90, max_value=90)

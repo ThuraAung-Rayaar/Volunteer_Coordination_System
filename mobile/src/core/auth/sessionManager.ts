@@ -2,7 +2,11 @@
  * @format
  */
 
-import { defaultTokenStore, TokenStore } from './tokenStore';
+import {
+  defaultTokenStore,
+  SessionStorageError,
+  TokenStore,
+} from './tokenStore';
 
 export type UnauthorizedListener = () => void;
 
@@ -34,7 +38,11 @@ export class SessionManager {
    * 429 (Rate Limited), 5xx (Server Error), or network/timeout errors.
    */
   public async handleUnauthorized(): Promise<void> {
-    await this.tokenStore.clearToken();
+    try {
+      await this.tokenStore.clearToken();
+    } catch {
+      // Storage clear failure during unauthorized handling must not block notifying listeners
+    }
     for (const listener of this.unauthorizedListeners) {
       try {
         listener();
@@ -60,10 +68,18 @@ export class SessionManager {
 
   /**
    * Checks whether a non-empty token is stored.
+   * Returns false if token is null, empty, or if secure storage is unavailable.
    */
   public async hasValidToken(): Promise<boolean> {
-    const token = await this.tokenStore.getToken();
-    return Boolean(token && token.trim().length > 0);
+    try {
+      const token = await this.tokenStore.getToken();
+      return Boolean(token && token.trim().length > 0);
+    } catch (err) {
+      if (err instanceof SessionStorageError) {
+        return false;
+      }
+      throw err;
+    }
   }
 
   /**

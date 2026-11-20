@@ -220,13 +220,13 @@ describe('Phase 6: Secure Token Persistence & PluggableTokenStore (P0-08)', () =
   });
 
   it('trims whitespace and rejects empty tokens safely', async () => {
-    const store = new PluggableTokenStore();
+    const store = new PluggableTokenStore(new MemoryTokenStore());
     await store.setToken('   token-with-whitespace   ');
     expect(await store.getToken()).toBe('token-with-whitespace');
   });
 
   it('guarantees zero token leakage in diagnostics', async () => {
-    const store = new PluggableTokenStore();
+    const store = new PluggableTokenStore(new MemoryTokenStore());
     await store.setToken('super-confidential-auth-token-xyz');
 
     const tier = await store.getStorageTier();

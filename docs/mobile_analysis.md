@@ -1,5 +1,5 @@
 # Mobile Client Analysis — Volunteer HR Management System
-> **Generated:** 2026-11-15 | **Updated:** 2026-11-16 | **Target folder:** `python_stack/mobile/` | **Stack:** React Native 0.88.1 / React 19.3 / TypeScript 6.0 | **Version:** v0.10.0 (Production / Release-Ready)
+> **Generated:** 2026-11-15 | **Updated:** 2026-11-19 | **Target folder:** `python_stack/mobile/` | **Stack:** React Native 0.88.1 / React 19.3 / TypeScript 6.0 | **Version:** v0.11.1 (Full Role Capability Parity Verified)
 
 ---
 
@@ -36,16 +36,20 @@
 
 The mobile client is a **production-ready React Native application written in strict TypeScript**, implementing the **CommonGround Mobile UI Design Specification** and fully integrated with the **Django Backend-for-Frontend (BFF)** system (`services/` and `bff/`).
 
-As of version **v0.10.0**, the mobile application is in a **fully integrated and verified condition**:
+As of version **v0.11.1**, the mobile application achieves **100% role capability parity across 82 capabilities (43 Volunteer + 39 Coordinator)**:
 - **Design & UI Layer:** 100% complete. Implements a cohesive design language with custom Light and Dark palettes, an 8-point harmonic spacing grid, typography scale, responsive layout containers, and smooth Reanimated transitions.
 - **Navigation Architecture:** 100% complete. A custom 17-screen Drawer Navigation shell (`MainDrawerNavigator.tsx`) handles role-based screen mounting (Volunteer vs Coordinator), contextual header indicators, and seamless route transitions.
 - **Contract & Domain Layer:** 100% complete. Pure domain models enforce backend business constraints: T2 semi-private capability shielding, attendance-backed activity verification, owner-as-monitor read-only access, and strict profile allow-list immutability.
+- **Domain Use-Case Layer:** 100% complete. Pure domain action handlers in `volunteerUseCases.ts` and `coordinatorUseCases.ts` wrap all 82 role operations with unified error handling, optimistic updates, and cache synchronization.
+- **Location Provider Layer:** 100% complete. Pluggable `locationProvider.ts` abstraction supporting deterministic mock geolocation, native GPS devices, geofence radius checking, and mock detection.
 - **Backend / Network Connectivity:** **100% Integrated (Dual-Mode Execution).**
   - **`mock` mode:** In-memory repositories backed by realistic fixtures for deterministic previews, offline testing, and QA persona switching (`ordinaryVolunteerUser`, `approvedCoordinatorUser`, `pendingCoordinatorUser`).
   - **`http` mode:** Production live communication with the Django BFF (`/api/v1/`), featuring robust token storage, session management, OTP authentication, cold-start bootstrapping, serializer-aligned DTOs, and pure bidirectional mappers.
+  - **Host Presets:** Dynamic switching between USB device (`adb reverse` port forward), Android Studio QEMU emulator, and iOS simulator via `API_HOST_PRESETS`.
+- **Tokenization Authentication Integration:** Full architecture and migration specification established in [tokenization_login_architecture.md](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/docs/tokenization_login_architecture.md) for zero-cleartext phone transmission, ephemeral session-token approval, and sub-500ms latency compliance.
 - **Quality Assurance & Verification:** **100% Clean.**
   - **Static Typecheck (`npx tsc --noEmit`):** 0 errors.
-  - **Automated Test Suite (`jest`):** **28 test suites, 365 tests passing (100%)**, including a comprehensive 14-step end-to-end lifecycle integration test suite (`e2eMobileLifecycle.test.ts`).
+  - **Automated Test Suite (`jest`):** **32 test suites, 511 tests passing (100%)**, including the comprehensive 82-capability parity suite (`v0_11_0_capabilityParityE2E.test.ts`), location providers, and domain use cases.
 
 ---
 
@@ -86,15 +90,17 @@ mobile/src/
 │   ├── UserContext.tsx         # Active user session, cold-start bootstrap & QA role switcher
 │   └── configuration/          # Runtime app configuration
 │       └── dataMode.ts         # DataMode configuration ('mock' | 'http') & resolution
-├── core/                       # Foundational infrastructure (Transport & Auth)
+├── core/                       # Foundational infrastructure (Transport, Auth & Location)
 │   ├── api/                    # HTTP client, configuration, and normalized error models
 │   │   ├── apiClient.ts        # Typed fetch client with timeout, headers & auth injection
-│   │   ├── apiConfig.ts        # Base URL resolution ('http://10.0.2.2:8000/api/v1') & timeouts
+│   │   ├── apiConfig.ts        # Base URL resolution & presets ('usb' | 'emulator') & timeouts
 │   │   ├── apiError.ts         # Normalized error taxonomy (network, timeout, validation, auth)
 │   │   └── apiResult.ts        # Functional Result type (success / failure)
-│   └── auth/                   # Authentication tokens & session management
-│       ├── sessionManager.ts   # Session state caching and subscriber notifications
-│       └── tokenStore.ts       # Secure token persistence with in-memory adapter fallback
+│   ├── auth/                   # Authentication tokens & session management
+│   │   ├── sessionManager.ts   # Session state caching and subscriber notifications
+│   │   └── tokenStore.ts       # Multi-tier secure token persistence (Keychain, SecureStore, Memory)
+│   └── location/               # Location provider abstraction
+│       └── locationProvider.ts # GPS coordinates, accuracy, geofencing, and mock detection
 ├── data/                       # Data layer abstractions, DTOs, mappers & repositories
 │   ├── contracts/              # Abstract repository interfaces (Contracts)
 │   │   ├── coordinatorRepository.ts
@@ -132,14 +138,19 @@ mobile/src/
 │       ├── MockEventRepository.ts
 │       ├── MockProfileRepository.ts
 │       └── mockUtils.ts        # ID generation, deep clone, and simulated latency
-├── domain/                     # Pure domain models (Type definitions & business rules)
-│   └── models/
-│       ├── availability.ts     # Weekly rules & date exception types
-│       ├── coordinator.ts      # Coordinator metrics, wizard draft, T2 capabilities
-│       ├── dashboard.ts        # Dashboard metrics, verified activities
-│       ├── event.ts            # Events, posts, physical levels, categories
-│       ├── profile.ts          # Volunteer profile, allow-list fields, preferences
-│       ├── verification.ts     # ID verification slots and statuses
+├── domain/                     # Pure domain models & use cases (Clean Architecture)
+│   ├── models/
+│   │   ├── availability.ts     # Weekly rules & date exception types
+│   │   ├── coordinator.ts      # Coordinator metrics, wizard draft, T2 capabilities
+│   │   ├── dashboard.ts        # Dashboard metrics, verified activities
+│   │   ├── event.ts            # Events, posts, physical levels, categories
+│   │   ├── feedback.ts         # Volunteer and coordinator feedback domain models
+│   │   ├── profile.ts          # Volunteer profile, allow-list fields, preferences
+│   │   ├── verification.ts     # ID verification slots and statuses
+│   │   └── index.ts
+│   └── usecases/               # High-level domain capability action handlers (82 capabilities)
+│       ├── coordinatorUseCases.ts # 39 coordinator capability workflows
+│       ├── volunteerUseCases.ts   # 43 volunteer capability workflows
 │       └── index.ts
 ├── features/                   # Feature modules (Screens & specialized components)
 │   ├── auth/                   # Authentication feature
@@ -401,20 +412,31 @@ flowchart TD
   - Integrates `AbortController` with configurable request timeout (default 15,000ms).
   - Automatically transforms HTTP errors into strongly-typed `ApiError` instances.
 - **`ApiConfig` (`core/api/apiConfig.ts`):**
-  - Resolves backend base URL:
-    - Android Emulator: `http://10.0.2.2:8000/api/v1`
-    - iOS Simulator / Physical Device: `http://127.0.0.1:8000/api/v1` (or custom host via `setApiBaseUrl()`)
+  - Resolves backend base URL and environment presets:
+    - **`USB_DEVICE` (`http://localhost:8000`):** Default host preset. Enables physical devices connected via USB cable using `adb reverse tcp:8000 tcp:8000` to route directly to the host development server without requiring Wi-Fi or local IP configuration.
+    - **`ANDROID_EMULATOR` (`http://10.0.2.2:8000`):** Standard QEMU host loopback for Android Studio virtual devices.
+    - **`IOS_SIMULATOR` (`http://localhost:8000`):** Host loopback for macOS iOS simulator instances.
+  - Runtime switching via `setApiHostPreset('usb' | 'emulator')` and granular overrides with `setApiConfig()`.
 - **`ApiError` (`core/api/apiError.ts`):**
   - Standardizes error types: `NETWORK_ERROR`, `TIMEOUT_ERROR`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `VALIDATION_ERROR`, `CONFLICT`, `SERVER_ERROR`, `DOMAIN_ERROR`.
   - Normalizes DRF field validation dicts and `detail` payloads.
 
 ### 9.3 Token Storage & Session Management
-- **`TokenStore` (`core/auth/tokenStore.ts`):**
-  - Clean `ITokenStore` contract: `getToken()`, `setToken(token)`, `clearToken()`.
-  - Built-in in-memory adapter with extensible interface for secure keychain/keystore adapters.
+- **`PluggableTokenStore` (`core/auth/tokenStore.ts`):**
+  - Hardened multi-tier native persistence resolving the highest security storage driver available on the device platform:
+    1. **Tier 1: `react-native-keychain`** — Hardware-backed Android Keystore / iOS Keychain.
+    2. **Tier 2: `expo-secure-store`** — Platform-level hardware encrypted key-value storage.
+    3. **Tier 3: `@react-native-async-storage/async-storage`** — Sandboxed platform storage.
+    4. **Fallback: `MemoryTokenStore`** — Deterministic in-memory store for Jest and node test environments.
+  - Strictly guarantees zero token leakage in logs or diagnostics.
 - **`SessionManager` (`core/auth/sessionManager.ts`):**
   - Caches authenticated user identity.
-  - Manages event subscriptions so UI components react instantly to login and logout events.
+  - Subscribes exclusively to HTTP 401 Unauthorized responses to trigger cache invalidation and session reset without false positives on 403/404/5xx errors.
+- **Tokenization Authentication Integration (`docs/tokenization_login_architecture.md`):**
+  - Architectural blueprint established to replace cleartext phone number transmission:
+    1. **Client Identity Token (CIT):** Mobile encrypts phone + client nonce + timestamp before wire transit.
+    2. **Ephemeral Auth Session Token:** Backend issues short-lived `auth_session_token` upon OTP dispatch.
+    3. **Decoupled Approval:** Mobile approves verification by submitting `auth_session_token` and `code` only, completely eliminating phone PII re-transmission while adhering to the 500ms max latency budget.
 
 ### 9.4 DTOs & Bidirectional Mappers
 Located in `data/dto/` and `data/mappers/`:
@@ -453,9 +475,9 @@ The mobile test suite is located in `mobile/__tests__/` and `mobile/src/`:
 ### 10.1 Test Execution Metrics
 - **Test Runner:** Jest 29
 - **Command:** `npm test -- --watchAll=false`
-- **Total Test Suites:** **28 Passed (100%)**
-- **Total Tests:** **365 Passed (100%)**
-- **Execution Duration:** ~15–20 seconds
+- **Total Test Suites:** **32 Passed (100%)**
+- **Total Tests:** **511 Passed (100%)**
+- **Execution Duration:** ~20–25 seconds
 - **TypeScript Static Verification:** `npx tsc --noEmit` exits with **0 errors (100% clean)**.
 
 ### 10.2 Test Suite Directory & Coverage Breakdown
@@ -478,7 +500,8 @@ The mobile test suite is located in `mobile/__tests__/` and `mobile/src/`:
 | `__tests__/apiClient.test.ts` | Core / API | HTTP methods, timeout, auth header injection |
 | `__tests__/apiConfig.test.ts` | Core / API | Base URL configuration and platform defaults |
 | `__tests__/apiError.test.ts` | Core / API | HTTP status mapping, DRF error normalization |
-| `__tests__/tokenStoreAndSession.test.ts` | Core / Auth | In-memory token storage, session subscribers |
+| `__tests__/tokenStoreAndSession.test.ts` | Core / Auth | Multi-tier token storage, session subscribers |
+| `__tests__/locationAndSessionProviders.test.ts` | Core / Location | Native vs mock location, accuracy, session context |
 | `__tests__/repositoryBridge.test.tsx` | DI Bridge | `RepositoryProvider` context and prop fallback |
 | `features/auth/__tests__/authSession.test.tsx` | Feature | OTP request, verification, cold-start bootstrap |
 | `data/mappers/__tests__/eventMapper.test.ts` | Data / Mappers | Query filter translation, event DTO mapping |
@@ -489,13 +512,16 @@ The mobile test suite is located in `mobile/__tests__/` and `mobile/src/`:
 | `data/http/__tests__/volunteerMutations.test.ts` | Data / HTTP | Profile PATCH, availability PUT, apply/withdraw |
 | `data/http/__tests__/coordinatorWorkspace.test.tsx` | Data / HTTP | 7-step wizard POST, lifecycle actions, T2 review |
 | `data/http/__tests__/checkinAttendance.test.tsx` | Data / HTTP | QR token resolve, geo-checkin, checkout |
+| `data/__tests__/endpointsAndDtos.test.ts` | Data / Endpoints | Wire DTO schemas, request payload formats, serialization |
 | `data/__tests__/e2eMobileLifecycle.test.ts` | E2E Integration | Full 14-step volunteer and coordinator lifecycle |
+| `data/__tests__/v0_11_0_capabilityParityE2E.test.ts` | Capability E2E | Cross-role 82-capability parity verification |
+| `domain/usecases/__tests__/capabilityUseCases.test.ts` | Domain / Use Cases | Pure domain action handlers (43 volunteer + 39 coordinator) |
 
 ---
 
 ## 11. Backend BFF Integration Delivery Matrix
 
-The integration between the mobile client and the Django BFF was executed across 10 disciplined phases without touching a single backend file or database migration:
+The integration between the mobile client and the Django BFF was executed across 11 disciplined milestones without touching a single backend file or database migration:
 
 | Phase | Milestone | Deliverables & Scope | Status |
 |---|---|---|---|
@@ -509,6 +535,7 @@ The integration between the mobile client and the Django BFF was executed across
 | **Phase 7** | Coordinator Workspace Integration | Coordinator metrics, 7-step wizard, lifecycle transitions, T2 review | ✅ COMPLETE |
 | **Phase 8** | Onboarding, QR, Attendance & Feedback | Onboarding acknowledgment, QR tokens, geo-checkin, shift checkout, feedback | ✅ COMPLETE |
 | **Phase 9** | Stabilization & Release Readiness | Dev diagnostics, session cache hygiene, 14-step E2E lifecycle test | ✅ COMPLETE |
+| **Phase 10 (v0.11.1)** | 82-Capability Role Parity & Use Cases | Domain Use Cases (`volunteerUseCases`, `coordinatorUseCases`), `locationProvider`, 32 test suites (511 tests), and Tokenized Auth Architecture foundation | ✅ COMPLETE |
 
 ---
 

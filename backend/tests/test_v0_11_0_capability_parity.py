@@ -157,16 +157,17 @@ class V0110CapabilityParityBackendTestSuite(TestCase):
         self.assertIn("status", resp.data)
         delivery = resp.data.get("delivery")
         self.assertIsNotNone(delivery)
-        self.assertTrue(delivery.get("delivered"))
+        # In v0.12.0 ConsoleOtpDeliveryAdapter truthfully reports delivered: False
+        self.assertFalse(delivery.get("delivered"))
         self.assertIn("channel", delivery)
 
-    @patch("services.auth_service.secrets.randbelow", return_value=1234)
+    @patch("services.auth_service.secrets.randbelow", return_value=123456)
     def test_v02_otp_verification_session_and_logout(self, mock_rand):
         """V-02: OTP verification returns access token, Bearer auth works, logout invalidates."""
         phone = _unique_phone()
         req_resp = self.client.post("/api/v1/auth/request-otp/", {"phone": phone}, format="json")
         self.assertEqual(req_resp.status_code, status.HTTP_200_OK)
-        dev_code = "1234"
+        dev_code = "123456"
 
         verify_resp = self.client.post("/api/v1/auth/verify-otp/", {"phone": phone, "code": dev_code}, format="json")
         self.assertEqual(verify_resp.status_code, status.HTTP_200_OK)

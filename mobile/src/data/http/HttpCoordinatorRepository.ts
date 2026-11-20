@@ -11,9 +11,13 @@ import type {
   CoordinatorEventDetail,
   CoordinatorEventStatus,
   CoordinatorEventSummary,
+  CoordinatorHistoryItem,
   CoordinatorOverviewMetrics,
   CreateEventWizardDraft,
+  EventPostCapacity,
   EventPurposeType,
+  GeoAttemptReview,
+  VolunteerUuidLookup,
 } from '../../domain/models/coordinator';
 import type {
   CoordinatorOperationResult,
@@ -28,7 +32,11 @@ import {
   mapCoordinatorApplication,
   mapCoordinatorAssignment,
   mapCoordinatorEventSummary,
+  mapCoordinatorHistoryItem,
   mapCreateEventDraftToRequest,
+  mapEventPostCapacity,
+  mapGeoAttemptReview,
+  mapVolunteerUuidLookup,
 } from '../mappers/coordinatorMapper';
 import { mapPublicEventPost } from '../mappers/eventMapper';
 import type { PublicEventPostDto } from '../dto/eventDto';
@@ -463,12 +471,13 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
 
   public async getCoordinatorHistory(
     eventId: string,
-  ): Promise<CoordinatorHistoryItemDto[]> {
+  ): Promise<CoordinatorHistoryItem[]> {
     const res = await coordinatorApi.getCoordinatorHistory(eventId, this.client);
     if (!res.ok) {
       throw new Error(`Failed to load coordinator history: ${res.error.message}`);
     }
-    return res.data.results || [];
+    const list = res.data.results || [];
+    return list.map(mapCoordinatorHistoryItem);
   }
 
   public async getApplications(
@@ -668,18 +677,14 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
     postId: string,
     groupCode?: string,
     isGroupLeader?: boolean,
+    eventIdOverride?: string,
   ): Promise<CoordinatorOperationResult<CoordinatorAssignmentItem>> {
-    let eventId = this.appToEventMap.get(applicationId);
+    const eventId = eventIdOverride || this.appToEventMap.get(applicationId);
     if (!eventId) {
-      const events = await this.getMyEvents();
-      if (events.length > 0) {
-        eventId = events[0].id;
-      } else {
-        return {
-          success: false,
-          message: 'Unable to determine event for volunteer assignment.',
-        };
-      }
+      return {
+        success: false,
+        message: 'Unable to determine event for volunteer assignment.',
+      };
     }
 
     const numericPostId =
@@ -704,12 +709,18 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
       };
     }
 
-    // P0-03: Call this.getAssignments(eventId) and return newly created CoordinatorAssignmentItem
+    // P1-03: Deterministically refetch assignments from server; do not fabricate fake assignment fallback
     const assignments = await this.getAssignments(eventId);
+    const returnedAssignmentId =
+      res.data.assignment_id != null
+        ? String(res.data.assignment_id)
+        : res.data.id != null
+        ? String(res.data.id)
+        : null;
     const created = assignments.find(
       a =>
-        a.id === String(res.data.assignment_id) ||
-        a.applicationId === applicationId,
+        (returnedAssignmentId !== null && a.id === returnedAssignmentId) ||
+        (Boolean(a.applicationId) && a.applicationId === applicationId),
     );
 
     if (created) {
@@ -720,25 +731,10 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
       };
     }
 
-    const fallbackItem: CoordinatorAssignmentItem = {
-      id: String(res.data.assignment_id),
-      eventId,
-      eventTitle: 'Coordinator Event',
-      applicationId,
-      userId: '',
-      volunteerName: 'Assigned Volunteer',
-      postId,
-      postTitle: 'Assigned Post',
-      groupCode: groupCode ?? undefined,
-      isGroupLeader: isGroupLeader ?? false,
-      status: 'assigned',
-      assignedAt: new Date().toISOString(),
-    };
-
     return {
-      success: true,
-      message: 'Volunteer assigned successfully',
-      data: fallbackItem,
+      success: false,
+      message:
+        'Assignment succeeded on server but failed to synchronize updated assignment record.',
     };
   }
 
@@ -883,30 +879,71 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
   }
 
   public async manualCheckIn(
+    params: { eventId: string | number; volunteerUserId: string | number; note?: string },
+  ): Promise<CoordinatorOperationResult<CoordinatorAttendanceItem>>;
+  public async manualCheckIn(
+    eventId: string | number,
+    volunteerUserId: string | number,
+    note?: string,
+  ): Promise<CoordinatorOperationResult<CoordinatorAttendanceItem>>;
+  public async manualCheckIn(
     attendanceId: string,
+  ): Promise<CoordinatorOperationResult<CoordinatorAttendanceItem>>;
+  public async manualCheckIn(
+    arg1: string | number | { eventId: string | number; volunteerUserId: string | number; note?: string },
+    arg2?: string | number,
+    arg3?: string,
   ): Promise<CoordinatorOperationResult<CoordinatorAttendanceItem>> {
-    let record = this.attendanceCache.get(attendanceId);
-    if (!record) {
-      for (const item of this.attendanceCache.values()) {
-        if (item.id === attendanceId || item.assignmentId === attendanceId) {
-          record = item;
-          break;
+    let targetEventId: number | null = null;
+    let targetUserId: number | null = null;
+    let targetNote: string | undefined = undefined;
+    let cachedRecord: CoordinatorAttendanceItem | undefined = undefined;
+
+    if (typeof arg1 === 'object' && arg1 !== null && 'eventId' in arg1 && 'volunteerUserId' in arg1) {
+      targetEventId = Number(arg1.eventId);
+      targetUserId = Number(arg1.volunteerUserId);
+      targetNote = arg1.note;
+    } else if (arg2 !== undefined && arg2 !== null) {
+      targetEventId = Number(arg1);
+      targetUserId = Number(arg2);
+      targetNote = arg3;
+    } else {
+      const attendanceId = String(arg1);
+      cachedRecord = this.attendanceCache.get(attendanceId);
+      if (!cachedRecord) {
+        for (const item of this.attendanceCache.values()) {
+          if (item.id === attendanceId || item.assignmentId === attendanceId) {
+            cachedRecord = item;
+            break;
+          }
         }
       }
+
+      if (!cachedRecord) {
+        return {
+          success: false,
+          message: 'Attendance record not found in active roster cache.',
+        };
+      }
+
+      targetEventId = Number(cachedRecord.eventId);
+      targetUserId = Number(cachedRecord.userId);
+      targetNote = 'Manual on-site check-in';
     }
 
-    if (!record) {
+    if (!targetEventId || isNaN(targetEventId) || !targetUserId || isNaN(targetUserId)) {
       return {
         success: false,
-        message: 'Attendance record not found in active roster cache.',
+        message: 'Invalid event or volunteer user identifier for manual check-in.',
       };
     }
 
-    const res = await coordinatorApi.manualCheckIn(
+    // Call canonical BFF endpoint: POST /api/v1/checkin/attendance/manual-checkin/
+    const res = await checkinApi.manualCheckIn(
       {
-        event_id: Number(record.eventId),
-        user_id: Number(record.userId),
-        note: 'Manual on-site check-in',
+        event_id: targetEventId,
+        user_id: targetUserId,
+        note: targetNote ?? 'Manual on-site check-in',
       },
       this.client,
     );
@@ -918,15 +955,65 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
       };
     }
 
-    record.status = 'checked_in';
-    record.checkInMethod = 'manual';
-    record.checkedInAt = new Date().toISOString();
-    record.isPendingGeoConfirmation = false;
+    const data = res.data;
+    const attendanceIdStr = String(data.attendance_id || data.id);
+
+    // If item was in cache or can be found in cache
+    if (!cachedRecord) {
+      cachedRecord = this.attendanceCache.get(attendanceIdStr);
+      if (!cachedRecord) {
+        for (const item of this.attendanceCache.values()) {
+          if (
+            (item.id === attendanceIdStr || item.userId === String(targetUserId)) &&
+            item.eventId === String(targetEventId)
+          ) {
+            cachedRecord = item;
+            break;
+          }
+        }
+      }
+    }
+
+    if (cachedRecord) {
+      cachedRecord.status = (data.status as any) || 'checked_in';
+      // Authoritative method from server: never overwrite qr_scan / geo to manual
+      if (data.method) {
+        cachedRecord.checkInMethod = (data.method as any);
+      }
+      // Authoritative server timestamp (never fabricated with new Date())
+      cachedRecord.checkedInAt = data.checkin_at;
+      // Do not clear pending geo confirmation unless verified by server
+      if (data.status === 'checked_in' || data.status === 'completed') {
+        cachedRecord.isPendingGeoConfirmation = false;
+      }
+    }
+
+    const resultItem: CoordinatorAttendanceItem = cachedRecord
+      ? { ...cachedRecord }
+      : {
+          id: attendanceIdStr,
+          eventId: String(targetEventId),
+          eventTitle: 'Event',
+          assignmentId: attendanceIdStr,
+          userId: String(targetUserId),
+          volunteerName: 'Volunteer',
+          postTitle: 'Assigned Role',
+          status: (data.status as any) || 'checked_in',
+          checkInMethod: (data.method as any) || 'coordinator_manual',
+          checkedInAt: data.checkin_at,
+          isPendingGeoConfirmation: false,
+        };
+
+    // Store in cache for subsequent lookups
+    this.attendanceCache.set(resultItem.id, resultItem);
+    this.attendanceCache.set(resultItem.userId, resultItem);
 
     return {
       success: true,
-      message: 'Volunteer checked in manually',
-      data: record,
+      message: data.already_checked_in
+        ? 'Volunteer already checked in'
+        : 'Volunteer checked in manually',
+      data: resultItem,
     };
   }
 
@@ -989,33 +1076,35 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
 
   public async getPostCapacity(
     eventId: string,
-  ): Promise<EventPostCapacityDto[]> {
+  ): Promise<EventPostCapacity[]> {
     const res = await coordinatorApi.getPostCapacity(eventId, this.client);
     if (!res.ok) {
       throw new Error(`Failed to load post capacity: ${res.error.message}`);
     }
-    return res.data.results || [];
+    const list = res.data.results || [];
+    return list.map(mapEventPostCapacity);
   }
 
   public async lookupVolunteerByUuid(
     uuid: string,
     eventId?: string,
-  ): Promise<UserUuidLookupDto> {
+  ): Promise<VolunteerUuidLookup> {
     const res = await profileApi.lookupUserByUuid(uuid, eventId, this.client);
     if (!res.ok) {
       throw new Error(`Failed to lookup volunteer by UUID: ${res.error.message}`);
     }
-    return res.data;
+    return mapVolunteerUuidLookup(res.data);
   }
 
   public async getGeoAttempts(
     eventId: string,
-  ): Promise<GeoAttemptReviewDto[]> {
+  ): Promise<GeoAttemptReview[]> {
     const res = await checkinApi.getGeoAttempts(eventId, this.client);
     if (!res.ok) {
       throw new Error(`Failed to load geo attempts: ${res.error.message}`);
     }
-    return res.data.results || [];
+    const list = res.data.results || [];
+    return list.map(mapGeoAttemptReview);
   }
 
   public async submitCoordinatorFeedback(

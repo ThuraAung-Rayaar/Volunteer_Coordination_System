@@ -21,16 +21,19 @@ from typing import Optional
 from django.conf import settings
 
 from common.security import (
+    compute_challenge_token_hash,
     compute_otp_hash,
     compute_phone_hash,
     decrypt_phone,
     encrypt_phone,
+    generate_challenge_token,
     generate_otp_code,
     generate_raw_qr_token,
     hash_phone,
     hash_qr_token,
     normalize_phone,
     redact_sensitive_data,
+    validate_key_separation,
 )
 
 logger = logging.getLogger(__name__)

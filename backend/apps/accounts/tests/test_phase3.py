@@ -82,7 +82,7 @@ class OtpRequestTests(TestCase):
         with override_settings(DEBUG=True):
             result = auth_service.request_login_otp(phone)
             self.assertIn("dev_code", result)
-            self.assertEqual(len(result["dev_code"]), 4)
+            self.assertEqual(len(result["dev_code"]), 6)
 
     def test_otp_request_api_endpoint(self):
         client = APIClient()
