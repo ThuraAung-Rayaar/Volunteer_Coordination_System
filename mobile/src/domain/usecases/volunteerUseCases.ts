@@ -24,6 +24,7 @@ import type {
 } from '../../data/contracts';
 import type {
   AvailabilityException,
+  CharityCategory,
   CharityCategoryCode,
   DashboardSummary,
   EventDetail,
@@ -334,11 +335,9 @@ export class VolunteerUseCases {
   // =========================================================================
 
   /**
-   * V-19: Fetches the public charity category taxonomy.
+   * V-19: Fetches the public charity category taxonomy (P1-05).
    */
-  public async getCharityFields(): Promise<
-    Array<{ code: string; label: string; sort_order?: number }>
-  > {
+  public async getCharityFields(): Promise<CharityCategory[]> {
     return this.eventRepo.getCharityFields();
   }
 
@@ -414,14 +413,68 @@ export class VolunteerUseCases {
   }
 
   /**
-   * V-24: Joins an event via an invite.
+   * V-24: Joins an event via an invite (P1-06 / INV-01).
+   * Checks for an existing pending invite application first so coordinator-invite ->
+   * volunteer-response -> coordinator-view round trip works cleanly.
    */
   public async joinThroughInvite(
-    eventId: string,
+    eventIdOrApplicationId: string,
     postId?: string,
     note?: string,
   ): Promise<EventApplyResult> {
-    return this.applyToPost(eventId, postId ?? '', note ?? 'Accepted coordinator invitation');
+    const apps = await this.eventRepo.getUserApplications();
+    const existingInvite = apps.find(
+      a =>
+        (a.id === eventIdOrApplicationId || a.eventId === eventIdOrApplicationId) &&
+        a.source === 'invite' &&
+        a.status === 'pending',
+    );
+
+    if (existingInvite) {
+      const res = await this.eventRepo.acceptInvite(
+        existingInvite.id,
+        note ?? 'Accepted coordinator invitation',
+      );
+      if (res.success) {
+        return {
+          success: true,
+          message: 'Invitation accepted successfully',
+          application: {
+            id: existingInvite.id,
+            eventId: existingInvite.eventId,
+            postId: existingInvite.postId || postId || '',
+            postTitle: existingInvite.postTitle || 'Invited Role',
+            status: 'accepted',
+            appliedAt: existingInvite.appliedAt,
+            volunteerNote: note ?? 'Accepted coordinator invitation',
+          },
+        };
+      }
+      return {
+        success: false,
+        message: res.message,
+      };
+    }
+
+    return this.applyToPost(
+      eventIdOrApplicationId,
+      postId ?? '',
+      note ?? 'Accepted coordinator invitation',
+    );
+  }
+
+  /**
+   * Responds to an invitation directly with accept/reject (P1-06 / INV-01).
+   */
+  public async respondToInvite(
+    applicationId: string,
+    accept: boolean,
+    note?: string,
+  ): Promise<{ success: boolean; message: string; applicationId: string }> {
+    if (accept) {
+      return this.eventRepo.acceptInvite(applicationId, note);
+    }
+    return this.eventRepo.rejectInvite(applicationId, note);
   }
 
   /**

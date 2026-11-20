@@ -20,6 +20,7 @@ import type {
   EventSummaryViewDto,
   ManualAssignResultDto,
 } from '../dto/coordinatorDto';
+import type { ManualCheckinResponseDto } from '../dto/checkinDto';
 import type { PublicEventPostDto } from '../dto/eventDto';
 
 export const coordinatorApi = {
@@ -431,8 +432,8 @@ export const coordinatorApi = {
   },
 
   /**
-   * Checks in a volunteer manually on-site.
-   * Authenticated endpoint.
+   * Checks in a volunteer manually on-site (C-34 / ATT-02).
+   * Authenticated endpoint. Canonical route: checkin/attendance/manual-checkin/
    */
   manualCheckIn(
     data: {
@@ -441,9 +442,9 @@ export const coordinatorApi = {
       note?: string;
     },
     client: ApiClient = defaultApiClient,
-  ): Promise<ApiResult<{ id: number; status: string; method: string }>> {
-    return client.post<{ id: number; status: string; method: string }>(
-      'attendance/manual-checkin/',
+  ): Promise<ApiResult<ManualCheckinResponseDto>> {
+    return client.post<ManualCheckinResponseDto>(
+      'checkin/attendance/manual-checkin/',
       data,
     );
   },

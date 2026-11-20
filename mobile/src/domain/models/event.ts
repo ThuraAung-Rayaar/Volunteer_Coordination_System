@@ -131,6 +131,7 @@ export interface VolunteerApplicationItem {
   postTitle: string;
   status: EventApplicationStatus;
   appliedAt: string;
+  source?: 'browse' | 'qr_walkin' | 'invite' | string;
   volunteerNote?: string;
 }
 

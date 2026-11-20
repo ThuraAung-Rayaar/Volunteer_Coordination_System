@@ -11,6 +11,7 @@ from .views import (
     MeAvailabilityExceptionsView,
     MeAvailabilityRulesView,
     MeAvailabilityView,
+    MeBootstrapView,
     MeCharityInterestsView,
     MeCoordinatorView,
     MeProfileView,
@@ -32,6 +33,7 @@ urlpatterns = [
     path("events/<int:event_id>/posts/", PublicEventPostsView.as_view(), name="public-event-posts"),
 
     # User Profile & Interests (Phase 3)
+    path("me/bootstrap/", MeBootstrapView.as_view(), name="me-bootstrap"),
     path("me/", MeProfileView.as_view(), name="me-profile"),
     path("profile/", MeProfileView.as_view(), name="profile"),
     path("me/charity-interests/", MeCharityInterestsView.as_view(), name="me-charity-interests"),

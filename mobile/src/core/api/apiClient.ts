@@ -29,10 +29,70 @@ export interface RequestOptions {
   >;
 }
 
+export interface RequestTelemetry {
+  requestId: string;
+  method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
+  url: string;
+  status?: number;
+  durationMs: number;
+  ok: boolean;
+  errorCode?: string;
+}
+
+export type TelemetryObserver = (telemetry: RequestTelemetry) => void;
+
 /**
  * Standard fetch transport implementation.
  */
 const defaultTransport: TransportAdapter = (input, init) => fetch(input, init);
+
+/**
+ * Generates a collision-resistant per-request correlation ID.
+ */
+function generateRequestId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    try {
+      return crypto.randomUUID();
+    } catch {
+      // Fallback to timestamp + random entropy
+    }
+  }
+  const ts = Date.now().toString(36);
+  const rand = Math.random().toString(36).substring(2, 11);
+  return `req-${ts}-${rand}`;
+}
+
+/**
+ * Keys whose values must NEVER appear in client telemetry or diagnostic logs.
+ */
+const SENSITIVE_KEY_PATTERN =
+  /^(authorization|phone|raw_phone|otp|code|token|auth_token|auth_session_token|identity_token|cit|password|secret)$/i;
+
+/**
+ * Recursively redacts sensitive credentials, tokens, phone numbers, and OTPs from log/telemetry objects.
+ */
+export function redactSensitiveData(data: unknown): unknown {
+  if (data === null || data === undefined) {
+    return data;
+  }
+  if (typeof data !== 'object') {
+    return data;
+  }
+  if (Array.isArray(data)) {
+    return data.map(item => redactSensitiveData(item));
+  }
+  const redacted: Record<string, unknown> = {};
+  for (const [key, val] of Object.entries(data as Record<string, unknown>)) {
+    if (SENSITIVE_KEY_PATTERN.test(key)) {
+      redacted[key] = '[REDACTED]';
+    } else if (typeof val === 'object' && val !== null) {
+      redacted[key] = redactSensitiveData(val);
+    } else {
+      redacted[key] = val;
+    }
+  }
+  return redacted;
+}
 
 /**
  * Serializes query parameters into URL search string.
@@ -67,6 +127,7 @@ export class ApiClient {
   private transport: TransportAdapter;
   private tokenStore: TokenStore;
   private sessionMgr: SessionManager;
+  private telemetryObservers: Set<TelemetryObserver> = new Set();
 
   constructor(
     transport: TransportAdapter = defaultTransport,
@@ -76,6 +137,27 @@ export class ApiClient {
     this.transport = transport;
     this.tokenStore = tokenStore;
     this.sessionMgr = sessionMgr;
+  }
+
+  /**
+   * Registers a callback for request timing and status telemetry.
+   * Telemetry payloads strictly redact Authorization, phone, OTP, CIT, and challenge tokens.
+   */
+  public onTelemetry(observer: TelemetryObserver): () => void {
+    this.telemetryObservers.add(observer);
+    return () => {
+      this.telemetryObservers.delete(observer);
+    };
+  }
+
+  private emitTelemetry(telemetry: RequestTelemetry): void {
+    for (const observer of this.telemetryObservers) {
+      try {
+        observer(telemetry);
+      } catch {
+        // Telemetry observer exceptions must never affect API execution
+      }
+    }
   }
 
   /**
@@ -93,8 +175,12 @@ export class ApiClient {
   }
 
   /**
-   * Internal request executor handling URL construction, auth headers, timeouts,
-   * cancellation, 204 handling, and error normalization.
+   * Internal request executor handling URL construction, correlation ID injection,
+   * auth headers, timeouts, cancellation, 204 handling, telemetry, and error normalization.
+   *
+   * STRICT IDEMPOTENCY INVARIANT:
+   * Non-idempotent POST requests are NEVER retried automatically. Explicit idempotency
+   * key headers (Idempotency-Key / X-Idempotency-Key) are forwarded directly to the backend.
    */
   public async request<T>(
     method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE',
@@ -102,14 +188,23 @@ export class ApiClient {
     body?: unknown,
     options: RequestOptions = {},
   ): Promise<ApiResult<T>> {
+    const startTime = Date.now();
     const config = getApiConfig();
     const query = serializeQueryParams(options.params);
     const fullUrl = `${buildApiUrl(endpointPath, config)}${query}`;
 
+    // Generate or preserve request correlation ID
+    const requestId =
+      options.headers?.['X-Request-ID'] ||
+      options.headers?.['x-request-id'] ||
+      generateRequestId();
+
     const headers: Record<string, string> = {
       Accept: 'application/json',
+      'X-Request-ID': requestId,
       ...(options.headers || {}),
     };
+    headers['X-Request-ID'] = requestId;
 
     // Inject DRF Token header when required
     const authRequired = options.authRequired ?? true;
@@ -142,17 +237,26 @@ export class ApiClient {
     const controller = new AbortController();
     let isTimedOut = false;
 
-    const timeoutTimer = setTimeout(() => {
+    let timeoutTimer: ReturnType<typeof setTimeout> | null = setTimeout(() => {
       isTimedOut = true;
       controller.abort();
     }, timeoutMs);
 
-    // If caller provided their own signal, listen to it as well
+    let callerAbortListener: (() => void) | null = null;
     if (options.signal) {
-      options.signal.addEventListener('abort', () => {
+      if (options.signal.aborted) {
         controller.abort();
-      });
+      } else {
+        callerAbortListener = () => {
+          controller.abort();
+        };
+        options.signal.addEventListener('abort', callerAbortListener);
+      }
     }
+
+    let responseStatus: number | undefined;
+    let requestOk = false;
+    let reportedErrorCode: string | undefined;
 
     try {
       const response = await this.transport(fullUrl, {
@@ -162,10 +266,11 @@ export class ApiClient {
         signal: controller.signal,
       });
 
-      clearTimeout(timeoutTimer);
+      responseStatus = response.status;
 
       // Handle 204 No Content
       if (response.status === 204) {
+        requestOk = true;
         return apiSuccess(undefined as unknown as T, 204);
       }
 
@@ -182,26 +287,54 @@ export class ApiClient {
 
       // Check success
       if (response.ok) {
+        requestOk = true;
         return apiSuccess(responseBody as T, response.status);
       }
 
-      // On 401 Unauthorized, invalidate session immediately
+      // STRICT 401 INVARIANT: Invalidate session ONLY on HTTP 401 Unauthorized
       if (response.status === 401) {
         await this.sessionMgr.handleUnauthorized();
       }
 
       const error = normalizeApiError(response.status, responseBody);
+      reportedErrorCode =
+        'code' in error && typeof (error as { code?: unknown }).code === 'string'
+          ? (error as { code: string }).code
+          : error.kind;
       return apiFailure(error, response.status);
     } catch (err: unknown) {
-      clearTimeout(timeoutTimer);
-
       if (isTimedOut) {
-        return apiFailure(createTimeoutError(`Request timed out after ${timeoutMs}ms.`));
+        const timeoutErr = createTimeoutError(`Request timed out after ${timeoutMs}ms.`);
+        reportedErrorCode = timeoutErr.kind;
+        return apiFailure(timeoutErr);
       }
 
       const message =
         err instanceof Error ? err.message : 'Network request failed.';
-      return apiFailure(createNetworkError(message));
+      const netErr = createNetworkError(message);
+      reportedErrorCode = netErr.kind;
+      return apiFailure(netErr);
+    } finally {
+      // Guarantee timeout timer is cleared and caller AbortSignal listener is detached on ALL exit paths
+      if (timeoutTimer !== null) {
+        clearTimeout(timeoutTimer);
+        timeoutTimer = null;
+      }
+      if (options.signal && callerAbortListener) {
+        options.signal.removeEventListener('abort', callerAbortListener);
+        callerAbortListener = null;
+      }
+
+      // Emit structured request telemetry
+      this.emitTelemetry({
+        requestId,
+        method,
+        url: fullUrl,
+        status: responseStatus,
+        durationMs: Math.max(0, Date.now() - startTime),
+        ok: requestOk,
+        errorCode: reportedErrorCode,
+      });
     }
   }
 

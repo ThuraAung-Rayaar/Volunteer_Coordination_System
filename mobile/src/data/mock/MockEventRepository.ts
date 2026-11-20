@@ -4,6 +4,7 @@
 
 import {
   CHARITY_CATEGORIES,
+  type CharityCategory,
   type EventApplicationState,
   type EventDetail,
   type EventFilters,
@@ -235,14 +236,8 @@ export class MockEventRepository implements EventRepository {
     };
   }
 
-  public async getCharityFields(): Promise<
-    Array<{ code: string; label: string; sort_order?: number }>
-  > {
-    return CHARITY_CATEGORIES.map(c => ({
-      code: c.code,
-      label: c.label,
-      sort_order: c.sortOrder,
-    }));
+  public async getCharityFields(): Promise<CharityCategory[]> {
+    return CHARITY_CATEGORIES.map(c => ({ ...c }));
   }
 
   public async getEventById(id: string): Promise<EventDetail | null> {
@@ -357,6 +352,38 @@ export class MockEventRepository implements EventRepository {
     return {
       success: true,
       message: 'Application withdrawn locally (Demo only — not submitted to server)',
+    };
+  }
+
+  public async acceptInvite(
+    applicationId: string,
+    _note?: string,
+  ): Promise<{ success: boolean; message: string; applicationId: string }> {
+    const app = this.applications.find(a => a.id === applicationId);
+    if (!app) {
+      return { success: false, message: 'Application not found', applicationId };
+    }
+    app.status = 'accepted';
+    return {
+      success: true,
+      message: 'Invitation accepted successfully (Demo only)',
+      applicationId,
+    };
+  }
+
+  public async rejectInvite(
+    applicationId: string,
+    _note?: string,
+  ): Promise<{ success: boolean; message: string; applicationId: string }> {
+    const app = this.applications.find(a => a.id === applicationId);
+    if (!app) {
+      return { success: false, message: 'Application not found', applicationId };
+    }
+    app.status = 'withdrawn';
+    return {
+      success: true,
+      message: 'Invitation declined successfully (Demo only)',
+      applicationId,
     };
   }
 

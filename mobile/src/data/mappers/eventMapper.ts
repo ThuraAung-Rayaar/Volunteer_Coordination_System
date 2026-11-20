@@ -4,6 +4,7 @@
 
 import type {
   ApplicationSubmitRequestDto,
+  CharityFieldDto,
   PublicEventDetailDto,
   PublicEventDto,
   PublicEventPostDto,
@@ -11,6 +12,7 @@ import type {
   VolunteerAssignmentDto,
 } from '../dto/eventDto';
 import type {
+  CharityCategory,
   CharityCategoryCode,
   EventApplicationState,
   EventApplicationStatus,
@@ -169,6 +171,7 @@ export function mapVolunteerApplication(
     postTitle: dto.post_title ?? 'General Volunteer Support',
     status: dto.status as EventApplicationStatus,
     appliedAt: dto.applied_at,
+    source: dto.source,
     volunteerNote: dto.note ?? undefined,
   };
 }
@@ -218,5 +221,16 @@ export function mapApplicationSubmitRequest(
         : null,
     source: 'browse',
     note: note && note.trim().length > 0 ? note.trim() : null,
+  };
+}
+
+/**
+ * Maps CharityFieldDto from GET /api/v1/charity-fields/ to domain CharityCategory (V-19 / P1-05).
+ */
+export function mapCharityField(dto: CharityFieldDto): CharityCategory {
+  return {
+    code: dto.code as CharityCategoryCode,
+    label: dto.label,
+    sortOrder: dto.sort_order,
   };
 }

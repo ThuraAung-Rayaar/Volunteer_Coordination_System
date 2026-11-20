@@ -129,6 +129,35 @@ class AuthOtp(models.Model):
         db_table = "auth_otp"
 
 
+class AuthOtpChallenge(models.Model):
+    class Purpose(models.TextChoices):
+        LOGIN = 'login', 'Login'
+        QR_REGISTRATION = 'qr_registration', 'QR Registration'
+
+    id = models.BigAutoField(primary_key=True)
+    otp = models.ForeignKey(
+        'AuthOtp',
+        on_delete=models.CASCADE,
+        related_name='challenges',
+        db_column='otp_id',
+    )
+    challenge_token_hash = models.TextField(unique=True)
+    purpose = models.CharField(
+        max_length=30,
+        choices=Purpose.choices,
+        default=Purpose.LOGIN,
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+    expires_at = models.DateTimeField()
+    consumed_at = models.DateTimeField(blank=True, null=True)
+    request_id = models.TextField(blank=True, null=True)
+    identity_nonce_hash = models.TextField(blank=True, null=True, unique=True)
+
+    class Meta:
+        managed = False
+        db_table = "auth_otp_challenge"
+
+
 class UserVerificationImages(models.Model):
     class ImageType(models.TextChoices):
         MOCK_SELFIE = 'mock_selfie', 'Mock Selfie'

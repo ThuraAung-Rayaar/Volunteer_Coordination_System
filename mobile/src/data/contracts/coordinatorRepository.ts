@@ -10,16 +10,14 @@ import type {
   CoordinatorEventDetail,
   CoordinatorEventStatus,
   CoordinatorEventSummary,
+  CoordinatorHistoryItem,
   CoordinatorOverviewMetrics,
   CreateEventWizardDraft,
+  EventPostCapacity,
+  GeoAttemptReview,
+  VolunteerUuidLookup,
 } from '../../domain/models/coordinator';
 import type { EventPost } from '../../domain/models/event';
-import type {
-  CoordinatorHistoryItemDto,
-  EventPostCapacityDto,
-} from '../dto/coordinatorDto';
-import type { GeoAttemptReviewDto } from '../dto/checkinDto';
-import type { UserUuidLookupDto } from '../dto/profileDto';
 
 export interface CoordinatorOperationResult<T = void> {
   success: boolean;
@@ -119,11 +117,11 @@ export interface CoordinatorRepository {
   ): Promise<CoordinatorOperationResult>;
 
   /**
-   * Fetches event coordinator handover audit history (C-18).
+   * Fetches event coordinator handover audit history (C-18 / P1-05).
    */
   getCoordinatorHistory(
     eventId: string,
-  ): Promise<CoordinatorHistoryItemDto[]>;
+  ): Promise<CoordinatorHistoryItem[]>;
 
   /**
    * Fetches applications for coordinator events, optionally filtered by eventId.
@@ -178,6 +176,7 @@ export interface CoordinatorRepository {
     postId: string,
     groupCode?: string,
     isGroupLeader?: boolean,
+    eventId?: string,
   ): Promise<CoordinatorOperationResult<CoordinatorAssignmentItem>>;
 
   /**
@@ -189,17 +188,17 @@ export interface CoordinatorRepository {
   ): Promise<CoordinatorOperationResult<CoordinatorAssignmentItem>>;
 
   /**
-   * Fetches post capacity breakdown for an event (C-28).
+   * Fetches post capacity breakdown for an event (C-28 / P1-05).
    */
-  getPostCapacity(eventId: string): Promise<EventPostCapacityDto[]>;
+  getPostCapacity(eventId: string): Promise<EventPostCapacity[]>;
 
   /**
-   * Resolves volunteer identity and capabilities by UUID for check-in / roster (C-29).
+   * Resolves volunteer identity and capabilities by UUID for check-in / roster (C-29 / P1-05).
    */
   lookupVolunteerByUuid(
     uuid: string,
     eventId?: string,
-  ): Promise<UserUuidLookupDto>;
+  ): Promise<VolunteerUuidLookup>;
 
   /**
    * Generates a new coordinator QR token for an event (C-30).
@@ -235,9 +234,9 @@ export interface CoordinatorRepository {
   ): Promise<CoordinatorAttendanceItem[]>;
 
   /**
-   * Fetches geo check-in attempts for review matching v_geo_attempts_review (C-35).
+   * Fetches geo check-in attempts for review matching v_geo_attempts_review (C-35 / P1-05).
    */
-  getGeoAttempts(eventId: string): Promise<GeoAttemptReviewDto[]>;
+  getGeoAttempts(eventId: string): Promise<GeoAttemptReview[]>;
 
   /**
    * Confirms a pending geo check-in attempt.
@@ -256,9 +255,19 @@ export interface CoordinatorRepository {
   ): Promise<CoordinatorOperationResult<CoordinatorAttendanceItem>>;
 
   /**
-   * Manually checks in a volunteer on-site.
+   * Manually checks in a volunteer on-site (C-34 / ATT-02).
+   * Supports explicit { eventId, volunteerUserId, note? }, (eventId, volunteerUserId, note?),
+   * or legacy attendanceId lookup.
    * Rejects writes if the event is in owner-as-monitor mode.
    */
+  manualCheckIn(
+    params: { eventId: string | number; volunteerUserId: string | number; note?: string },
+  ): Promise<CoordinatorOperationResult<CoordinatorAttendanceItem>>;
+  manualCheckIn(
+    eventId: string | number,
+    volunteerUserId: string | number,
+    note?: string,
+  ): Promise<CoordinatorOperationResult<CoordinatorAttendanceItem>>;
   manualCheckIn(
     attendanceId: string,
   ): Promise<CoordinatorOperationResult<CoordinatorAttendanceItem>>;

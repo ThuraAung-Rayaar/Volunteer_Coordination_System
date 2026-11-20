@@ -10,20 +10,18 @@ import type {
   CoordinatorEventDetail,
   CoordinatorEventStatus,
   CoordinatorEventSummary,
+  CoordinatorHistoryItem,
   CoordinatorOverviewMetrics,
   CreateEventWizardDraft,
+  EventPostCapacity,
+  GeoAttemptReview,
+  VolunteerUuidLookup,
 } from '../../domain/models/coordinator';
 import type {
   CoordinatorOperationResult,
   CoordinatorRepository,
 } from '../contracts/coordinatorRepository';
 import type { EventPost } from '../../domain/models/event';
-import type {
-  CoordinatorHistoryItemDto,
-  EventPostCapacityDto,
-} from '../dto/coordinatorDto';
-import type { GeoAttemptReviewDto } from '../dto/checkinDto';
-import type { UserUuidLookupDto } from '../dto/profileDto';
 import { approvedCoordinatorUser } from './fixtures/demoUsers';
 import {
   Clock,
@@ -695,9 +693,35 @@ export class MockCoordinatorRepository implements CoordinatorRepository {
   }
 
   public async manualCheckIn(
+    params: { eventId: string | number; volunteerUserId: string | number; note?: string },
+  ): Promise<CoordinatorOperationResult<CoordinatorAttendanceItem>>;
+  public async manualCheckIn(
+    eventId: string | number,
+    volunteerUserId: string | number,
+    note?: string,
+  ): Promise<CoordinatorOperationResult<CoordinatorAttendanceItem>>;
+  public async manualCheckIn(
     attendanceId: string,
+  ): Promise<CoordinatorOperationResult<CoordinatorAttendanceItem>>;
+  public async manualCheckIn(
+    arg1: string | number | { eventId: string | number; volunteerUserId: string | number; note?: string },
+    arg2?: string | number,
+    _arg3?: string,
   ): Promise<CoordinatorOperationResult<CoordinatorAttendanceItem>> {
-    const record = this.attendance.find(a => a.id === attendanceId);
+    let record: CoordinatorAttendanceItem | undefined;
+    if (typeof arg1 === 'object' && arg1 !== null && 'eventId' in arg1 && 'volunteerUserId' in arg1) {
+      record = this.attendance.find(
+        a => a.eventId === String(arg1.eventId) && a.userId === String(arg1.volunteerUserId),
+      );
+    } else if (arg2 !== undefined && arg2 !== null) {
+      record = this.attendance.find(
+        a => a.eventId === String(arg1) && a.userId === String(arg2),
+      );
+    } else {
+      const attendanceId = String(arg1);
+      record = this.attendance.find(a => a.id === attendanceId || a.assignmentId === attendanceId);
+    }
+
     if (!record) {
       return {
         success: false,
@@ -705,7 +729,7 @@ export class MockCoordinatorRepository implements CoordinatorRepository {
       };
     }
 
-    const event = this.events.find(e => e.id === record.eventId);
+    const event = this.events.find(e => e.id === record!.eventId);
     if (event?.isOwnerAsMonitor) {
       return {
         success: false,
@@ -938,54 +962,54 @@ export class MockCoordinatorRepository implements CoordinatorRepository {
 
   public async getCoordinatorHistory(
     _eventId: string,
-  ): Promise<CoordinatorHistoryItemDto[]> {
+  ): Promise<CoordinatorHistoryItem[]> {
     return [
       {
-        id: 1,
-        event_id: 101,
-        change_type: 'coordinator_handover',
-        previous_coordinator_id: 5,
-        previous_coordinator_name: 'Alex Morgan',
-        new_coordinator_id: 6,
-        new_coordinator_name: 'Jordan Lee',
-        changed_by_id: 5,
-        changed_by_name: 'Alex Morgan',
+        id: '1',
+        eventId: '101',
+        changeType: 'coordinator_handover',
+        previousCoordinatorId: '5',
+        previousCoordinatorName: 'Alex Morgan',
+        newCoordinatorId: '6',
+        newCoordinatorName: 'Jordan Lee',
+        changedById: '5',
+        changedByName: 'Alex Morgan',
         reason: 'Shift handover to relief coordinator',
-        changed_at: '2026-11-01T12:00:00Z',
+        changedAt: '2026-11-01T12:00:00Z',
       },
     ];
   }
 
   public async getPostCapacity(
     eventId: string,
-  ): Promise<EventPostCapacityDto[]> {
+  ): Promise<EventPostCapacity[]> {
     const event = this.events.find(e => e.id === eventId);
     if (!event) return [];
-    return event.posts.map((p, idx) => ({
-      post_id: Number(p.id.replace(/\D/g, '')) || idx + 1,
+    return event.posts.map(p => ({
+      postId: p.id,
       title: p.title,
       status: p.status,
-      required_headcount: p.requiredHeadcount,
-      assigned_count: p.filledHeadcount,
-      remaining: p.remainingCapacity,
+      requiredHeadcount: p.requiredHeadcount,
+      assignedCount: p.filledHeadcount,
+      remainingCapacity: p.remainingCapacity,
     }));
   }
 
   public async getGeoAttempts(
     _eventId: string,
-  ): Promise<GeoAttemptReviewDto[]> {
+  ): Promise<GeoAttemptReview[]> {
     return [
       {
-        attempt_id: 901,
-        event_id: 77,
-        user_id: 88,
-        display_name: 'Ma Hla Hla',
-        attempted_at: '2026-12-20T07:55:00Z',
-        distance_m: 85.5,
-        effective_radius_m: 100,
-        accuracy_m: 10,
-        is_mocked: false,
-        result_code: 'pending_confirmation',
+        attemptId: '901',
+        eventId: '77',
+        userId: '88',
+        displayName: 'Ma Hla Hla',
+        attemptedAt: '2026-12-20T07:55:00Z',
+        distanceMeters: 85.5,
+        effectiveRadiusMeters: 100,
+        accuracyMeters: 10,
+        isMocked: false,
+        resultCode: 'pending_confirmation',
       },
     ];
   }
@@ -993,25 +1017,26 @@ export class MockCoordinatorRepository implements CoordinatorRepository {
   public async lookupVolunteerByUuid(
     uuid: string,
     _eventId?: string,
-  ): Promise<UserUuidLookupDto> {
+  ): Promise<VolunteerUuidLookup> {
     return {
-      user_id: 88,
+      userId: '88',
       uuid,
+      displayName: 'Demo Volunteer',
       display_name: 'Demo Volunteer',
-      verification_status: 'verified',
+      verificationStatus: 'verified',
       skills: ['first aid', 'logistics'],
-      physical_ok: true,
-      good_eyesight: true,
-      needs_glasses: false,
-      can_lift_heavy: true,
-      can_work_outdoor: true,
-      has_leader_experience: true,
-      new_to_volunteer: false,
-      preferred_language: 'my',
-      home_area: 'Kamayut, Yangon',
-      needs_meal_support: true,
-      needs_travel_support: false,
-      accepts_unpaid: true,
+      physicalOk: true,
+      goodEyesight: true,
+      needsGlasses: false,
+      canLiftHeavy: true,
+      canWorkOutdoor: true,
+      hasLeaderExperience: true,
+      newToVolunteer: false,
+      preferredLanguage: 'my',
+      homeArea: 'Kamayut, Yangon',
+      needsMealSupport: true,
+      needsTravelSupport: false,
+      acceptsUnpaid: true,
     };
   }
 

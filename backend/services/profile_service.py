@@ -173,6 +173,51 @@ def update_user_profile(user: Users, validated_data: dict) -> Users:
             user.emergency_contact_phone_enc = None
             validated_data["emergency_contact_name"] = None
 
+    # Donation preferences aggregate consistency (P1-02):
+    # Enforce server-side consistency across is_willing_to_donate,
+    # is_willing_to_donate_blood, and is_willing_to_donate_items so partial PATCH
+    # updates cannot leave inconsistent master/sub-flag states or violate DB constraint:
+    # CHECK (is_willing_to_donate OR (NOT is_willing_to_donate_blood AND NOT is_willing_to_donate_items))
+    has_donate_master = "is_willing_to_donate" in validated_data
+    has_donate_blood = "is_willing_to_donate_blood" in validated_data
+    has_donate_items = "is_willing_to_donate_items" in validated_data
+
+    if has_donate_master or has_donate_blood or has_donate_items:
+        new_master = validated_data.get("is_willing_to_donate")
+        new_blood = validated_data.get("is_willing_to_donate_blood")
+        new_items = validated_data.get("is_willing_to_donate_items")
+
+        if has_donate_master and new_master is False:
+            if (has_donate_blood and new_blood is True) or (has_donate_items and new_items is True):
+                raise DomainError(
+                    code="invalid_donation_preferences",
+                    message="Cannot set is_willing_to_donate to False while donation sub-flags are True.",
+                    status_code=400,
+                )
+            # Master explicitly disabled: cascade both sub-flags to False
+            validated_data["is_willing_to_donate"] = False
+            validated_data["is_willing_to_donate_blood"] = False
+            validated_data["is_willing_to_donate_items"] = False
+        else:
+            eff_blood = new_blood if has_donate_blood else user.is_willing_to_donate_blood
+            eff_items = new_items if has_donate_items else user.is_willing_to_donate_items
+
+            if has_donate_master and new_master is True:
+                validated_data["is_willing_to_donate"] = True
+                if has_donate_blood:
+                    validated_data["is_willing_to_donate_blood"] = new_blood
+                if has_donate_items:
+                    validated_data["is_willing_to_donate_items"] = new_items
+            elif has_donate_blood or has_donate_items:
+                # Sub-flag(s) updated without explicit master flag:
+                # If either sub-flag is True, master must be True.
+                # If both sub-flags become False, master becomes False.
+                validated_data["is_willing_to_donate"] = bool(eff_blood or eff_items)
+                if has_donate_blood:
+                    validated_data["is_willing_to_donate_blood"] = eff_blood
+                if has_donate_items:
+                    validated_data["is_willing_to_donate_items"] = eff_items
+
     # Apply remaining fields
     for field, value in validated_data.items():
         if field == "emergency_contact_phone":

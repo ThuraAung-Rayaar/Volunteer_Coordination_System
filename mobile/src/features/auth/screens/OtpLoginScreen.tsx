@@ -2,9 +2,10 @@
  * @format
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useCurrentUser } from '../../../app/UserContext';
+import type { RequestOtpResult, VerifyOtpResult } from '../../../app/UserContext';
 import {
   AppButton,
   AppCard,
@@ -24,7 +25,14 @@ export function OtpLoginScreen({
   onLoginSuccess,
 }: OtpLoginScreenProps): React.JSX.Element {
   const { theme } = useAppTheme();
-  const { requestOtp, verifyOtp } = useCurrentUser();
+  const {
+    challenge,
+    clearChallenge,
+    requestTokenizedOtp,
+    verifyTokenizedOtp,
+    requestOtp,
+    verifyOtp,
+  } = useCurrentUser();
 
   const [step, setStep] = useState<'phone' | 'otp'>('phone');
   const [phone, setPhone] = useState('+959');
@@ -36,7 +44,24 @@ export function OtpLoginScreen({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [fieldError, setFieldError] = useState<string | null>(null);
 
+  // Clear ephemeral challenge and code state on navigation exit / unmount
+  useEffect(() => {
+    return () => {
+      clearChallenge?.();
+    };
+  }, [clearChallenge]);
+
+  // Server-supplied code_length (default locked 6 digits)
+  const codeLength = challenge?.codeLength ?? 6;
+
+  // Development build check: show dev banner ONLY in dev builds when dev_code is returned
+  const isDevBuild =
+    (typeof __DEV__ !== 'undefined' && Boolean(__DEV__)) ||
+    process.env.NODE_ENV !== 'production';
+  const effectiveDevCode = isDevBuild ? (challenge?.devCode ?? devCode) : null;
+
   const handleSendOtp = async () => {
+    if (isLoading) return; // Prevent double-submit while in flight
     setErrorMessage(null);
     setFieldError(null);
 
@@ -46,9 +71,21 @@ export function OtpLoginScreen({
       return;
     }
 
+    clearChallenge?.();
     setIsLoading(true);
     try {
-      const result = await requestOtp(trimmedPhone, 'login');
+      let result: RequestOtpResult;
+      if (requestOtp) {
+        result = await requestOtp(trimmedPhone, 'login');
+      } else if (requestTokenizedOtp) {
+        result = await requestTokenizedOtp({
+          phone: trimmedPhone,
+          purpose: 'login',
+        });
+      } else {
+        throw new Error('Authentication service unavailable.');
+      }
+
       if (result.success) {
         if (result.devCode) {
           setDevCode(result.devCode);
@@ -70,26 +107,41 @@ export function OtpLoginScreen({
   };
 
   const handleVerifyOtp = async () => {
+    if (isLoading) return; // Prevent double-submit while in flight
     setErrorMessage(null);
     setFieldError(null);
 
     const trimmedCode = code.trim();
-    if (!trimmedCode) {
-      setFieldError('Please enter the 6-digit verification code.');
+    if (!trimmedCode || trimmedCode.length !== codeLength) {
+      setFieldError(`Please enter the ${codeLength}-digit verification code.`);
       return;
     }
 
     setIsLoading(true);
     try {
-      const result = await verifyOtp(
-        phone.trim(),
-        trimmedCode,
-        displayName.trim() || undefined,
-      );
+      let result: VerifyOtpResult;
+      // Phase 6A: Submit verification with auth_session_token + code only (never resending phone)
+      if (challenge?.authSessionToken && verifyTokenizedOtp) {
+        result = await verifyTokenizedOtp({
+          code: trimmedCode,
+          displayName: displayName.trim() || undefined,
+        });
+      } else if (verifyOtp) {
+        // Fallback for legacy mocks or providers where tokenized method is absent
+        result = await verifyOtp(
+          phone.trim(),
+          trimmedCode,
+          displayName.trim() || undefined,
+        );
+      } else {
+        throw new Error('Authentication service unavailable.');
+      }
 
       if (result.success) {
+        clearChallenge?.();
         onLoginSuccess?.();
       } else {
+        // Display expired/invalid/locked errors without needlessly wiping the user's phone input
         setErrorMessage(
           result.error || 'Invalid verification code. Please try again.',
         );
@@ -104,8 +156,10 @@ export function OtpLoginScreen({
   };
 
   const handleBackToPhone = () => {
+    clearChallenge?.();
     setStep('phone');
     setCode('');
+    setDevCode(null);
     setErrorMessage(null);
     setFieldError(null);
   };
@@ -194,7 +248,7 @@ export function OtpLoginScreen({
           <AppCard style={styles.card}>
             <View style={styles.headerBlock}>
               <AppText variant="title" weight="bold" color={theme.colors.textPrimary}>
-                Enter 6-Digit Code
+                {`Enter ${codeLength}-Digit Code`}
               </AppText>
               <AppText
                 variant="body"
@@ -207,9 +261,24 @@ export function OtpLoginScreen({
                 </AppText>
                 .
               </AppText>
+
+              {/* Truthful delivery status metadata */}
+              {challenge?.delivery ? (
+                <View style={styles.deliveryBlock}>
+                  <AppText variant="caption" color={theme.colors.textSecondary}>
+                    Delivery channel: {challenge.delivery.channel || 'SMS'}
+                    {challenge.delivery.delivered
+                      ? ' (delivered)'
+                      : 'configured' in challenge.delivery &&
+                        challenge.delivery.configured === false
+                      ? ' (simulation mode / provider unconfigured)'
+                      : ' (queued)'}
+                  </AppText>
+                </View>
+              ) : null}
             </View>
 
-            {devCode ? (
+            {effectiveDevCode ? (
               <View
                 style={[
                   styles.devBanner,
@@ -223,23 +292,23 @@ export function OtpLoginScreen({
                   <StatusBadge status="info" label="DEV TEST OTP" />
                 </View>
                 <AppText variant="caption" color={theme.colors.primary}>
-                  Development Code: <AppText weight="bold">{devCode}</AppText>
+                  Development Code: <AppText weight="bold">{effectiveDevCode}</AppText>
                 </AppText>
               </View>
             ) : null}
 
             <AppInput
               label="Verification Code"
-              placeholder="123456"
+              placeholder={'123456'.slice(0, codeLength)}
               value={code}
               onChangeText={text => {
                 setCode(text);
                 if (fieldError) setFieldError(null);
               }}
               keyboardType="number-pad"
-              maxLength={6}
+              maxLength={codeLength}
               error={fieldError ?? undefined}
-              helperText="Enter the 6-digit code received via SMS"
+              helperText={`Enter the ${codeLength}-digit code received via SMS`}
             />
 
             {errorMessage ? (
@@ -265,6 +334,15 @@ export function OtpLoginScreen({
                 onPress={handleVerifyOtp}
                 loading={isLoading}
               />
+
+              <View style={styles.secondaryButtonSpacer}>
+                <AppButton
+                  label="Resend Code"
+                  variant="outline"
+                  onPress={handleSendOtp}
+                  disabled={isLoading}
+                />
+              </View>
 
               <View style={styles.secondaryButtonSpacer}>
                 <AppButton
@@ -299,6 +377,9 @@ const styles = StyleSheet.create({
   },
   subtext: {
     marginTop: 6,
+  },
+  deliveryBlock: {
+    marginTop: 8,
   },
   fieldSpacer: {
     height: 16,

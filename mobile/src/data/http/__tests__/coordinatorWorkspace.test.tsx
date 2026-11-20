@@ -9,6 +9,7 @@ import { ApiClient } from '../../../core/api/apiClient';
 import { MemoryTokenStore } from '../../../core/auth/tokenStore';
 import { SessionManager } from '../../../core/auth/sessionManager';
 import { coordinatorApi } from '../../endpoints/coordinatorApi';
+import { checkinApi } from '../../endpoints/checkinApi';
 import { eventApi } from '../../endpoints/eventApi';
 import { HttpCoordinatorRepository } from '../HttpCoordinatorRepository';
 import { MockCoordinatorRepository } from '../../mock/MockCoordinatorRepository';
@@ -689,6 +690,17 @@ describe('Phase 7: Coordinator Workspace Integration', () => {
           data: mockAsgDto,
         });
 
+      jest.spyOn(coordinatorApi, 'getAssignments').mockResolvedValue({
+        ok: true,
+        status: 200,
+        data: {
+          count: 1,
+          next: null,
+          previous: null,
+          results: [mockAsgDto],
+        },
+      } as any);
+
       jest.spyOn(coordinatorRepo, 'getMyEvents').mockResolvedValue([
         {
           id: '101',
@@ -717,6 +729,7 @@ describe('Phase 7: Coordinator Workspace Integration', () => {
         '201',
         'GRP-B',
         false,
+        '101',
       );
       expect(resWithPost.success).toBe(true);
       expect(manualSpy).toHaveBeenCalledWith(
@@ -736,6 +749,7 @@ describe('Phase 7: Coordinator Workspace Integration', () => {
         '',
         'GRP-B',
         false,
+        '101',
       );
       expect(resWithoutPost.success).toBe(true);
       expect(manualSpy).toHaveBeenCalledWith(
@@ -800,14 +814,20 @@ describe('Phase 7: Coordinator Workspace Integration', () => {
           data: { id: 801, confirmation_status: 'confirmed' },
         });
       const checkinSpy = jest
-        .spyOn(coordinatorApi, 'manualCheckIn')
+        .spyOn(checkinApi, 'manualCheckIn')
         .mockResolvedValue({
           ok: true,
           status: 200,
           data: {
             id: 801,
+            attendance_id: 801,
+            event_id: 101,
+            user_id: 301,
             status: 'checked_in',
-            method: 'manual',
+            method: 'coordinator_manual',
+            checkin_at: '2026-11-20T10:00:00Z',
+            recorded_by_user_id: 99,
+            already_checked_in: false,
           },
         });
 

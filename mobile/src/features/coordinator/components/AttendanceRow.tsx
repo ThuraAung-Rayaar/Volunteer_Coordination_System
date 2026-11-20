@@ -13,7 +13,11 @@ interface AttendanceRowProps {
   isMonitorMode: boolean;
   onConfirmGeo?: (attendanceId: string) => void;
   onRejectGeo?: (attendanceId: string) => void;
-  onManualCheckIn?: (attendanceId: string) => void;
+  onManualCheckIn?: (
+    attendanceId: string,
+    eventId?: string,
+    volunteerUserId?: string,
+  ) => void;
 }
 
 export function AttendanceRow({
@@ -43,6 +47,12 @@ export function AttendanceRow({
   };
 
   const badgeProps = getStatusBadge(attendance.status);
+
+  // Enable manual check-in action only when row state permits it and coordinator has write capability
+  const canManualCheckIn =
+    !isMonitorMode &&
+    (attendance.status === 'scheduled' ||
+      attendance.status === 'pending_confirmation');
 
   return (
     <AppCard style={styles.card}>
@@ -104,8 +114,11 @@ export function AttendanceRow({
             >
               {attendance.checkInMethod === 'geo'
                 ? 'Geo Check-In'
-                : attendance.checkInMethod === 'qr'
+                : attendance.checkInMethod === 'qr' ||
+                  attendance.checkInMethod === 'qr_scan'
                 ? 'QR Scan'
+                : attendance.checkInMethod === 'coordinator_manual'
+                ? 'Coordinator Manual'
                 : 'Manual Verification'}
             </AppText>
           </View>
@@ -114,10 +127,19 @@ export function AttendanceRow({
         {attendance.checkedInAt ? (
           <AppText variant="caption" color={theme.colors.textSecondary}>
             Time:{' '}
-            {new Date(attendance.checkedInAt).toLocaleTimeString(undefined, {
-              hour: '2-digit',
-              minute: '2-digit',
-            })}
+            {(() => {
+              try {
+                return new Date(attendance.checkedInAt).toLocaleTimeString(
+                  undefined,
+                  {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  },
+                );
+              } catch {
+                return attendance.checkedInAt;
+              }
+            })()}
           </AppText>
         ) : null}
       </View>
@@ -207,25 +229,33 @@ export function AttendanceRow({
         </View>
       ) : null}
 
-      {/* Manual Check-in Action for scheduled volunteers */}
-      {attendance.status === 'scheduled' ? (
+      {/* Manual Check-in Action for scheduled / eligible volunteers */}
+      {canManualCheckIn ? (
         <View style={styles.manualCheckinRow}>
-          {isMonitorMode ? (
-            <AppText
-              variant="caption"
-              color={theme.colors.accent}
-              style={styles.monitorText}
-            >
-              Check-in disabled in monitor mode
-            </AppText>
-          ) : (
-            <AppButton
-              label="Manual Check-In (Demo)"
-              variant="secondary"
-              disabled={isMonitorMode}
-              onPress={() => onManualCheckIn?.(attendance.id)}
-            />
-          )}
+          <AppButton
+            label="Manual Check-In"
+            variant="secondary"
+            disabled={isMonitorMode}
+            onPress={() =>
+              onManualCheckIn?.(
+                attendance.id,
+                attendance.eventId,
+                attendance.userId,
+              )
+            }
+          />
+        </View>
+      ) : isMonitorMode &&
+        (attendance.status === 'scheduled' ||
+          attendance.status === 'pending_confirmation') ? (
+        <View style={styles.manualCheckinRow}>
+          <AppText
+            variant="caption"
+            color={theme.colors.accent}
+            style={styles.monitorText}
+          >
+            Check-in disabled in monitor mode
+          </AppText>
         </View>
       ) : null}
     </AppCard>

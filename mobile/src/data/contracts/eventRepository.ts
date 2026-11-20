@@ -3,6 +3,7 @@
  */
 
 import type {
+  CharityCategory,
   EventApplicationState,
   EventDetail,
   EventFilters,
@@ -86,11 +87,9 @@ export interface EventRepository {
   getEventById(id: string): Promise<EventDetail | null>;
 
   /**
-   * Fetches active charity fields taxonomy.
+   * Fetches active charity fields taxonomy (V-19 / P1-05).
    */
-  getCharityFields(): Promise<
-    Array<{ code: string; label: string; sort_order?: number }>
-  >;
+  getCharityFields(): Promise<CharityCategory[]>;
 
   /**
    * Submits an application to an open post on an event.
@@ -105,6 +104,22 @@ export interface EventRepository {
    * Fetches the volunteer's submitted applications.
    */
   getUserApplications(): Promise<VolunteerApplicationItem[]>;
+
+  /**
+   * Accepts a coordinator invitation to an event (V-24 / P1-06 / INV-01).
+   */
+  acceptInvite(
+    applicationId: string,
+    note?: string,
+  ): Promise<{ success: boolean; message: string; applicationId: string }>;
+
+  /**
+   * Declines / rejects a coordinator invitation to an event (P1-06 / INV-01).
+   */
+  rejectInvite(
+    applicationId: string,
+    note?: string,
+  ): Promise<{ success: boolean; message: string; applicationId: string }>;
 
   /**
    * Withdraws a pending or waitlisted volunteer application.

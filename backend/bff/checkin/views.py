@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -8,6 +9,7 @@ from services import attendance_service, geo_service, onboarding_service, qr_ser
 from .serializers import (
     ConfirmAttendanceSerializer,
     GeoCheckinSerializer,
+    ManualCheckinResponseSerializer,
     ManualCheckinSerializer,
     OnboardingStatusSerializer,
     QrRedeemSerializer,
@@ -113,9 +115,20 @@ class AttendanceQrCheckinView(APIView):
 
 
 class AttendanceManualCheckinView(APIView):
-    """POST /api/v1/attendance/manual-checkin/ or /events/{event_id}/check-in/ (coordinator only)"""
+    """
+    POST /api/v1/checkin/attendance/manual-checkin/ (Canonical route)
+    Aliases: /api/v1/attendance/manual-checkin/, /api/v1/events/{event_id}/check-in/
+    Coordinator in-person verification at registration desk.
+    Returns full authoritative mutation payload with existing timestamps and methods.
+    """
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        request=ManualCheckinSerializer,
+        responses={200: ManualCheckinResponseSerializer},
+        summary="Coordinator manual on-site check-in",
+        description="Records volunteer in-person attendance at event desk. Returns authoritative state; preserves existing QR/geo methods on repeat.",
+    )
     def post(self, request, event_id=None):
         serializer = ManualCheckinSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -126,13 +139,31 @@ class AttendanceManualCheckinView(APIView):
         att = attendance_service.manual_check_in(
             request.user, target_event_id, data["user_id"], data.get("note", "")
         )
-        return Response({"id": att.id, "status": att.status, "method": att.method})
+        return Response({
+            "attendance_id": att.attendance_id,
+            "event_id": att.event_id,
+            "user_id": att.user_id,
+            "status": att.status,
+            "method": att.method,
+            "checkin_at": att.checkin_at,
+            "recorded_by_user_id": att.recorded_by_user_id,
+            "already_checked_in": att.already_checked_in,
+            "id": att.attendance_id,
+        }, status=status.HTTP_200_OK)
 
 
 class AttendanceGeoCheckinView(APIView):
-    """POST /api/v1/attendance/geo-checkin/ or /events/{event_id}/geo-check-in/"""
+    """
+    POST /api/v1/attendance/geo-checkin/ or /events/{event_id}/geo-check-in/
+    Note: This is a dormant backend capability not active in the v0.12.0 mobile release.
+    """
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        request=GeoCheckinSerializer,
+        summary="Volunteer GPS geo check-in (Dormant)",
+        description="GPS geolocation check-in orchestration. Note: This is a dormant backend capability not active in the v0.12.0 mobile release.",
+    )
     def post(self, request, event_id=None):
         serializer = GeoCheckinSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

@@ -83,11 +83,64 @@ def get_geo_attempts_review(actor, event_id: int) -> list[dict]:
 # Manual Check-In / Check-Out
 # ---------------------------------------------------------------------------
 
+class ManualCheckInResult(dict):
+    """
+    Structured authoritative result of a manual check-in mutation.
+    Subclasses dict so Response(result) and dict indexing work directly,
+    while also exposing attributes for backward-compatible object access.
+    """
+    def __init__(
+        self,
+        *,
+        attendance_id: int,
+        event_id: int,
+        user_id: int,
+        status: str,
+        method: str,
+        checkin_at,
+        recorded_by_user_id: int | None,
+        already_checked_in: bool,
+        attendance_obj: Attendance | None = None,
+    ):
+        super().__init__(
+            attendance_id=attendance_id,
+            id=attendance_id,
+            event_id=event_id,
+            user_id=user_id,
+            status=status,
+            method=method,
+            checkin_at=checkin_at,
+            recorded_by_user_id=recorded_by_user_id,
+            already_checked_in=already_checked_in,
+        )
+        self.attendance_id = attendance_id
+        self.id = attendance_id
+        self.event_id = event_id
+        self.user_id = user_id
+        self.status = status
+        self.method = method
+        self.checkin_at = checkin_at
+        self.recorded_by_user_id = recorded_by_user_id
+        self.already_checked_in = already_checked_in
+        self._attendance_obj = attendance_obj
+
+    def __getattr__(self, name: str):
+        if self._attendance_obj is not None and hasattr(self._attendance_obj, name):
+            return getattr(self._attendance_obj, name)
+        raise AttributeError(f"'ManualCheckInResult' object has no attribute '{name}'")
+
+
 @transaction.atomic
-def manual_check_in(actor, event_id: int, volunteer_user_id: int, note: str = "") -> Attendance:
+def manual_check_in(
+    actor,
+    event_id: int,
+    volunteer_user_id: int,
+    note: str = "",
+) -> ManualCheckInResult:
     """
     Coordinator checks in a volunteer in person.
     The DB trigger validates event active, active assignment, and onboarding.
+    Returns a structured authoritative result dictionary with object-attribute compatibility.
     """
     get_event_for_manager_or_404(actor, event_id, require_write=True)
 
@@ -103,8 +156,27 @@ def manual_check_in(actor, event_id: int, volunteer_user_id: int, note: str = ""
             status_code=400,
         )
 
+    # Cancelled attendance cannot be directly checked in under trg_attendance_guard
+    if att.status == "cancelled":
+        raise DomainError(
+            code="invalid_state",
+            message="Cannot check in a cancelled attendance record.",
+            status_code=409,
+        )
+
+    # Idempotent repeat for already checked_in or completed attendance
     if att.status in ("checked_in", "completed"):
-        return att  # idempotent
+        return ManualCheckInResult(
+            attendance_id=att.id,
+            event_id=att.event_id,
+            user_id=att.user_id,
+            status=att.status,
+            method=att.method,
+            checkin_at=att.checkin_at,
+            recorded_by_user_id=att.recorded_by_user_id,
+            already_checked_in=True,
+            attendance_obj=att,
+        )
 
     prev_user_id, prev_ip = get_db_session_context()
     set_db_session_context(actor.id)
@@ -114,10 +186,18 @@ def manual_check_in(actor, event_id: int, volunteer_user_id: int, note: str = ""
     att.checkin_at = timezone.now()
     if note:
         att.note = note
+
     try:
         att.save()
         att.refresh_from_db()
     except (ProgrammingError, IntegrityError, InternalError) as exc:
+        err_str = str(exc)
+        if "invalid_transition" in err_str and "cancelled" in err_str:
+            raise DomainError(
+                code="invalid_state",
+                message="Cannot check in a cancelled attendance record.",
+                status_code=409,
+            ) from exc
         raise translate_db_exception(exc) from exc
     else:
         set_db_session_context(prev_user_id, prev_ip)
@@ -126,7 +206,17 @@ def manual_check_in(actor, event_id: int, volunteer_user_id: int, note: str = ""
         "Manual check-in",
         extra={"event_id": event_id, "volunteer_id": volunteer_user_id, "actor_id": actor.id},
     )
-    return att
+    return ManualCheckInResult(
+        attendance_id=att.id,
+        event_id=att.event_id,
+        user_id=att.user_id,
+        status=att.status,
+        method=att.method,
+        checkin_at=att.checkin_at,
+        recorded_by_user_id=actor.id,
+        already_checked_in=False,
+        attendance_obj=att,
+    )
 
 
 @transaction.atomic

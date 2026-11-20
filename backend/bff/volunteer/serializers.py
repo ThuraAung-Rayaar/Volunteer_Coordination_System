@@ -394,3 +394,34 @@ class VolunteerAssignmentListSerializer(serializers.Serializer):
 ApplicationCancelSerializer = AssignmentCancelSerializer
 VolunteerApplicationListSerializer = ApplicationStatusSerializer
 
+
+# ---------------------------------------------------------------------------
+# v0.12.0 Compact Session Bootstrap Serializers (Section 8.7, API-01)
+# ---------------------------------------------------------------------------
+
+class BootstrapUserSerializer(serializers.Serializer):
+    id = serializers.IntegerField(read_only=True)
+    uuid = serializers.UUIDField(read_only=True)
+    display_name = serializers.CharField(read_only=True)
+    phone = serializers.CharField(read_only=True, allow_null=True)
+    email = serializers.CharField(read_only=True, allow_null=True)
+    account_status = serializers.CharField(read_only=True)
+    verification_status = serializers.CharField(read_only=True)
+
+
+class BootstrapCoordinatorSerializer(serializers.Serializer):
+    status = serializers.CharField(read_only=True)
+    can_access_workspace = serializers.BooleanField(read_only=True)
+
+
+class BootstrapCapabilitiesSerializer(serializers.Serializer):
+    volunteer = serializers.BooleanField(read_only=True)
+    coordinator = serializers.BooleanField(read_only=True)
+
+
+class UserBootstrapResponseSerializer(serializers.Serializer):
+    user = BootstrapUserSerializer(read_only=True)
+    coordinator = BootstrapCoordinatorSerializer(read_only=True)
+    capabilities = BootstrapCapabilitiesSerializer(read_only=True)
+
+

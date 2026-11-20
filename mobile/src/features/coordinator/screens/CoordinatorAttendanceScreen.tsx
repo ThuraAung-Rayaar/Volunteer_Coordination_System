@@ -150,10 +150,23 @@ export function CoordinatorAttendanceScreen({
     }
   };
 
-  const handleManualCheckIn = async (attendanceId: string) => {
-    const result = await repo.manualCheckIn(
-      attendanceId,
-    );
+  const handleManualCheckIn = async (
+    attendanceId: string,
+    eventId?: string,
+    volunteerUserId?: string,
+  ) => {
+    const targetEventId = eventId || selectedEventId;
+    let result;
+    if (targetEventId && volunteerUserId) {
+      result = await repo.manualCheckIn({
+        eventId: targetEventId,
+        volunteerUserId,
+        note: 'Manual on-site check-in verified by coordinator',
+      });
+    } else {
+      result = await repo.manualCheckIn(attendanceId);
+    }
+
     setFeedbackBanner(result.message);
     if (result.success) {
       await loadData();

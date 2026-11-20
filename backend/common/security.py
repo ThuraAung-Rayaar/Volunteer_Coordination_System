@@ -139,15 +139,15 @@ def decrypt_phone(token: Optional[str]) -> Optional[str]:
 
 def compute_otp_hash(raw_code: str) -> str:
     """
-    Compute HMAC-SHA256 hash of an OTP code.
+    Compute HMAC-SHA256 hash of an OTP code using dedicated OTP_CODE_HMAC_SECRET.
 
     Args:
-        raw_code: The raw OTP code string (e.g., "1234").
+        raw_code: The raw OTP code string (e.g., "123456").
 
     Returns:
         64-character hex HMAC-SHA256 hash.
     """
-    secret = settings.PHONE_HASH_HMAC_SECRET
+    secret = getattr(settings, "OTP_CODE_HMAC_SECRET", settings.PHONE_HASH_HMAC_SECRET)
     return hmac.new(
         secret.encode("utf-8"),
         raw_code.strip().encode("utf-8"),
@@ -155,12 +155,12 @@ def compute_otp_hash(raw_code: str) -> str:
     ).hexdigest()
 
 
-def generate_otp_code(length: int = 4) -> str:
+def generate_otp_code(length: int = 6) -> str:
     """
-    Generate a cryptographically secure numeric OTP code.
+    Generate a cryptographically secure numeric OTP code (default 6 digits per v0.12.0).
 
     Args:
-        length: Number of digits (default 4).
+        length: Number of digits (default 6).
 
     Returns:
         Numeric string of the specified length.
@@ -168,6 +168,65 @@ def generate_otp_code(length: int = 4) -> str:
     max_val = 10 ** length
     code = secrets.randbelow(max_val)
     return str(code).zfill(length)
+
+
+# =============================================================================
+# AUTH SESSION CHALLENGE TOKEN HANDLING (v0.12.0 Tokenized Handshake)
+# =============================================================================
+
+def generate_challenge_token() -> str:
+    """
+    Generate a cryptographically secure 256-bit opaque challenge token.
+
+    Returns:
+        43-character URL-safe string containing 32 cryptographically secure random bytes.
+    """
+    return secrets.token_urlsafe(32)
+
+
+def compute_challenge_token_hash(token: str) -> str:
+    """
+    Compute HMAC-SHA256 hash of an opaque challenge token using AUTH_SESSION_TOKEN_SECRET.
+
+    The resulting 64-character hex string is stored in auth_otp_challenge.challenge_token_hash.
+    The raw challenge token is NEVER stored in the database.
+
+    Args:
+        token: The raw opaque challenge token.
+
+    Returns:
+        64-character hex HMAC-SHA256 hash.
+    """
+    if not token or not token.strip():
+        raise ValueError("Challenge token cannot be empty.")
+    secret = getattr(settings, "AUTH_SESSION_TOKEN_SECRET", settings.PHONE_HASH_HMAC_SECRET)
+    return hmac.new(
+        secret.encode("utf-8"),
+        token.strip().encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+
+
+def validate_key_separation() -> None:
+    """
+    Validate that cryptographic HMAC secrets are properly configured and isolated.
+    Ensures PHONE_HASH_HMAC_SECRET, OTP_CODE_HMAC_SECRET, and AUTH_SESSION_TOKEN_SECRET
+    are all set and pairwise distinct.
+    """
+    phone_secret = getattr(settings, "PHONE_HASH_HMAC_SECRET", None)
+    otp_secret = getattr(settings, "OTP_CODE_HMAC_SECRET", None)
+    chal_secret = getattr(settings, "AUTH_SESSION_TOKEN_SECRET", None)
+
+    if not phone_secret or not otp_secret or not chal_secret:
+        raise ValueError(
+            "All HMAC secrets (PHONE_HASH_HMAC_SECRET, OTP_CODE_HMAC_SECRET, AUTH_SESSION_TOKEN_SECRET) must be set."
+        )
+
+    if len({phone_secret, otp_secret, chal_secret}) < 3:
+        raise ValueError(
+            "Cryptographic key separation violation: PHONE_HASH_HMAC_SECRET, OTP_CODE_HMAC_SECRET, "
+            "and AUTH_SESSION_TOKEN_SECRET must be pairwise distinct."
+        )
 
 
 # =============================================================================
@@ -209,12 +268,22 @@ def hash_qr_token(raw_token: str) -> str:
 # =============================================================================
 
 SENSITIVE_FIELDS = frozenset({
+    "phone",
+    "raw_phone",
     "phone_enc",
     "phone_hash",
     "password",
     "emergency_contact_phone_enc",
-    "token_hash",
+    "otp",
+    "raw_code",
+    "code",
     "code_hash",
+    "token",
+    "key",
+    "token_hash",
+    "auth_session_token",
+    "challenge_token",
+    "challenge_token_hash",
     "checkin_latitude",
     "checkin_longitude",
 })
