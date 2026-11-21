@@ -1,3 +1,5 @@
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from apps.accounts.models import UserVerificationImages
@@ -107,6 +109,7 @@ class PublicEventDetailSerializer(serializers.Serializer):
 
 class EventSummarySerializer(serializers.ModelSerializer):
     id = serializers.IntegerField(source="event_id", read_only=True)
+    checked_in_today_count = serializers.SerializerMethodField(help_text="Count of check-ins recorded today.")
 
     class Meta:
         model = VEventSummary
@@ -126,9 +129,24 @@ class EventSummarySerializer(serializers.ModelSerializer):
             "waitlisted_count",
             "assignment_count",
             "checked_in_count",
+            "checked_in_today_count",
             "pending_confirmations",
         ]
         read_only_fields = fields
+
+    @extend_schema_field(OpenApiTypes.INT)
+    def get_checked_in_today_count(self, obj) -> int:
+        from apps.attendance.models import Attendance
+        from django.utils import timezone
+        today = timezone.now().date()
+        event_id = getattr(obj, "event_id", None) or getattr(obj, "id", None)
+        if not event_id:
+            return 0
+        return Attendance.objects.filter(
+            event_id=event_id,
+            status__in=["checked_in", "completed"],
+            checkin_at__date=today,
+        ).count()
 
 
 # ---------------------------------------------------------------------------

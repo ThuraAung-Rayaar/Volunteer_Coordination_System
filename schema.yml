@@ -822,20 +822,23 @@ paths:
   /api/v1/attendance/geo-checkin/:
     post:
       operationId: attendance_geo_checkin_create
-      description: POST /api/v1/attendance/geo-checkin/ or /events/{event_id}/geo-check-in/
+      description: 'GPS geolocation check-in orchestration. Note: This is a dormant
+        backend capability not active in the v0.12.0 mobile release.'
+      summary: Volunteer GPS geo check-in (Dormant)
       tags:
       - attendance
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/EmptyResponse'
+              $ref: '#/components/schemas/GeoCheckin'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/EmptyResponse'
+              $ref: '#/components/schemas/GeoCheckin'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/EmptyResponse'
+              $ref: '#/components/schemas/GeoCheckin'
+        required: true
       security:
       - tokenAuth: []
       - cookieAuth: []
@@ -849,21 +852,23 @@ paths:
   /api/v1/attendance/manual-checkin/:
     post:
       operationId: attendance_manual_checkin_create
-      description: POST /api/v1/attendance/manual-checkin/ or /events/{event_id}/check-in/
-        (coordinator only)
+      description: Records volunteer in-person attendance at event desk. Returns authoritative
+        state; preserves existing QR/geo methods on repeat.
+      summary: Coordinator manual on-site check-in
       tags:
       - attendance
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/EmptyResponse'
+              $ref: '#/components/schemas/ManualCheckin'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/EmptyResponse'
+              $ref: '#/components/schemas/ManualCheckin'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/EmptyResponse'
+              $ref: '#/components/schemas/ManualCheckin'
+        required: true
       security:
       - tokenAuth: []
       - cookieAuth: []
@@ -872,7 +877,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/EmptyResponse'
+                $ref: '#/components/schemas/ManualCheckinResponse'
           description: ''
   /api/v1/attendance/qr-checkin/:
     post:
@@ -931,7 +936,7 @@ paths:
   /api/v1/auth/otp/request/:
     post:
       operationId: auth_otp_request_create
-      description: POST /api/v1/auth/otp/request/
+      description: POST /api/v1/auth/otp/request/ — Deprecated legacy route.
       tags:
       - auth
       requestBody:
@@ -957,7 +962,7 @@ paths:
   /api/v1/auth/otp/verify/:
     post:
       operationId: auth_otp_verify_create
-      description: POST /api/v1/auth/otp/verify/
+      description: POST /api/v1/auth/otp/verify/ — Deprecated legacy route.
       tags:
       - auth
       requestBody:
@@ -983,7 +988,7 @@ paths:
   /api/v1/auth/request-otp/:
     post:
       operationId: auth_request_otp_create
-      description: POST /api/v1/auth/otp/request/
+      description: POST /api/v1/auth/otp/request/ — Deprecated legacy route.
       tags:
       - auth
       requestBody:
@@ -1006,10 +1011,67 @@ paths:
               schema:
                 $ref: '#/components/schemas/EmptyResponse'
           description: ''
+  /api/v1/auth/tokenized/request-otp/:
+    post:
+      operationId: auth_tokenized_request_otp_create
+      description: Creates an atomic 180s challenge row bound to an OTP in PostgreSQL
+        and returns an opaque auth_session_token.
+      summary: Create login challenge / request tokenized OTP
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenizedOtpRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenizedOtpRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenizedOtpRequest'
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenizedOtpRequestResponse'
+          description: ''
+  /api/v1/auth/tokenized/verify-otp/:
+    post:
+      operationId: auth_tokenized_verify_otp_create
+      description: Verifies challenge using auth_session_token and 6-digit code. Consumes
+        challenge row atomically and returns DRF Token.
+      summary: Verify login challenge
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenizedOtpVerify'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenizedOtpVerify'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenizedOtpVerify'
+        required: true
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenizedOtpVerifyResponse'
+          description: ''
   /api/v1/auth/verify-otp/:
     post:
       operationId: auth_verify_otp_create
-      description: POST /api/v1/auth/otp/verify/
+      description: POST /api/v1/auth/otp/verify/ — Deprecated legacy route.
       tags:
       - auth
       requestBody:
@@ -1246,20 +1308,23 @@ paths:
   /api/v1/checkin/attendance/geo-checkin/:
     post:
       operationId: checkin_attendance_geo_checkin_create
-      description: POST /api/v1/attendance/geo-checkin/ or /events/{event_id}/geo-check-in/
+      description: 'GPS geolocation check-in orchestration. Note: This is a dormant
+        backend capability not active in the v0.12.0 mobile release.'
+      summary: Volunteer GPS geo check-in (Dormant)
       tags:
       - checkin
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/EmptyResponse'
+              $ref: '#/components/schemas/GeoCheckin'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/EmptyResponse'
+              $ref: '#/components/schemas/GeoCheckin'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/EmptyResponse'
+              $ref: '#/components/schemas/GeoCheckin'
+        required: true
       security:
       - tokenAuth: []
       - cookieAuth: []
@@ -1273,21 +1338,23 @@ paths:
   /api/v1/checkin/attendance/manual-checkin/:
     post:
       operationId: checkin_attendance_manual_checkin_create
-      description: POST /api/v1/attendance/manual-checkin/ or /events/{event_id}/check-in/
-        (coordinator only)
+      description: Records volunteer in-person attendance at event desk. Returns authoritative
+        state; preserves existing QR/geo methods on repeat.
+      summary: Coordinator manual on-site check-in
       tags:
       - checkin
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/EmptyResponse'
+              $ref: '#/components/schemas/ManualCheckin'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/EmptyResponse'
+              $ref: '#/components/schemas/ManualCheckin'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/EmptyResponse'
+              $ref: '#/components/schemas/ManualCheckin'
+        required: true
       security:
       - tokenAuth: []
       - cookieAuth: []
@@ -1296,7 +1363,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/EmptyResponse'
+                $ref: '#/components/schemas/ManualCheckinResponse'
           description: ''
   /api/v1/checkin/attendance/qr-checkin/:
     post:
@@ -1548,8 +1615,9 @@ paths:
   /api/v1/checkin/events/{event_id}/check-in/:
     post:
       operationId: checkin_events_check_in_create
-      description: POST /api/v1/attendance/manual-checkin/ or /events/{event_id}/check-in/
-        (coordinator only)
+      description: Records volunteer in-person attendance at event desk. Returns authoritative
+        state; preserves existing QR/geo methods on repeat.
+      summary: Coordinator manual on-site check-in
       parameters:
       - in: path
         name: event_id
@@ -1562,13 +1630,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/EmptyResponse'
+              $ref: '#/components/schemas/ManualCheckin'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/EmptyResponse'
+              $ref: '#/components/schemas/ManualCheckin'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/EmptyResponse'
+              $ref: '#/components/schemas/ManualCheckin'
+        required: true
       security:
       - tokenAuth: []
       - cookieAuth: []
@@ -1577,7 +1646,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/EmptyResponse'
+                $ref: '#/components/schemas/ManualCheckinResponse'
           description: ''
   /api/v1/checkin/events/{event_id}/check-out/:
     post:
@@ -1615,8 +1684,9 @@ paths:
   /api/v1/checkin/events/{event_id}/checkin/:
     post:
       operationId: checkin_events_checkin_create
-      description: POST /api/v1/attendance/manual-checkin/ or /events/{event_id}/check-in/
-        (coordinator only)
+      description: Records volunteer in-person attendance at event desk. Returns authoritative
+        state; preserves existing QR/geo methods on repeat.
+      summary: Coordinator manual on-site check-in
       parameters:
       - in: path
         name: event_id
@@ -1629,13 +1699,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/EmptyResponse'
+              $ref: '#/components/schemas/ManualCheckin'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/EmptyResponse'
+              $ref: '#/components/schemas/ManualCheckin'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/EmptyResponse'
+              $ref: '#/components/schemas/ManualCheckin'
+        required: true
       security:
       - tokenAuth: []
       - cookieAuth: []
@@ -1644,7 +1715,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/EmptyResponse'
+                $ref: '#/components/schemas/ManualCheckinResponse'
           description: ''
   /api/v1/checkin/events/{event_id}/checkout/:
     post:
@@ -1760,7 +1831,9 @@ paths:
   /api/v1/checkin/events/{event_id}/geo-check-in/:
     post:
       operationId: checkin_events_geo_check_in_create
-      description: POST /api/v1/attendance/geo-checkin/ or /events/{event_id}/geo-check-in/
+      description: 'GPS geolocation check-in orchestration. Note: This is a dormant
+        backend capability not active in the v0.12.0 mobile release.'
+      summary: Volunteer GPS geo check-in (Dormant)
       parameters:
       - in: path
         name: event_id
@@ -1773,13 +1846,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/EmptyResponse'
+              $ref: '#/components/schemas/GeoCheckin'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/EmptyResponse'
+              $ref: '#/components/schemas/GeoCheckin'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/EmptyResponse'
+              $ref: '#/components/schemas/GeoCheckin'
+        required: true
       security:
       - tokenAuth: []
       - cookieAuth: []
@@ -1793,7 +1867,9 @@ paths:
   /api/v1/checkin/events/{event_id}/geo-checkin/:
     post:
       operationId: checkin_events_geo_checkin_create
-      description: POST /api/v1/attendance/geo-checkin/ or /events/{event_id}/geo-check-in/
+      description: 'GPS geolocation check-in orchestration. Note: This is a dormant
+        backend capability not active in the v0.12.0 mobile release.'
+      summary: Volunteer GPS geo check-in (Dormant)
       parameters:
       - in: path
         name: event_id
@@ -1806,13 +1882,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/EmptyResponse'
+              $ref: '#/components/schemas/GeoCheckin'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/EmptyResponse'
+              $ref: '#/components/schemas/GeoCheckin'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/EmptyResponse'
+              $ref: '#/components/schemas/GeoCheckin'
+        required: true
       security:
       - tokenAuth: []
       - cookieAuth: []
@@ -4119,8 +4196,9 @@ paths:
   /api/v1/events/{event_id}/check-in/:
     post:
       operationId: events_check_in_create
-      description: POST /api/v1/attendance/manual-checkin/ or /events/{event_id}/check-in/
-        (coordinator only)
+      description: Records volunteer in-person attendance at event desk. Returns authoritative
+        state; preserves existing QR/geo methods on repeat.
+      summary: Coordinator manual on-site check-in
       parameters:
       - in: path
         name: event_id
@@ -4133,13 +4211,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/EmptyResponse'
+              $ref: '#/components/schemas/ManualCheckin'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/EmptyResponse'
+              $ref: '#/components/schemas/ManualCheckin'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/EmptyResponse'
+              $ref: '#/components/schemas/ManualCheckin'
+        required: true
       security:
       - tokenAuth: []
       - cookieAuth: []
@@ -4148,7 +4227,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/EmptyResponse'
+                $ref: '#/components/schemas/ManualCheckinResponse'
           description: ''
   /api/v1/events/{event_id}/check-out/:
     post:
@@ -4186,8 +4265,9 @@ paths:
   /api/v1/events/{event_id}/checkin/:
     post:
       operationId: events_checkin_create
-      description: POST /api/v1/attendance/manual-checkin/ or /events/{event_id}/check-in/
-        (coordinator only)
+      description: Records volunteer in-person attendance at event desk. Returns authoritative
+        state; preserves existing QR/geo methods on repeat.
+      summary: Coordinator manual on-site check-in
       parameters:
       - in: path
         name: event_id
@@ -4200,13 +4280,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/EmptyResponse'
+              $ref: '#/components/schemas/ManualCheckin'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/EmptyResponse'
+              $ref: '#/components/schemas/ManualCheckin'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/EmptyResponse'
+              $ref: '#/components/schemas/ManualCheckin'
+        required: true
       security:
       - tokenAuth: []
       - cookieAuth: []
@@ -4215,7 +4296,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/EmptyResponse'
+                $ref: '#/components/schemas/ManualCheckinResponse'
           description: ''
   /api/v1/events/{event_id}/checkout/:
     post:
@@ -4364,7 +4445,9 @@ paths:
   /api/v1/events/{event_id}/geo-check-in/:
     post:
       operationId: events_geo_check_in_create
-      description: POST /api/v1/attendance/geo-checkin/ or /events/{event_id}/geo-check-in/
+      description: 'GPS geolocation check-in orchestration. Note: This is a dormant
+        backend capability not active in the v0.12.0 mobile release.'
+      summary: Volunteer GPS geo check-in (Dormant)
       parameters:
       - in: path
         name: event_id
@@ -4377,13 +4460,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/EmptyResponse'
+              $ref: '#/components/schemas/GeoCheckin'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/EmptyResponse'
+              $ref: '#/components/schemas/GeoCheckin'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/EmptyResponse'
+              $ref: '#/components/schemas/GeoCheckin'
+        required: true
       security:
       - tokenAuth: []
       - cookieAuth: []
@@ -4397,7 +4481,9 @@ paths:
   /api/v1/events/{event_id}/geo-checkin/:
     post:
       operationId: events_geo_checkin_create
-      description: POST /api/v1/attendance/geo-checkin/ or /events/{event_id}/geo-check-in/
+      description: 'GPS geolocation check-in orchestration. Note: This is a dormant
+        backend capability not active in the v0.12.0 mobile release.'
+      summary: Volunteer GPS geo check-in (Dormant)
       parameters:
       - in: path
         name: event_id
@@ -4410,13 +4496,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/EmptyResponse'
+              $ref: '#/components/schemas/GeoCheckin'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/EmptyResponse'
+              $ref: '#/components/schemas/GeoCheckin'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/EmptyResponse'
+              $ref: '#/components/schemas/GeoCheckin'
+        required: true
       security:
       - tokenAuth: []
       - cookieAuth: []
@@ -5081,6 +5168,25 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/EmptyResponse'
+          description: ''
+  /api/v1/me/bootstrap/:
+    get:
+      operationId: me_bootstrap_retrieve
+      description: 'Single authenticated startup endpoint returning minimal user identity
+        (with email: null and decrypted phone), coordinator workspace status, and
+        server-derived capabilities.'
+      summary: Compact session bootstrap
+      tags:
+      - me
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserBootstrapResponse'
           description: ''
   /api/v1/me/charity-interests/:
     get:
@@ -6088,6 +6194,25 @@ paths:
               schema:
                 $ref: '#/components/schemas/EmptyResponse'
           description: ''
+  /api/v1/volunteer/me/bootstrap/:
+    get:
+      operationId: volunteer_me_bootstrap_retrieve
+      description: 'Single authenticated startup endpoint returning minimal user identity
+        (with email: null and decrypted phone), coordinator workspace status, and
+        server-derived capabilities.'
+      summary: Compact session bootstrap
+      tags:
+      - volunteer
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserBootstrapResponse'
+          description: ''
   /api/v1/volunteer/me/charity-interests/:
     get:
       operationId: volunteer_me_charity_interests_retrieve
@@ -7080,6 +7205,65 @@ components:
           type: string
           format: date-time
           nullable: true
+    BootstrapCapabilities:
+      type: object
+      properties:
+        volunteer:
+          type: boolean
+          readOnly: true
+        coordinator:
+          type: boolean
+          readOnly: true
+      required:
+      - coordinator
+      - volunteer
+    BootstrapCoordinator:
+      type: object
+      properties:
+        status:
+          type: string
+          readOnly: true
+        can_access_workspace:
+          type: boolean
+          readOnly: true
+      required:
+      - can_access_workspace
+      - status
+    BootstrapUser:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        uuid:
+          type: string
+          format: uuid
+          readOnly: true
+        display_name:
+          type: string
+          readOnly: true
+        phone:
+          type: string
+          readOnly: true
+          nullable: true
+        email:
+          type: string
+          readOnly: true
+          nullable: true
+        account_status:
+          type: string
+          readOnly: true
+        verification_status:
+          type: string
+          readOnly: true
+      required:
+      - account_status
+      - display_name
+      - email
+      - id
+      - phone
+      - uuid
+      - verification_status
     DecisionEnum:
       enum:
       - approved
@@ -7097,6 +7281,40 @@ components:
           default: true
       required:
       - success
+    GeoCheckin:
+      type: object
+      description: |-
+        Mixin for DRF serializers that strictly enforces allow-listing of input fields.
+        Rejects any input key that is not explicitly declared on the serializer,
+        as well as incoming payload updates on read_only=True fields.
+      properties:
+        event_id:
+          type: integer
+        latitude:
+          type: number
+          format: double
+          maximum: 90
+          minimum: -90
+        longitude:
+          type: number
+          format: double
+          maximum: 180
+          minimum: -180
+        accuracy_m:
+          type: number
+          format: double
+          minimum: 0
+          nullable: true
+        captured_at:
+          type: string
+          format: date-time
+          nullable: true
+        is_mocked:
+          type: boolean
+          default: false
+      required:
+      - latitude
+      - longitude
     HideFeedback:
       type: object
       description: |-
@@ -7116,6 +7334,56 @@ components:
         * `mock_selfie` - Mock Selfie
         * `id_license` - ID License
         * `driver_license` - Driver License
+    ManualCheckin:
+      type: object
+      description: |-
+        Mixin for DRF serializers that strictly enforces allow-listing of input fields.
+        Rejects any input key that is not explicitly declared on the serializer,
+        as well as incoming payload updates on read_only=True fields.
+      properties:
+        event_id:
+          type: integer
+        user_id:
+          type: integer
+        note:
+          type: string
+          default: ''
+      required:
+      - user_id
+    ManualCheckinResponse:
+      type: object
+      description: Authoritative response payload for manual on-site check-in.
+      properties:
+        attendance_id:
+          type: integer
+        event_id:
+          type: integer
+        user_id:
+          type: integer
+        status:
+          type: string
+        method:
+          type: string
+        checkin_at:
+          type: string
+          format: date-time
+        recorded_by_user_id:
+          type: integer
+          nullable: true
+        already_checked_in:
+          type: boolean
+        id:
+          type: integer
+      required:
+      - already_checked_in
+      - attendance_id
+      - checkin_at
+      - event_id
+      - id
+      - method
+      - recorded_by_user_id
+      - status
+      - user_id
     MinimumVerificationTierEnum:
       enum:
       - none
@@ -7213,6 +7481,14 @@ components:
           type: boolean
           readOnly: true
           default: true
+    PurposeEnum:
+      enum:
+      - login
+      - qr_registration
+      type: string
+      description: |-
+        * `login` - login
+        * `qr_registration` - qr_registration
     ReviewImage:
       type: object
       description: |-
@@ -7250,6 +7526,147 @@ components:
         * `match` - match
         * `no_match` - no_match
         * `needs_review` - needs_review
+    TokenizedAuthUser:
+      type: object
+      properties:
+        id:
+          type: integer
+        uuid:
+          type: string
+          nullable: true
+        display_name:
+          type: string
+        verification_status:
+          type: string
+      required:
+      - display_name
+      - id
+      - uuid
+      - verification_status
+    TokenizedOtpDelivery:
+      type: object
+      properties:
+        provider:
+          type: string
+        channel:
+          type: string
+        delivered:
+          type: boolean
+        configured:
+          type: boolean
+        accepted:
+          type: boolean
+          default: false
+        message_id:
+          type: string
+          nullable: true
+        error_category:
+          type: string
+          nullable: true
+        retryability:
+          type: string
+          nullable: true
+      required:
+      - channel
+      - configured
+      - delivered
+      - provider
+    TokenizedOtpRequest:
+      type: object
+      description: |-
+        POST /api/v1/auth/tokenized/request-otp/
+        Accepts identity_token (CIT envelope) or phone (over TLS), purpose, and optional request_id.
+      properties:
+        identity_token:
+          type: string
+        phone:
+          type: string
+          maxLength: 20
+        purpose:
+          allOf:
+          - $ref: '#/components/schemas/PurposeEnum'
+          default: login
+        request_id:
+          type: string
+          maxLength: 64
+    TokenizedOtpRequestResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        auth_session_token:
+          type: string
+        expires_in:
+          type: integer
+        code_length:
+          type: integer
+        delivery:
+          $ref: '#/components/schemas/TokenizedOtpDelivery'
+        dev_code:
+          type: string
+          nullable: true
+        idempotent_reissue:
+          type: boolean
+          default: false
+      required:
+      - auth_session_token
+      - code_length
+      - delivery
+      - expires_in
+      - status
+    TokenizedOtpVerify:
+      type: object
+      description: |-
+        POST /api/v1/auth/tokenized/verify-otp/
+        Verifies challenge with auth_session_token and code only.
+        MUST NOT accept or require phone.
+      properties:
+        auth_session_token:
+          type: string
+          maxLength: 128
+        code:
+          type: string
+          maxLength: 10
+        purpose:
+          allOf:
+          - $ref: '#/components/schemas/PurposeEnum'
+          default: login
+        display_name:
+          type: string
+          default: ''
+          maxLength: 150
+      required:
+      - auth_session_token
+      - code
+    TokenizedOtpVerifyResponse:
+      type: object
+      properties:
+        token:
+          type: string
+        user:
+          $ref: '#/components/schemas/TokenizedAuthUser'
+      required:
+      - token
+      - user
+    UserBootstrapResponse:
+      type: object
+      properties:
+        user:
+          allOf:
+          - $ref: '#/components/schemas/BootstrapUser'
+          readOnly: true
+        coordinator:
+          allOf:
+          - $ref: '#/components/schemas/BootstrapCoordinator'
+          readOnly: true
+        capabilities:
+          allOf:
+          - $ref: '#/components/schemas/BootstrapCapabilities'
+          readOnly: true
+      required:
+      - capabilities
+      - coordinator
+      - user
   securitySchemes:
     cookieAuth:
       type: apiKey

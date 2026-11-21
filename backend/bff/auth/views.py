@@ -1,9 +1,13 @@
 import logging
 
+from django.conf import settings
+from django.db import transaction
+from django.utils.decorators import method_decorator
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.throttling import AnonRateThrottle
 from rest_framework.views import APIView
 
 from common.exceptions import DomainError
@@ -25,14 +29,29 @@ logger = logging.getLogger(__name__)
 # v0.12.0 Tokenized Challenge Handshake Endpoints (AUTH-02, AUTH-03)
 # ---------------------------------------------------------------------------
 
+class TokenizedOtpRequestThrottle(AnonRateThrottle):
+    """
+    Dedicated IP-scoped throttle for tokenized OTP requests (Defect B3 mitigation).
+    Limits challenge creation rate per IP in addition to the DB per-phone rate limit.
+    """
+    scope = "tokenized_otp_request"
+
+    def get_rate(self):
+        return getattr(settings, "OTP_REQUEST_IP_THROTTLE_RATE", "30/minute")
+
+
+@method_decorator(transaction.non_atomic_requests, name="dispatch")
 class TokenizedOtpRequestView(APIView):
     """
     POST /api/v1/auth/tokenized/request-otp/
     Public endpoint: creates an atomic login challenge and issues auth_session_token.
     Accepts identity_token (CIT envelope) or standard phone input over TLS.
+    Executed with non_atomic_requests wrapper to guarantee durable commit before
+    network delivery dispatch (Section 4.2).
     """
     permission_classes = [AllowAny]
     authentication_classes = []
+    throttle_classes = [TokenizedOtpRequestThrottle]
 
     @extend_schema(
         request=TokenizedOtpRequestSerializer,
@@ -90,6 +109,7 @@ class TokenizedOtpVerifyView(APIView):
         result = auth_service.verify_tokenized_login_otp(
             auth_session_token=data["auth_session_token"],
             code=data["code"],
+            purpose=data.get("purpose", "login"),
             display_name=data.get("display_name"),
         )
 

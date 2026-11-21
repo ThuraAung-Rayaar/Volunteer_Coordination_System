@@ -63,21 +63,27 @@ export interface OtpVerifyResponseDto {
 
 /**
  * Truthful delivery metadata returned in TokenizedOtpResponseDto.
+ * Represents provider identity, channel, acceptance, and delivery status (Section 4.2).
  */
 export interface TokenizedOtpDeliveryDto {
   provider: string;
   channel: string;
   delivered: boolean;
   configured: boolean;
+  accepted?: boolean;
+  message_id?: string | null;
+  error_category?: string | null;
+  retryability?: string | null;
 }
 
 /**
  * Request payload for `POST /api/v1/auth/tokenized/request-otp/`.
- * Accepts phone (over TLS) or identity_token (CIT envelope), with optional request_id.
+ * STRICT ARCHITECTURAL INVARIANT (Section 4.1):
+ * Feasibility prototype sends phone + purpose + request_id over TLS.
+ * CIT / identity_token is NOT supported in the feasibility prototype.
  */
 export interface TokenizedOtpRequestDto {
-  phone?: string;
-  identity_token?: string;
+  phone: string;
   purpose?: 'login' | 'qr_registration';
   request_id?: string;
 }
@@ -93,6 +99,7 @@ export interface TokenizedOtpResponseDto {
   code_length: number;
   delivery: TokenizedOtpDeliveryDto;
   dev_code?: string | null;
+  idempotent_reissue?: boolean;
 }
 
 /**
@@ -104,6 +111,7 @@ export interface TokenizedOtpResponseDto {
 export interface TokenizedOtpVerifyRequestDto {
   auth_session_token: string;
   code: string;
+  purpose?: 'login' | 'qr_registration';
   display_name?: string;
 }
 

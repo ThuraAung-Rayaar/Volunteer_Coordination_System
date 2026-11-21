@@ -28,10 +28,34 @@ PHONE_ENCRYPTION_KEY = os.getenv(
     'PHONE_ENCRYPTION_KEY',
     'IcY3lXCl1k0P1NawgjDSeCYOqcNRWJStRaqbWN21nGs='
 )
+# Verification Image Encryption Key (AES-256-GCM, strictly distinct from PHONE_ENCRYPTION_KEY and HMAC secrets)
+VERIFICATION_IMAGE_ENCRYPTION_KEY = os.getenv(
+    'VERIFICATION_IMAGE_ENCRYPTION_KEY',
+    'k8Vz9X2mQ5wL1nR4tY7uI0oP3aS6dF9gH2jK5lZ8xC0='
+)
+VERIFICATION_IMAGE_KEY_ID = os.getenv(
+    'VERIFICATION_IMAGE_KEY_ID',
+    'v1'
+)
+VERIFICATION_IMAGE_KEYRING = os.getenv(
+    'VERIFICATION_IMAGE_KEYRING',
+    '{}'
+)
 CARTO_API_KEY = os.getenv(
     'CARTO_API_KEY',
     'cb1_5490_1_395a9eafc491da9c508bf094'
 )
+
+# External SMS / Network OTP Delivery Settings (Section 4.2)
+OTP_DELIVERY_PROVIDER = os.getenv('OTP_DELIVERY_PROVIDER', 'console')
+OTP_DELIVERY_ENABLED = os.getenv('OTP_DELIVERY_ENABLED', 'false').lower() in ('true', '1')
+OTP_PROVIDER_BASE_URL = os.getenv('OTP_PROVIDER_BASE_URL', '')
+OTP_PROVIDER_API_KEY = os.getenv('OTP_PROVIDER_API_KEY', '')
+OTP_PROVIDER_API_SECRET = os.getenv('OTP_PROVIDER_API_SECRET', '')
+OTP_PROVIDER_SENDER_ID = os.getenv('OTP_PROVIDER_SENDER_ID', 'VOLUNTEER')
+OTP_PROVIDER_TIMEOUT_SECONDS = int(os.getenv('OTP_PROVIDER_TIMEOUT_SECONDS', '10'))
+OTP_PROVIDER_DELIVERY_RECEIPTS_ENABLED = os.getenv('OTP_PROVIDER_DELIVERY_RECEIPTS_ENABLED', 'false').lower() in ('true', '1')
+OTP_REQUEST_IP_THROTTLE_RATE = os.getenv('OTP_REQUEST_IP_THROTTLE_RATE', '30/minute')
 
 # Dedicated feature flag to gate dev_code exposure in auth responses (local/test only)
 ALLOW_DEV_CODE_IN_AUTH_RESPONSE = os.getenv(

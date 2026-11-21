@@ -43,11 +43,17 @@ def run():
     if sys.platform == "win32":
         cmd = ["cmd", "/c", "npm", "run", "test:real-http"]
 
+    env = os.environ.copy()
+    env.setdefault("APP_ENV", "test")
+    env.setdefault("DB_NAME", "test_volunteer_coordination_db")
+    env.setdefault("DB_HOST", "127.0.0.1")
+
     result = subprocess.run(
         cmd,
         cwd=repo_root / "mobile",
         capture_output=True,
         text=True,
+        env=env,
     )
 
     duration = (datetime.now(timezone.utc) - start_time).total_seconds()
@@ -71,7 +77,7 @@ def run():
 - **Execution Duration:** {duration:.2f}s
 - **Status:** **{status_str}** (Exit Code {result.returncode})
 - **Transport:** Real network HTTP sockets (`fetch` over TCP), zero mocks.
-- **Backend:** Django BFF with live PostgreSQL database (`volunteer_coordination_db`).
+- **Backend:** Django BFF with live PostgreSQL database (`test_volunteer_coordination_db`).
 
 ## Test Output
 
@@ -88,6 +94,7 @@ def run():
 4. **Authoritative Check-In & Roster Match:** Coordinator loads roster -> `POST /api/v1/checkin/attendance/manual-checkin/` returns authoritative server `checkin_at` and `method` -> refreshed roster matches server state -> repeat check-in is idempotent.
 5. **Authorization & Masking:** Owner-as-monitor blocked (`403 owner_monitor_read_only`), unrelated coordinator masked (`404`), unauthenticated caller denied (`401`).
 6. **Session Invalidation:** HTTP 401 clears local session token and triggers listeners; non-401 responses (403, 404, 409, 429, 5xx) and timeouts do NOT silently clear local session.
+7. **Verification Image File Encryption & Admin Stream:** Volunteer uploads sanitized JPEG over real HTTP multipart/form-data -> server-side AES-256-GCM envelope stored on disk (`VIMG\\x01`) -> volunteer metadata response excludes file path and raw bytes -> admin stream decrypts JPEG in-memory (`image/jpeg`) -> non-admin access is rejected with masked 404/401.
 """
 
     with open(report_file, "w", encoding="utf-8") as f:

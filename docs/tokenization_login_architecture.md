@@ -1,8 +1,8 @@
 # Tokenization Login Architecture & Active OTP Integration Specification
 > **System:** Volunteer Coordination System (Volunteer HR Management)  
-> **Target Scope:** Django 5.1 BFF (`backend/`), PostgreSQL 16 DB Layer (`postgres_sql/`), React Native Mobile Client (`mobile/`)  
-> **Document Status:** Authoritative Architectural Design & Read-Only System Scan  
-> **Date:** November 2026 | **Target SLA:** Max 500ms Latency Budget / Sub-Second Failover  
+> **Target Scope:** Django 5.1 BFF (`backend/`), PostgreSQL 18 DB Layer (`postgres_sql/`), React Native Mobile Client (`mobile/`)  
+> **Document Status:** Authoritative Architectural Specification & v0.12.0 Implementation Baseline (Verified)  
+> **Date:** November 2026 (Updated: 2026-11-22) | **Target SLA:** Max 500ms Latency Budget / Sub-Second Failover  
 
 ---
 
@@ -174,7 +174,7 @@ sequenceDiagram
     participant Mobile as Mobile App (React Native)
     participant SecStore as Keystore / Keychain
     participant BFF as Django BFF (/api/v1/auth/)
-    participant DB as PostgreSQL 16 (Stored Procs)
+    participant DB as PostgreSQL 18 (Stored Procs)
     participant Queue as Async Task Worker (Celery/Thread)
     participant SMS as Active OTP Gateway (Twilio/SMPP)
 
@@ -786,25 +786,29 @@ To ensure zero regression of existing functionality while rolling out tokenizati
   [Disable legacy cleartext endpoints & enforce SSL Pinning]
 ```
 
-### Phase 1: Backend Foundation (Dual-Route Compatibility)
-- Deploy `backend/bff/auth/tokenized_views.py` and register `/api/v1/auth/tokenized/request-otp/` and `/verify-otp/`.
-- Maintain existing `/api/v1/auth/otp/request/` and `/verify/` as legacy compatibility routes during migration.
-- Introduce the Redis/Cache-backed `auth_session_token` state store with 180s TTL.
+### Phase 1: Backend Foundation (Dual-Route Compatibility) — ✅ IMPLEMENTED (v0.12.0)
+- Deployed in `backend/bff/auth/views.py` registering canonical routes:
+  - `POST /api/v1/auth/tokenized/request-otp/` (`TokenizedOtpRequestView`)
+  - `POST /api/v1/auth/tokenized/verify-otp/` (`TokenizedOtpVerifyView`)
+- Retained legacy compatibility routes `/api/v1/auth/otp/request/` and `/verify/`.
+- Deployed database-backed `auth_otp_challenge` table (PostgreSQL 18) with row-level locking (`FOR UPDATE`), 180s TTL, and SHA-256 token hashing (`v0_12_0_auth_otp_challenge_upgrade.sql`).
 
-### Phase 2: Active OTP Adapter Pipeline
-- Deploy `backend/services/otp_adapters.py` containing the `BaseOtpDeliveryAdapter` interface and concrete implementations (`ConsoleOtpDeliveryAdapter`, `TwilioOtpDeliveryAdapter`, `AwsSnsOtpDeliveryAdapter`, `TelecomSmppGatewayAdapter`).
-- Wire the asynchronous dispatch mechanism via `async_otp_dispatcher.py`.
-- Configure environment variables: `OTP_PROVIDER=console|twilio|aws_sns|telecom`.
+### Phase 2: Active OTP Adapter Pipeline — ✅ IMPLEMENTED (v0.12.0 Stabilization Phase B1)
+- Implemented `OtpDeliveryAdapter` interface in `backend/services/auth_service.py` with structured delivery results (`configured`, `provider_accepted`, `handset_delivered`, `safe_retry`).
+- Enforced post-commit dispatch via `transaction.on_commit()` to eliminate phantom OTP dispatch if DB transaction rolls back.
+- Built active `ConsoleOtpDeliveryAdapter` returning truthful delivery states (`dev_code_available`, `console_simulated`) and provider contract specifications for production carrier backends (Twilio, AWS SNS, Telecom SMPP).
 
-### Phase 3: Mobile Client Integration
-- Update `mobile/src/data/dto/authDto.ts` to include `TokenizedOtpRequestDto`, `TokenizedOtpVerifyDto`, and response schemas.
-- Add `requestTokenizedOtp()` and `verifyTokenizedOtp()` to `mobile/src/data/endpoints/authApi.ts`.
-- Update `OtpLoginScreen.tsx` to handle the session token state machine:
-  - Step 1: Submits tokenized payload, receives and holds `auth_session_token`.
-  - Step 2: Submits only `auth_session_token` and `code`.
-  - Step 3: Clears session token and saves DRF auth token in `PluggableTokenStore`.
+### Phase 3: Mobile Client Integration — ✅ IMPLEMENTED (v0.12.0 Phase B2)
+- Updated `mobile/src/data/dto/authDto.ts` with `TokenizedOtpRequestDto`, `TokenizedOtpResponseDto`, `TokenizedOtpVerifyRequestDto`, and `TokenizedOtpVerifyResponseDto`.
+- Implemented `requestTokenizedOtp()` and `verifyTokenizedOtp()` in `mobile/src/data/endpoints/authApi.ts` ensuring verify request sends strictly `auth_session_token` and `code` (never transmits phone number).
+- Updated `OtpLoginScreen.tsx` with two-step tokenized challenge state machine:
+  - Step 1: Submits phone identity, receives and stores `auth_session_token`.
+  - Step 2: Submits strictly `auth_session_token` and `code`.
+  - Step 3: Receives standard DRF token, stores in `tokenStore.ts`, and bootstraps user profile.
+- Verified by unit and integration suites: `tokenizedAuthAndBootstrap.test.tsx` and `v0_12_0_realHttpIntegration.test.ts`.
 
-### Phase 4: Production Hardening & Legacy Sunset
-- Set `settings.DEBUG = False` in production environments, ensuring `dev_code` is completely stripped from responses.
-- Verify mobile certificate pinning against production domains.
-- Safely decommission legacy cleartext phone endpoints once all active mobile client builds have migrated to the tokenized contract.
+### Phase 4: Production Hardening & Verification — ✅ IMPLEMENTED & VERIFIED (v0.12.0 Stabilization Phase E)
+- Gated `dev_code` behind explicit development flags (`ALLOW_DEV_CODE_IN_AUTH_RESPONSE=False` and `ENVIRONMENT=production`); verified complete absence over real HTTP sockets.
+- Verified zero session clearing on non-401 errors (403, 404, 409, 429, timeouts).
+- Real HTTP integration test suite (`v0_12_0_realHttpIntegration.test.ts`) executed over TCP sockets against Django + PostgreSQL 18.6 with 14/14 tests passing.
+- Operational requirements for final release (carrier account binding and physical device Keystore/Keychain persistence) documented in [v0_12_0_unfinished_remaining_operations.md](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/reference/v0_12_0_unfinished_remaining_operations.md).

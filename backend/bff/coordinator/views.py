@@ -272,6 +272,7 @@ class EventManualAssignView(APIView):
         result = assignment_service.assign_volunteer_manually(
             actor=request.user,
             application_id=data["application_id"],
+            event_id=event_id,
             post_id=data.get("post_id"),
             group_code=data.get("group_code"),
             is_group_leader=data.get("is_group_leader", False),

@@ -1,6 +1,6 @@
 -- =============================================================================
 -- seed_data.sql — Volunteer Coordination System Demo Seed
--- Target: PostgreSQL 16+ | Run AFTER the schema script
+-- Target: PostgreSQL 18+ | Run AFTER the schema script
 -- Usage:  psql -U postgres -d volunteer_coordination_db -f seed_data.sql
 -- All geo-coordinates are in Yangon, Myanmar.
 -- =============================================================================

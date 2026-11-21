@@ -97,6 +97,7 @@ def assign_volunteer_manually(
     post_id: Optional[int] = None,
     group_code: Optional[str] = None,
     is_group_leader: bool = False,
+    event_id: Optional[int] = None,
 ) -> dict:
     """
     Manually assign an accepted volunteer to a post/group.
@@ -115,8 +116,17 @@ def assign_volunteer_manually(
     except EventApplications.DoesNotExist:
         raise ResourceMaskedNotFound(message="Application not found.")
 
-    # Verify actor is event manager with write access
-    get_event_for_manager_or_404(actor, app.event_id, require_write=True)
+    # Section 6.3: Application-level check ensuring URL event_id matches the application's actual event
+    if event_id is not None and app.event_id != int(event_id):
+        raise DomainError(
+            code="event_mismatch",
+            message="Application does not belong to the specified event.",
+            status_code=400,
+        )
+
+    # Verify actor is event manager with write access for the event
+    target_event_id = int(event_id) if event_id is not None else app.event_id
+    get_event_for_manager_or_404(actor, target_event_id, require_write=True)
 
     # Call the SQL function
     with connection.cursor() as cursor:

@@ -17,6 +17,7 @@ _INSECURE_PHONE_HASH_HMAC = 'dev-hmac-secret-at-least-32-chars-long-abcdef'
 _INSECURE_OTP_CODE_HMAC = 'dev-otp-code-hmac-secret-at-least-32-chars-long-distinct'
 _INSECURE_AUTH_SESSION_SECRET = 'dev-auth-session-token-secret-at-least-32-chars-distinct'
 _INSECURE_PHONE_ENCRYPTION = 'IcY3lXCl1k0P1NawgjDSeCYOqcNRWJStRaqbWN21nGs='
+_INSECURE_VERIFICATION_IMAGE_KEY = 'k8Vz9X2mQ5wL1nR4tY7uI0oP3aS6dF9gH2jK5lZ8xC0='
 
 if not SECRET_KEY or SECRET_KEY == _INSECURE_SECRET_KEY:
     raise ImproperlyConfigured(
@@ -43,11 +44,22 @@ if not PHONE_ENCRYPTION_KEY or PHONE_ENCRYPTION_KEY == _INSECURE_PHONE_ENCRYPTIO
         "Production PHONE_ENCRYPTION_KEY must be set to a secure value and cannot use the development fallback."
     )
 
+if not VERIFICATION_IMAGE_ENCRYPTION_KEY or VERIFICATION_IMAGE_ENCRYPTION_KEY == _INSECURE_VERIFICATION_IMAGE_KEY:
+    raise ImproperlyConfigured(
+        "Production VERIFICATION_IMAGE_ENCRYPTION_KEY must be set to a secure value and cannot use the development fallback."
+    )
+
 # Enforce cryptographic key separation: secrets must be pairwise distinct
 if len({PHONE_HASH_HMAC_SECRET, OTP_CODE_HMAC_SECRET, AUTH_SESSION_TOKEN_SECRET}) < 3:
     raise ImproperlyConfigured(
         "PHONE_HASH_HMAC_SECRET, OTP_CODE_HMAC_SECRET, and AUTH_SESSION_TOKEN_SECRET must all be pairwise distinct."
     )
 
+if VERIFICATION_IMAGE_ENCRYPTION_KEY in {PHONE_ENCRYPTION_KEY, SECRET_KEY, PHONE_HASH_HMAC_SECRET, OTP_CODE_HMAC_SECRET, AUTH_SESSION_TOKEN_SECRET}:
+    raise ImproperlyConfigured(
+        "VERIFICATION_IMAGE_ENCRYPTION_KEY must be distinct from PHONE_ENCRYPTION_KEY, SECRET_KEY, and all HMAC secrets."
+    )
+
 # Strictly forbid dev_code exposure in production
 ALLOW_DEV_CODE_IN_AUTH_RESPONSE = False
+DEV_FIXED_OTP = None

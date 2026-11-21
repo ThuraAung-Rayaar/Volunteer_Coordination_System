@@ -221,15 +221,20 @@ export function mapProfileUpdateRequest(
       // P1-02: Setting master donation flag to false cascades both sub-flags to false
       // to avoid DB constraint violation and keep consistency with backend PATCH rules.
       payload.is_willing_to_donate = false;
-      payload.is_willing_to_donate_blood =
-        updates.donationPreferences.isWillingToDonateBlood ?? false;
-      payload.is_willing_to_donate_items =
-        updates.donationPreferences.isWillingToDonateItems ?? false;
-    } else {
+      if (updates.donationPreferences.isWillingToDonateBlood !== undefined) {
+        payload.is_willing_to_donate_blood =
+          updates.donationPreferences.isWillingToDonateBlood;
+      }
+      if (updates.donationPreferences.isWillingToDonateItems !== undefined) {
+        payload.is_willing_to_donate_items =
+          updates.donationPreferences.isWillingToDonateItems;
+      }
+    } else if (currentProfile && currentProfile.donationPreferences) {
+      // Explicit currentProfile supplied: merge fields locally
       const currentDonateBlood =
-        currentProfile?.donationPreferences?.isWillingToDonateBlood;
+        currentProfile.donationPreferences.isWillingToDonateBlood;
       const currentDonateItems =
-        currentProfile?.donationPreferences?.isWillingToDonateItems;
+        currentProfile.donationPreferences.isWillingToDonateItems;
 
       const donateBlood =
         updates.donationPreferences.isWillingToDonateBlood !== undefined
@@ -252,6 +257,21 @@ export function mapProfileUpdateRequest(
         payload.is_willing_to_donate = updates.donationPreferences.isWillingToDonate;
       } else if (donateBlood !== undefined || donateItems !== undefined) {
         payload.is_willing_to_donate = Boolean(donateBlood || donateItems);
+      }
+    } else {
+      // Section 6.7: Prefer server-owned merge rules when currentProfile is absent;
+      // never override server aggregate semantics using unprovided local assumptions.
+      if (updates.donationPreferences.isWillingToDonateBlood !== undefined) {
+        payload.is_willing_to_donate_blood =
+          updates.donationPreferences.isWillingToDonateBlood;
+      }
+      if (updates.donationPreferences.isWillingToDonateItems !== undefined) {
+        payload.is_willing_to_donate_items =
+          updates.donationPreferences.isWillingToDonateItems;
+      }
+      if (updates.donationPreferences.isWillingToDonate !== undefined) {
+        payload.is_willing_to_donate =
+          updates.donationPreferences.isWillingToDonate;
       }
     }
   }

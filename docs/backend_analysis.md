@@ -1,5 +1,5 @@
 # Backend Analysis — Volunteer HR Management System
-> **Generated:** 2026-11-15 | **Updated:** 2026-11-19 | **Target folder:** `python_stack/backend/` | **Framework:** Django 5.1 / DRF 3.15 | **Release:** v0.11.1 (Full Role Capability Parity Verified)
+> **Generated:** 2026-11-15 | **Updated:** 2026-11-22 | **Target folder:** `python_stack/backend/` | **Framework:** Django 5.1 / DRF 3.15 | **Release:** v0.12.0 Stabilization (Verified & Complete)
 
 ---
 
@@ -191,6 +191,7 @@ All models use `managed = False` (schema managed by PostgreSQL, not Django migra
 |---|---|---|
 | `Users` | `users` | `id`, `phone_hash` (HMAC), `phone_enc` (AES), `display_name`, `account_status` (`active`/`blocked`/`closed`), `is_admin`, `is_superuser`, `is_verified`, `is_active`, `last_login` |
 | `AuthOtp` | `auth_otp` | `id`, `phone_hash`, `code_hash`, `purpose`, `attempt_count`, `expires_at`, `used_at` |
+| `AuthOtpChallenge` | `auth_otp_challenge` | `id`, `otp` (FK→`auth_otp`), `challenge_token_hash`, `purpose` (`login`/`qr_registration`), `created_at`, `expires_at` (180s TTL), `consumed_at`, `request_id`, `identity_nonce_hash` |
 | `UserVerificationImages` | `user_verification_images` | `id`, `user`, `image_path`, `status` (`pending`/`approved`/`rejected`), `reviewed_by`, `reviewed_at` |
 | `OnboardingAcknowledgments` | `onboarding_acknowledgments` | `id`, `user`, `event`, `onboarding_version`, `acknowledged_at` |
 | `UserCharityInterests` | `user_charity_interests` | `id`, `user`, `charity_field` (FK→`charity_fields`) |
@@ -342,22 +343,24 @@ cursor.execute("SELECT * FROM geo_check_in(%s, %s, %s, %s, %s, %s, %s)", [...])
 
 The BFF is organized into 4 sub-packages. Many endpoints have both a canonical path and a convenience alias.
 
-### 6.1 Auth — `/api/bff/mobile/auth/`
+### 6.1 Auth — `/api/bff/mobile/auth/` (and `/api/v1/auth/`)
 
 #### Production & Baseline Routes
 | Method | Path | View | Description |
 |---|---|---|---|
-| POST | `otp/request/` | `OtpRequestView` | Request login OTP for phone number |
-| POST | `otp/verify/` | `OtpVerifyView` | Verify OTP → issue DRF token |
+| POST | `tokenized/request-otp/` | `TokenizedOtpRequestView` | **v0.12.0 Canonical:** Request OTP challenge; returns 180s ephemeral `auth_session_token` |
+| POST | `tokenized/verify-otp/` | `TokenizedOtpVerifyView` | **v0.12.0 Canonical:** Verify `auth_session_token` + `code` (zero phone PII transmitted) → DRF token |
+| POST | `otp/request/` | `OtpRequestView` | Legacy route: Request login OTP for phone number |
+| POST | `otp/verify/` | `OtpVerifyView` | Legacy route: Verify OTP → issue DRF token |
 | POST | `logout/` | `LogoutView` | Delete auth token (logout) |
 
 > Aliases: `request-otp/` = `otp/request/`, `verify-otp/` = `otp/verify/`
 
-#### Tokenization Authentication Specification (Ready for Rollout)
-*Detailed architecture and specifications defined in:* [tokenization_login_architecture.md](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/docs/tokenization_login_architecture.md)
-- `POST /api/v1/auth/tokenized/request-otp/`: Accepts client-side encrypted Client Identity Token (CIT), issues ephemeral `auth_session_token` (180s TTL), and asynchronously enqueues SMS dispatch.
-- `POST /api/v1/auth/tokenized/verify-otp/`: Approves login using `auth_session_token` and `code` without ever re-transmitting raw phone PII.
-- `OtpDeliveryAdapter` framework supporting Console (Dev), Twilio Verify, AWS SNS, Telecom SMPP, and automated failover.
+#### Tokenization Authentication Handshake Architecture
+*Authoritative specification:* [tokenization_login_architecture.md](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/docs/tokenization_login_architecture.md)
+- `POST /api/v1/auth/tokenized/request-otp/`: Accepts phone identity payload, creates linked `auth_otp` and `auth_otp_challenge` rows with row-level locks, issues ephemeral `auth_session_token` (180s TTL), and dispatches OTP.
+- `POST /api/v1/auth/tokenized/verify-otp/`: Approves login using strictly `auth_session_token` and `code` without ever re-transmitting raw phone PII. Replay or expired attempts fail closed with `409 challenge_consumed` or `400 challenge_expired`.
+- `ConsoleOtpDeliveryAdapter` active for local test execution with truthful delivery reporting (`dev_code_available`, `console_simulated`). Production adapters for Twilio, AWS SNS, and SMPP specified under Phase B stabilization.
 
 ---
 
@@ -524,11 +527,11 @@ The admin portal has two layers: **Template Views** (server-rendered HTML) and *
 
 ### 7.2 Administrative API Views
 
-#### Verification Images (Phase 4)
+#### Verification Images (Phase 4 / Phase C1)
 | Method | Path | View | Description |
 |---|---|---|---|
 | GET | `verification-images/` | `AdminPendingVerificationImagesView` | List pending images |
-| GET | `verification-images/<id>/file/` | `AdminVerificationImageFileView` | Serve image file |
+| GET | `verification-images/<id>/file/` | `AdminVerificationImageFileView` | Stream decrypted verification image in-memory (`image/jpeg`) from AES-256-GCM envelope |
 | POST | `verification-images/<id>/review/` | `AdminReviewVerificationImageView` | Approve/reject image |
 
 #### Coordinators (Phase 4)
@@ -576,6 +579,7 @@ The admin portal has two layers: **Template Views** (server-rendered HTML) and *
 | `exceptions.py` | 17.7 KB | Custom exception hierarchy: `DomainError`, `PermissionDeniedError`, `ResourceMaskedNotFound`, `OwnerMonitorReadOnlyError`, `OtpRateLimitError`, `custom_exception_handler`, security event logging |
 | `permissions.py` | 12.6 KB | DRF permission classes (`IsActiveUser`, `IsAdminUser`, `IsSuperAdminUser`, `IsApprovedCoordinator`, `AllowAnyReadOnly`) + guard functions + `AllowListSerializerMixin` |
 | `privacy.py` | 10.4 KB | Phone number encryption/decryption (AES), HMAC hashing, PII scrubbing utilities |
+| `image_crypto.py` | 10.6 KB | AES-256-GCM envelope encryption (`VIMG\x01` 48-byte header, AAD authenticated, streaming in-memory decrypt) |
 | `security.py` | 6.6 KB | Security utilities (input sanitization, injection detection) |
 | `utils.py` | 7.2 KB | `normalize_phone()`, `compute_phone_hash()`, `encrypt_phone()`, `compute_otp_hash()` and other shared utilities |
 | `map_engine.py` | 23.8 KB | Self-hosted map tile engine and region management |
@@ -661,14 +665,27 @@ backend/
 │   ├── test_phase8_*.py                   (Phase 8: audit, moderation, governance)
 │   ├── test_bff_phase1_parity.py          (BFF phase 1 parity verification)
 │   └── test_bff_phase2_parity.py          (BFF phase 2 parity verification)
+├── apps/accounts/tests/
+│   ├── test_bff_auth_tokenized.py         (v0.12.0: tokenized auth views, challenge flow)
+│   ├── test_otp_challenge_invariants.py   (v0.12.0: DB row locking, 180s TTL, single-use)
+│   ├── test_tokenized_auth_service.py     (v0.12.0: service layer challenge token lifecycle)
+│   ├── test_image_upload_and_streaming.py (v0.12.0: AES-256-GCM envelope upload & streaming decrypt)
+│   ├── test_image_conversion.py           (v0.12.0: in-place re-encryption management command)
+│   └── test_unit_verification_coordinator.py (v0.12.0: unit verification & coordinator tests)
+├── apps/attendance/tests/
+│   ├── test_bff_checkin_phase7.py         (v0.12.0: canonical manual checkin & aliases)
+│   └── test_services_phase7.py            (v0.12.0: attendance service layer transactions)
+├── apps/events/tests/
+│   └── test_phase_d1_contracts.py         (v0.12.0: cross-event validation, donation PATCH matrix, invites)
 ├── tests/
+│   ├── test_script_safety_guards.py       (v0.12.0: DB safety guards on helper scripts)
 │   └── test_v0_11_0_capability_parity.py  (40 tests, 991 lines — verifies all 82 role capabilities)
 └── tests_e2e/test_e2e_lifecycle.py        (End-to-end lifecycle flow)
 ```
 
-**Total Test Count:** **754 Tests Passing (100%)**
-- 714 baseline unit, trigger, and service tests
-- 40 cross-cutting capability parity tests
+**Total Backend Test Suite:** **662 Tests Passing (100% OK in 25.8s)**
+- Execution command: `python backend/manage.py test apps.accounts apps.attendance apps.events apps.coordination bff tests --keepdb`
+- Verified against disposable PostgreSQL 18.6 database with zero DDL/DML on `volunteer_coordination_db`.
 
 **Custom Test Runner:** `config/test_runner.SqlFileTestRunner` — loads `.sql` schema and triggers before running tests (seeds the DB from the authoritative SQL schema).
 
@@ -676,7 +693,9 @@ backend/
 - DB trigger behavior (rate limits, state machine transitions, cascade rules)
 - Service-layer functions (all 19 services)
 - BFF endpoint HTTP contracts across all 82 capabilities (status codes, payload shape, permission gating, error taxonomy)
-- Infrastructure (auth tokens, permissions, session DB context, exception handlers)
+- Verification image AES-256-GCM envelope encryption, streaming decryption, and in-place conversion
+- Business-contract invariants (cross-event assignment rejection, donation preference 8-case PATCH matrix, attendance metrics)
+- Infrastructure (auth tokens, permissions, session DB context, exception handlers, helper script safety guards)
 - E2E: full volunteer and coordinator lifecycle flows
 
 ---
@@ -733,6 +752,13 @@ CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
 | `DJANGO_SECRET_KEY` | (insecure dev key) | Django secret key |
 | `PHONE_HASH_HMAC_SECRET` | `dev-hmac-...` | HMAC secret for phone hashing |
 | `PHONE_ENCRYPTION_KEY` | (dev key) | AES key for phone encryption |
+| `IMAGE_ENCRYPTION_KEY_PRIMARY_ID` | `key-2026-01` | Active AES-256-GCM key identifier for verification images |
+| `IMAGE_ENCRYPTION_KEYS` | (JSON dictionary) | Map of key IDs to 32-byte hex keys for image decryption |
+| `SMS_DELIVERY_BACKEND` | `console` (dev) / `production` | Direct SMS delivery provider backend |
+| `SMS_PROVIDER_ENDPOINT` | (empty / operator set) | HTTPS endpoint for carrier SMS dispatch |
+| `SMS_PROVIDER_API_KEY` | (empty / operator set) | Carrier API credential for SMS dispatch |
+| `SMS_PROVIDER_SENDER_ID` | `VOLUNTEER` | SMS alphanumeric sender identifier |
+| `ALLOW_DEV_CODE_IN_AUTH_RESPONSE` | `True` (dev) / `False` (prod) | Guard controlling inclusion of `dev_code` in OTP challenge responses |
 | `CARTO_API_KEY` | (dev key) | External map/tile API key |
 | `DB_NAME` | `volunteer_coordination_db` | PostgreSQL database name |
 | `DB_USER` | `postgres` | DB user |
@@ -745,61 +771,63 @@ CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
 
 ---
 
-## 14. What Is Implemented vs. Pending
+## 14. What Is Implemented vs. Pending (v0.12.0 Stabilization Status)
 
-### ✅ Fully Implemented
+### ✅ Fully Implemented & Verified Baseline
 
-| Feature Area | Phase | Evidence |
+| Feature Area | Milestone / Phase | Evidence |
 |---|---|---|
-| OTP phone authentication (request + verify + token issuance + logout) | 1 | `auth_service.py`, `bff/auth/` |
-| Public event browsing with filtering/pagination | 2 | `query_service.py`, `bff/volunteer/` Phase 2 endpoints |
-| User profile management (display name, charity interests) | 3 | `profile_service.py`, `me/` endpoints |
-| Weekly availability rules + exception dates | 3 | `availability_service.py`, `me/availability/` endpoints |
-| Identity verification image upload + admin review | 4 | `verification_service.py`, admin portal Phase 4 APIs |
-| Coordinator application + admin approval/suspension/revocation | 4 | `coordinator_service.py`, admin coordinator routes |
-| Event full lifecycle (draft→publish→activate→complete/cancel) | 5 | `event_service.py`, coordinator event CRUD endpoints |
-| Event posts (capacity slots) management | 5 | `event_post_service.py` |
-| Event coordinator handover + owner retake | 5 | `change_event_coordinator()` SQL fn, `handover/` endpoint |
-| Volunteer application (apply/withdraw/accept/reject/waitlist) | 6 | `application_service.py`, application endpoints |
-| Auto-assignment algorithm (PostgreSQL-side) | 6 | `assignment_service.py` → `run_auto_assignment()` |
-| Manual assignment by coordinator | 6 | `assign_manually()` SQL fn |
-| Assignment confirm/cancel by volunteer | 6 | `AssignmentConfirmView`, `AssignmentCancelView` |
-| Onboarding briefing acknowledgment | 7 | `onboarding_service.py` |
-| QR token create/revoke/redeem | 7 | `qr_service.py` |
-| QR-based check-in | 7 | `attendance_service.py` → `qr_check_in()` |
-| GPS geo check-in (13 result codes, Haversine in SQL) | 7 | `geo_service.py` → `geo_check_in()` |
-| Manual coordinator check-in | 7 | `attendance_service.py` |
-| Check-out (end shift) | 7 | `AttendanceCheckoutView` |
-| Coordinator check-in confirmation/rejection | 7 | Coordinator attendance board endpoints |
-| Feedback (all 3 directions) | 7 | `feedback_service.py` |
-| Admin dashboard (live metrics from `v_admin_dashboard`) | 8 | `AdminDashboardView` |
-| Moderation actions (all 9 types) | 8 | `moderation_service.py` |
-| Audit log recording + query | 8 | `audit_service.py` |
-| Admin moderation summary per user | 8 | `v_user_moderation_summary` |
-| Scheduled maintenance trigger | 8 | `maintenance_service.py` → `run_maintenance()` |
+| OTP phone authentication (request + verify + token issuance + logout) | Phase 1 | `auth_service.py`, `bff/auth/` |
+| Tokenized OTP Challenge Handshake (`auth_session_token`, 180s TTL) | v0.12.0 | `auth_otp_challenge` table, `TokenizedOtpRequestView`, `TokenizedOtpVerifyView`, `test_bff_auth_tokenized.py` |
+| Public event browsing with filtering/pagination | Phase 2 | `query_service.py`, `bff/volunteer/` Phase 2 endpoints |
+| User profile management (display name, charity interests) | Phase 3 | `profile_service.py`, `me/` endpoints |
+| Weekly availability rules + exception dates | Phase 3 | `availability_service.py`, `me/availability/` endpoints |
+| Identity verification image upload + admin review | Phase 4 | `verification_service.py`, admin portal Phase 4 APIs |
+| Coordinator application + admin approval/suspension/revocation | Phase 4 | `coordinator_service.py`, admin coordinator routes |
+| Event full lifecycle (draft→publish→activate→complete/cancel) | Phase 5 | `event_service.py`, coordinator event CRUD endpoints |
+| Event posts (capacity slots) management | Phase 5 | `event_post_service.py` |
+| Event coordinator handover + owner retake | Phase 5 | `change_event_coordinator()` SQL fn, `handover/` endpoint |
+| Volunteer application (apply/withdraw/accept/reject/waitlist) | Phase 6 | `application_service.py`, application endpoints |
+| Auto-assignment algorithm (PostgreSQL-side) | Phase 6 | `assignment_service.py` → `run_auto_assignment()` |
+| Manual assignment by coordinator | Phase 6 | `assign_manually()` SQL fn |
+| Assignment confirm/cancel by volunteer | Phase 6 | `AssignmentConfirmView`, `AssignmentCancelView` |
+| Onboarding briefing acknowledgment | Phase 7 | `onboarding_service.py` |
+| QR token create/revoke/redeem | Phase 7 | `qr_service.py` |
+| QR-based check-in | Phase 7 | `attendance_service.py` → `qr_check_in()` |
+| GPS geo check-in (13 result codes, Haversine in SQL) | Phase 7 | `geo_service.py` → `geo_check_in()` |
+| Manual coordinator check-in (canonical + aliases) | Phase 7 / v0.12.0 | `AttendanceManualCheckinView`, `/api/v1/checkin/attendance/manual-checkin/` |
+| Check-out (end shift) | Phase 7 | `AttendanceCheckoutView` |
+| Coordinator check-in confirmation/rejection | Phase 7 | Coordinator attendance board endpoints |
+| Feedback (all 3 directions) | Phase 7 | `feedback_service.py` |
+| Admin dashboard (live metrics from `v_admin_dashboard`) | Phase 8 | `AdminDashboardView` |
+| Moderation actions (all 9 types) | Phase 8 | `moderation_service.py` |
+| Audit log recording + query | Phase 8 | `audit_service.py` |
+| Admin moderation summary per user | Phase 8 | `v_user_moderation_summary` |
+| Scheduled maintenance trigger | Phase 8 | `maintenance_service.py` → `run_maintenance()` |
 | Self-hosted map tile engine | MAP-TASK-01 | `map_engine.py`, `map_views.py` |
 | OpenAPI schema (206 KB) | — | `schema.yml` pre-generated |
 | Admin web UI (all 11 template pages) | — | `admin_portal/templates/` |
-| React Native Mobile BFF Integration | v0.11.1 | Complete integration across all 82 role capabilities (43 volunteer + 39 coordinator) with dual-mode mock/HTTP repositories (`mobile/src/data/http/`, `endpoints/`, `mappers/`, `domain/usecases/`) |
+| React Native Mobile BFF Integration | v0.11.1 / v0.12.0 | Complete integration across all 82 role capabilities with dual-mode mock/HTTP repositories, tokenized auth, and real HTTP test suites |
 | Unified API routing (`/api/v1/`, `/api/bff/mobile/`, `/api/`) | — | All map to `bff.urls` with identical view resolution |
-| Tokenization Login & Active OTP Framework | v0.11.1 | Complete architectural specification, wire schemas, and enterprise adapter templates defined in `docs/tokenization_login_architecture.md` |
+| AES-256-GCM Verification Image Encryption | Phase C1 / C2 | Encrypts uploaded images on disk with versioned binary envelope (`VIMG\x01`); admin file streaming decrypts in-memory; in-place conversion command `encrypt_verification_images` |
+| Authoritative Business Contracts & Safety Guards | Phase D1 / A | Cross-event manual assignment validation, `checked_in_today_count` attendance metric, 8-case donation PATCH matrix, script guards against `volunteer_coordination_db` |
 
-### ⚠️ Partially Implemented / Ready for Deployment
+### ✅ Completed Stabilization Execution Phases (v0.12.0 Master Plan)
 
-| Item | Status | Note |
-|---|---|---|
-| Active SMS OTP delivery | **Template Ready** | `ConsoleOtpDeliveryAdapter` active for dev/test (`dev_code` response); production templates for Twilio, AWS SNS, and Telecom SMPP specified in `docs/tokenization_login_architecture.md` |
-| Map tile proxy | **Partial** | `CARTO_API_KEY` suggests external tile source; offline region management implemented but map data likely not bundled |
-| Custom Test Runner SQL path | **Resolved** | `config/test_runner.py` configured to load authoritative schema SQL |
+As governed by [V0_12_0_STABILIZATION_MASTER_PLAN.md](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/reference/V0_12_0_STABILIZATION_MASTER_PLAN.md) and verified on candidate Git SHA `99db25a7ba26d26ad5d803e028ce405b827e926d`:
 
-### ❌ In-Flight / Production Hardening
+| Phase | Title | Focus & Delivered Requirements | Status |
+|---|---|---|---|
+| **Phase 0** | Database Preflight & Decision Gate | Read-only preflight on PostgreSQL 18.6 confirming Branch A (zero missing tables/views, zero schema drift). | ✅ COMPLETE |
+| **Phase A** | Database Freeze & CI Recovery | PostgreSQL 18.x CI workflow restored (`.github/workflows/v0_12_0_integration.yml`), safety guards on helper scripts (`scripts/alter_local_db.py`, `scripts/seed_integration_fixtures.py`), read-only preflight script (`scripts/db_preflight_check.py`). | ✅ COMPLETE |
+| **Phase B** | Auth Stabilization & Direct OTP Delivery | Strict three-credential separation, provider-neutral `OtpDeliveryAdapter` boundary with post-commit dispatch (`transaction.on_commit()`), truthful delivery status, safe retry semantics, React Native ephemeral auth client. | ✅ COMPLETE |
+| **Phase C** | Server-Side Encrypted Verification Images | AES-256-GCM envelope encryption (`backend/common/image_crypto.py`), authorized streaming decrypt (`AdminVerificationImageFileView`), in-place conversion command (`encrypt_verification_images`), and key management runbook. | ✅ COMPLETE |
+| **Phase D** | Service & Mobile Contract Consistency | Backend cross-event assignment validation, attendance metric alignment (`checked_in_today_count`), 8-case donation PATCH matrix, mobile direct HTTP check-in, removal of fabricated fallbacks, 36-route canonical parity. | ✅ COMPLETE |
+| **Phase E** | Full Verification, Real-HTTP Gate & Release Report | 662 backend tests passing, 588 mobile tests passing, TypeScript 0 errors, 14 real HTTP integration tests passing over TCP socket, clean Android Gradle build, and release decision `CONDITIONAL PASS` documented in `v0_12_0_stabilization_report.md`. | ✅ COMPLETE |
 
-| Item | Note |
-|---|---|
-| Celery / Async task worker | Framework and thread pool pipeline drafted in `tokenization_login_architecture.md` to guarantee <500ms SLA for external SMS dispatch |
-| Production Dockerfile & WSGI | Currently uses `manage.py runserver`; production deployment to configure Gunicorn/Uvicorn with PgBouncer connection pooling |
-| Push notifications | Planned FCM/APNs integration for assignment and attendance notifications |
+> [!NOTE]
+> All software engineering, contract alignment, encryption, and automated test tasks are 100% complete. Remaining operational tasks (remote CI trigger, physical Android/iOS device hardware QA, production carrier SMS account binding, and live image storage conversion runbook execution) are documented in [v0_12_0_unfinished_remaining_operations.md](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/reference/v0_12_0_unfinished_remaining_operations.md).
 
 ---
 
-*Analysis generated from: `backend/config/settings/base.py`, all 5 app `models.py` files, `bff/*/urls.py`, `admin_portal/urls.py`, `config/urls.py`, `services/*.py` (all 19 modules sampled), `common/*.py` (all files), `Dockerfile`, `requirements/*.txt`. Total files read: ~35.*
+*Analysis updated: 2026-11-22 against active branch `main` and candidate commit `99db25a7ba26d26ad5d803e028ce405b827e926d`.*

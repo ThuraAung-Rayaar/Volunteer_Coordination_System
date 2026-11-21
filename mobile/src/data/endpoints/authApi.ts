@@ -51,15 +51,24 @@ export const authApi = {
   /**
    * Request OTP challenge token via canonical tokenized route (AUTH-02, AUTH-03).
    * POST /api/v1/auth/tokenized/request-otp/
+   * STRICT ARCHITECTURAL INVARIANT (Section 4.1):
+   * Sends phone + purpose + request_id only (never identity_token or CIT).
    * Public endpoint (no auth required).
    */
   requestTokenizedOtp(
     data: TokenizedOtpRequestDto,
     client: ApiClient = defaultApiClient,
   ): Promise<ApiResult<TokenizedOtpResponseDto>> {
+    const payload: Record<string, string> = {
+      phone: data.phone,
+      purpose: data.purpose ?? 'login',
+    };
+    if (data.request_id) {
+      payload.request_id = data.request_id;
+    }
     return client.post<TokenizedOtpResponseDto>(
       'auth/tokenized/request-otp/',
-      data,
+      payload,
       {
         authRequired: false,
       },
@@ -69,16 +78,27 @@ export const authApi = {
   /**
    * Verify session-bound OTP challenge via canonical tokenized route (AUTH-02).
    * POST /api/v1/auth/tokenized/verify-otp/
-   * STRICT ARCHITECTURAL INVARIANT: Does NOT send phone.
+   * STRICT ARCHITECTURAL INVARIANT (Section 4.1): Does NOT send phone.
+   * Sends auth_session_token, code, purpose, and optional display_name only.
    * Public endpoint (no auth required).
    */
   verifyTokenizedOtp(
     data: TokenizedOtpVerifyRequestDto,
     client: ApiClient = defaultApiClient,
   ): Promise<ApiResult<TokenizedOtpVerifyResponseDto>> {
+    const payload: Record<string, string> = {
+      auth_session_token: data.auth_session_token,
+      code: data.code,
+    };
+    if (data.purpose) {
+      payload.purpose = data.purpose;
+    }
+    if (data.display_name !== undefined) {
+      payload.display_name = data.display_name;
+    }
     return client.post<TokenizedOtpVerifyResponseDto>(
       'auth/tokenized/verify-otp/',
-      data,
+      payload,
       {
         authRequired: false,
       },

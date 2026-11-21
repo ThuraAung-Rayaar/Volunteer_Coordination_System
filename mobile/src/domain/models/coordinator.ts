@@ -33,6 +33,7 @@ export interface CoordinatorOverviewMetrics {
   pendingApplicationsCount: number;
   acceptedApplicantsCount: number;
   checkedInTodayCount: number;
+  checkedInAllTimeCount?: number;
 }
 
 export interface CoordinatorEventSummary {
@@ -54,6 +55,7 @@ export interface CoordinatorEventSummary {
   acceptedApplicantCount: number;
   assignedCount: number;
   checkedInCount: number;
+  checkedInTodayCount?: number;
 }
 
 export interface CreateEventWizardDraft {
@@ -100,8 +102,8 @@ export interface CreateEventWizardDraft {
 }
 
 export interface CoordinatorEventDetail extends CoordinatorEventSummary {
-  latitude: number;
-  longitude: number;
+  latitude?: number | null;
+  longitude?: number | null;
   geoRadiusM: number;
   geoCheckinEnabled: boolean;
   geoCheckinOpensBeforeMin: number;
@@ -153,12 +155,12 @@ export interface VolunteerT2Capabilities {
 export interface CoordinatorApplicationItem {
   id: string;
   eventId: string;
-  eventTitle: string;
-  userId: string;
-  applicantName: string;
+  eventTitle?: string;
+  userId?: string;
+  applicantName?: string;
   status: CoordinatorApplicationStatus;
-  appliedAt: string;
-  source: 'browse' | 'qr_walkin' | 'invite';
+  appliedAt?: string;
+  source?: 'browse' | 'qr_walkin' | 'invite';
   postId?: string;
   postTitle?: string;
   // T2 semi-private capabilities: strictly present ONLY if status === 'accepted'
@@ -213,11 +215,11 @@ export interface CoordinatorGeoAttemptReview {
 export interface CoordinatorAttendanceItem {
   id: string;
   eventId: string;
-  eventTitle: string;
-  assignmentId: string;
+  eventTitle?: string;
+  assignmentId?: string;
   userId: string;
-  volunteerName: string;
-  postTitle: string;
+  volunteerName?: string;
+  postTitle?: string;
   groupCode?: string;
   status: AttendanceRecordStatus;
   attendanceStatus?:

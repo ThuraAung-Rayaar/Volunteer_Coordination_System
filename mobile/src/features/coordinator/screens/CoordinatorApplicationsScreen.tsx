@@ -122,7 +122,7 @@ export function CoordinatorApplicationsScreen({
       }
       if (searchQuery.trim().length > 0) {
         const q = searchQuery.toLowerCase();
-        const matchesName = app.applicantName.toLowerCase().includes(q);
+        const matchesName = (app.applicantName || '').toLowerCase().includes(q);
         const matchesPost = app.postTitle?.toLowerCase().includes(q) ?? false;
         if (!matchesName && !matchesPost) {
           return false;

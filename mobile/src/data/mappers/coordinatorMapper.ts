@@ -139,6 +139,10 @@ export function mapCoordinatorEventSummary(
     acceptedApplicantCount: summaryDto?.accepted_count ?? 0,
     assignedCount: summaryDto?.assignment_count ?? 0,
     checkedInCount: summaryDto?.checked_in_count ?? 0,
+    checkedInTodayCount:
+      typeof summaryDto?.checked_in_today_count === 'number'
+        ? summaryDto.checked_in_today_count
+        : summaryDto?.checked_in_count ?? 0,
   };
 }
 
@@ -230,7 +234,7 @@ export function mapCoordinatorAssignment(
   const assignedAt =
     ('assigned_at' in dto && dto.assigned_at) ||
     ('schedule_start' in dto && dto.schedule_start) ||
-    new Date().toISOString();
+    '';
 
   return {
     id: String(assignId),
@@ -287,7 +291,7 @@ export function mapAttendanceRosterItem(
   let geoAttempt = undefined;
   if (dto.checkin_distance_m !== null && dto.checkin_distance_m !== undefined) {
     geoAttempt = {
-      attemptedAt: dto.checkin_at || new Date().toISOString(),
+      attemptedAt: dto.checkin_at || '',
       withinGeofence: status !== 'pending_confirmation',
       distanceMeters: Number(dto.checkin_distance_m),
       confirmationStatus:

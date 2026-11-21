@@ -64,10 +64,22 @@ class SanitizerUnitTests(TestCase):
         self.assertEqual(len(sha256_hex), 64)
         self.assertTrue(all(c in "0123456789abcdef" for c in sha256_hex))
 
-        # Ensure saved file is a valid image on disk
+        # Ensure saved file is an encrypted ciphertext envelope on disk (Section 5.8)
         saved_file = Path(self.media_root) / rel_path
         self.assertTrue(saved_file.exists())
-        with Image.open(saved_file) as img:
+        envelope_data = saved_file.read_bytes()
+
+        # Starts with AGYI magic prefix, NOT JPEG 0xFFD8 marker
+        self.assertTrue(envelope_data.startswith(b"AGYI"))
+        self.assertFalse(envelope_data.startswith(b"\xff\xd8"))
+
+        # Decrypt in memory to verify sanitized JPEG payload
+        from common.image_crypto import decrypt_image
+        import hashlib
+        decrypted_bytes, _ = decrypt_image(envelope_data)
+        self.assertEqual(hashlib.sha256(decrypted_bytes).hexdigest(), sha256_hex)
+
+        with Image.open(io.BytesIO(decrypted_bytes)) as img:
             self.assertEqual(img.format, "JPEG")
             self.assertEqual(img.size, (300, 300))
             # EXIF metadata must be stripped

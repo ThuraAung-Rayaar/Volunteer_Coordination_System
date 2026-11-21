@@ -276,6 +276,70 @@ class BffCheckinPhase7ApiTests(TestCase):
         self.assertEqual(res.status_code, status.HTTP_409_CONFLICT)
         self.assertEqual(res.data.get("error", {}).get("code"), "invalid_state")
 
+    def test_manual_checkin_repeat_preserves_original_geo_method_and_timestamp(self):
+        """Section 6.2: Repeat manual checkin on already checked-in row preserves original method and timestamp."""
+        vol_g = _make_api_user("Volunteer G")
+        EventApplications.objects.create(
+            event=self.event,
+            user=vol_g,
+            source="browse",
+            conditions_acknowledged_at=timezone.now(),
+        )
+        onboarding_service.acknowledge_event_onboarding(vol_g, self.event.id)
+
+        att = Attendance.objects.get(event=self.event, user=vol_g)
+        orig_time = timezone.now() - timedelta(minutes=45)
+        att.status = "checked_in"
+        att.method = "geo"
+        att.checkin_at = orig_time
+        att.checkin_latitude = 1.3521
+        att.checkin_longitude = 103.8198
+        att.checkin_accuracy_m = 10.0
+        att.geo_verified = True
+        att.save()
+
+        self.client.force_authenticate(user=self.coord)
+        res = self.client.post(
+            "/api/v1/checkin/attendance/manual-checkin/",
+            {"event_id": self.event.id, "user_id": vol_g.id, "note": "Duplicate desk attempt"},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertTrue(res.data["already_checked_in"])
+        self.assertEqual(res.data["method"], "geo", "Original method must be preserved, never changed to coordinator_manual")
+        # Checkin timestamp must remain the original
+        self.assertEqual(res.data["status"], "checked_in")
+
+    def test_manual_checkin_unauthorized_and_monitor_permissions(self):
+        """Section 6.2: Unrelated coordinator masked 404, owner-as-monitor 403."""
+        vol_h = _make_api_user("Volunteer H")
+        EventApplications.objects.create(
+            event=self.event,
+            user=vol_h,
+            source="browse",
+            conditions_acknowledged_at=timezone.now(),
+        )
+        onboarding_service.acknowledge_event_onboarding(vol_h, self.event.id)
+
+        # 1. Unrelated coordinator -> 404 masked
+        self.client.force_authenticate(user=self.unauth_coord)
+        res_unauth = self.client.post(
+            "/api/v1/checkin/attendance/manual-checkin/",
+            {"event_id": self.event.id, "user_id": vol_h.id},
+            format="json",
+        )
+        self.assertEqual(res_unauth.status_code, status.HTTP_404_NOT_FOUND)
+
+        # 2. Owner in monitor mode -> 403
+        self.client.force_authenticate(user=self.owner)
+        res_monitor = self.client.post(
+            "/api/v1/checkin/attendance/manual-checkin/",
+            {"event_id": self.event.id, "user_id": vol_h.id},
+            format="json",
+        )
+        self.assertEqual(res_monitor.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertIn("owner_monitor_read_only", str(res_monitor.data).lower())
+
     # --- Volunteer Self-Checkout and History Privacy (BR-PRIV-T4) ---
 
     def test_volunteer_checkout_and_history_privacy(self):

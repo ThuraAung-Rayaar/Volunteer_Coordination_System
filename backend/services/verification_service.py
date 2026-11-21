@@ -133,9 +133,10 @@ def upload_verification_image(
     # Real-format + dimension validation
     _validate_image_dimensions(uploaded_file)
 
-    # Sanitize (EXIF strip, RGB, JPEG re-encode, SHA-256) and save privately.
-    # Never log the image contents.
+    # Sanitize (EXIF strip, RGB, JPEG re-encode, SHA-256) and encrypt privately.
+    # Never log raw paths or image contents.
     user_code = str(getattr(user, "uuid", None) or user.id)
+    rel_path = None
     try:
         rel_path, sha256_hex = sanitize_and_save_verification_jpeg(
             user_code, image_type, uploaded_file
@@ -143,15 +144,30 @@ def upload_verification_image(
     except ValueError as exc:
         raise _validation_error(f"Invalid image file: {exc}", code="invalid_image")
 
-    image = UserVerificationImages.objects.create(
-        user=user,
-        image_type=image_type,
-        image_path=rel_path,
-        file_format="jpeg",
-        file_sha256=sha256_hex,
-        is_current=True,
-    )
-    image.refresh_from_db()
+    try:
+        image = UserVerificationImages.objects.create(
+            user=user,
+            image_type=image_type,
+            image_path=rel_path,
+            file_format="jpeg",
+            file_sha256=sha256_hex,
+            is_current=True,
+        )
+        image.refresh_from_db()
+    except Exception:
+        # Section 5.4: Clean up ONLY the newly-created unreferenced ciphertext file if DB insert fails
+        if rel_path:
+            try:
+                root = Path(settings.VERIFICATION_MEDIA_ROOT).resolve()
+                target_file = (root / rel_path).resolve()
+                if root in target_file.parents and target_file.is_file():
+                    target_file.unlink()
+            except OSError as cleanup_err:
+                logger.warning(
+                    "Failed to clean up newly-created ciphertext file on DB error: %s",
+                    type(cleanup_err).__name__,
+                )
+        raise
 
     logger.info(
         "Verification image uploaded",
@@ -306,11 +322,13 @@ def resolve_private_image_path(image: UserVerificationImages) -> Path:
     Resolve the on-disk path safely, preventing path traversal outside
     VERIFICATION_MEDIA_ROOT.
     """
+    if not image or not getattr(image, "image_path", None):
+        raise ResourceMaskedNotFound(message="Image file not found.")
     root = Path(settings.VERIFICATION_MEDIA_ROOT).resolve()
     target = (root / image.image_path).resolve()
     if root not in target.parents and target != root:
         raise PermissionDeniedError(message="Invalid image path.", code="invalid_path")
-    if not target.exists():
+    if not target.is_file():
         raise ResourceMaskedNotFound(message="Image file not found.")
     return target
 

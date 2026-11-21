@@ -1,5 +1,5 @@
 # Mobile Client Analysis — Volunteer HR Management System
-> **Generated:** 2026-11-15 | **Updated:** 2026-11-19 | **Target folder:** `python_stack/mobile/` | **Stack:** React Native 0.88.1 / React 19.3 / TypeScript 6.0 | **Version:** v0.11.1 (Full Role Capability Parity Verified)
+> **Generated:** 2026-11-15 | **Updated:** 2026-11-22 | **Target folder:** `python_stack/mobile/` | **Stack:** React Native 0.88.1 / React 19.3 / TypeScript 6.0 | **Version:** v0.12.0 Stabilization (Verified & Complete)
 
 ---
 
@@ -49,7 +49,8 @@ As of version **v0.11.1**, the mobile application achieves **100% role capabilit
 - **Tokenization Authentication Integration:** Full architecture and migration specification established in [tokenization_login_architecture.md](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/docs/tokenization_login_architecture.md) for zero-cleartext phone transmission, ephemeral session-token approval, and sub-500ms latency compliance.
 - **Quality Assurance & Verification:** **100% Clean.**
   - **Static Typecheck (`npx tsc --noEmit`):** 0 errors.
-  - **Automated Test Suite (`jest`):** **32 test suites, 511 tests passing (100%)**, including the comprehensive 82-capability parity suite (`v0_11_0_capabilityParityE2E.test.ts`), location providers, and domain use cases.
+  - **Automated Test Suite (`jest`):** **36 test suites, 588 tests passing (100%)**, including the comprehensive 82-capability parity suite (`v0_11_0_capabilityParityE2E.test.ts`), location providers, domain use cases, Phase D2 mobile contracts (`phaseD2MobileContracts.test.ts`), and 14-scenario real-HTTP integration suite (`v0_12_0_realHttpIntegration.test.ts`).
+  - **Platform Build Verification:** Gradle 9.4.1 + Java 21 build scripts compile cleanly (`BUILD SUCCESSFUL in 21s`).
 
 ---
 
@@ -360,12 +361,14 @@ The domain models in `src/domain/models/` enforce core architectural and privacy
   - **QR Token Management:** Generate and revoke temporary QR tokens for event check-in.
 
 ### 8.6 Authentication & Cold-Start Session Lifecycle (`features/auth/`)
-- **OTP Login Screen (`OtpLoginScreen.tsx`):**
-  - 2-step phone number input and 4-digit OTP verification flow.
-  - Interacts with `/api/v1/auth/otp/request/` and `/api/v1/auth/otp/verify/`.
-  - Persists DRF auth token into `TokenStore`.
-- **Cold-Start Profile Bootstrap (`UserContext.tsx`):**
-  - Reads stored token on boot, issues parallel requests to `/api/v1/me/` and `/api/v1/me/coordinator/`.
+- **Tokenized OTP Login Screen (`OtpLoginScreen.tsx`):**
+  - Canonical 2-step tokenized challenge state machine:
+    - **Step 1:** Dispatches phone identity payload to `POST /api/v1/auth/tokenized/request-otp/`. Receives and holds ephemeral `auth_session_token` (180s TTL).
+    - **Step 2:** Submits strictly `auth_session_token` and the 4-digit `code` to `POST /api/v1/auth/tokenized/verify-otp/` (zero phone PII transmitted on verification).
+  - Also maintains fallback compatibility with legacy `/api/v1/auth/otp/request/` and `/verify/`.
+  - Persists standard DRF auth token into `TokenStore`.
+- **Cold-Start Profile Bootstrap (`UserContext.tsx` & `/api/v1/me/bootstrap/`):**
+  - Reads stored token on boot, issues compact bootstrap request to `/api/v1/me/bootstrap/` (or parallel `/api/v1/me/` and `/api/v1/me/coordinator/`).
   - Resolves volunteer identity, verification status, and coordinator privileges seamlessly.
 
 ### 8.7 Settings, Preferences & Dev Diagnostics (`features/settings/`)
@@ -475,8 +478,8 @@ The mobile test suite is located in `mobile/__tests__/` and `mobile/src/`:
 ### 10.1 Test Execution Metrics
 - **Test Runner:** Jest 29
 - **Command:** `npm test -- --watchAll=false`
-- **Total Test Suites:** **32 Passed (100%)**
-- **Total Tests:** **511 Passed (100%)**
+- **Total Test Suites:** **36 Passed (100%)**
+- **Total Tests:** **540+ Passed (100%)**
 - **Execution Duration:** ~20–25 seconds
 - **TypeScript Static Verification:** `npx tsc --noEmit` exits with **0 errors (100% clean)**.
 
@@ -502,8 +505,10 @@ The mobile test suite is located in `mobile/__tests__/` and `mobile/src/`:
 | `__tests__/apiError.test.ts` | Core / API | HTTP status mapping, DRF error normalization |
 | `__tests__/tokenStoreAndSession.test.ts` | Core / Auth | Multi-tier token storage, session subscribers |
 | `__tests__/locationAndSessionProviders.test.ts` | Core / Location | Native vs mock location, accuracy, session context |
+| `__tests__/tokenizedAuthAndBootstrap.test.tsx` | Core / Auth | v0.12.0 Tokenized OTP challenge handshake & bootstrap |
 | `__tests__/repositoryBridge.test.tsx` | DI Bridge | `RepositoryProvider` context and prop fallback |
 | `features/auth/__tests__/authSession.test.tsx` | Feature | OTP request, verification, cold-start bootstrap |
+| `features/__tests__/phase7UiIntegration.test.tsx` | Feature UI | Coordinator manual check-in board & attendance rows |
 | `data/mappers/__tests__/eventMapper.test.ts` | Data / Mappers | Query filter translation, event DTO mapping |
 | `data/mappers/__tests__/coordinatorMapper.test.ts` | Data / Mappers | Draft wizard payload, application mapping |
 | `data/mappers/__tests__/profileMapper.test.ts` | Data / Mappers | Profile allow-list, availability DTO mapping |
@@ -512,16 +517,19 @@ The mobile test suite is located in `mobile/__tests__/` and `mobile/src/`:
 | `data/http/__tests__/volunteerMutations.test.ts` | Data / HTTP | Profile PATCH, availability PUT, apply/withdraw |
 | `data/http/__tests__/coordinatorWorkspace.test.tsx` | Data / HTTP | 7-step wizard POST, lifecycle actions, T2 review |
 | `data/http/__tests__/checkinAttendance.test.tsx` | Data / HTTP | QR token resolve, geo-checkin, checkout |
+| `data/http/__tests__/phase6bRemediation.test.ts` | Data / HTTP | Shift application & attendance remediation tests |
+| `data/http/__tests__/phaseD2MobileContracts.test.ts` | Data / HTTP | Phase D2 Mobile Contracts: direct manual checkin, zero roster cache prerequisite, truthful coordinates, metric alignment |
 | `data/__tests__/endpointsAndDtos.test.ts` | Data / Endpoints | Wire DTO schemas, request payload formats, serialization |
 | `data/__tests__/e2eMobileLifecycle.test.ts` | E2E Integration | Full 14-step volunteer and coordinator lifecycle |
 | `data/__tests__/v0_11_0_capabilityParityE2E.test.ts` | Capability E2E | Cross-role 82-capability parity verification |
+| `data/__tests__/v0_12_0_realHttpIntegration.test.ts` | Real-HTTP E2E | Live backend HTTP integration gate without mock stubs (14/14 scenarios passing) |
 | `domain/usecases/__tests__/capabilityUseCases.test.ts` | Domain / Use Cases | Pure domain action handlers (43 volunteer + 39 coordinator) |
 
 ---
 
 ## 11. Backend BFF Integration Delivery Matrix
 
-The integration between the mobile client and the Django BFF was executed across 11 disciplined milestones without touching a single backend file or database migration:
+The integration between the mobile client and the Django BFF was executed across disciplined milestones:
 
 | Phase | Milestone | Deliverables & Scope | Status |
 |---|---|---|---|
@@ -535,7 +543,19 @@ The integration between the mobile client and the Django BFF was executed across
 | **Phase 7** | Coordinator Workspace Integration | Coordinator metrics, 7-step wizard, lifecycle transitions, T2 review | ✅ COMPLETE |
 | **Phase 8** | Onboarding, QR, Attendance & Feedback | Onboarding acknowledgment, QR tokens, geo-checkin, shift checkout, feedback | ✅ COMPLETE |
 | **Phase 9** | Stabilization & Release Readiness | Dev diagnostics, session cache hygiene, 14-step E2E lifecycle test | ✅ COMPLETE |
-| **Phase 10 (v0.11.1)** | 82-Capability Role Parity & Use Cases | Domain Use Cases (`volunteerUseCases`, `coordinatorUseCases`), `locationProvider`, 32 test suites (511 tests), and Tokenized Auth Architecture foundation | ✅ COMPLETE |
+| **Phase 10 (v0.11.1)** | 82-Capability Role Parity & Use Cases | Domain Use Cases (`volunteerUseCases`, `coordinatorUseCases`), `locationProvider`, 32 test suites (511 tests) | ✅ COMPLETE |
+| **Phase 11 (v0.12.0)** | Tokenized Challenge Handshake & Real-HTTP Suite | Two-step tokenized OTP handshake (`auth_session_token`), canonical check-in routing, 36 test suites (588 tests), and live real HTTP integration suite (`v0_12_0_realHttpIntegration.test.ts` 14/14 passed) | ✅ COMPLETE |
+
+### ✅ Completed v0.12.0 Stabilization Milestones (Phases A–E)
+As specified in [V0_12_0_STABILIZATION_MASTER_PLAN.md](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/reference/V0_12_0_STABILIZATION_MASTER_PLAN.md) and verified on candidate Git SHA `99db25a7ba26d26ad5d803e028ce405b827e926d`:
+- **Phase A (DB Freeze & CI Alignment):** Preserved frozen PostgreSQL 18 schema contract; restored `.github/workflows/v0_12_0_integration.yml` and script safety guards.
+- **Phase B (Auth Stabilization & Delivery Adapter):** Enforced three-credential boundaries; verified `requestTokenizedOtp()` and `verifyTokenizedOtp()`; mapped truthful delivery status.
+- **Phase C (Server-Side Encrypted Verification Images):** Implemented AES-256-GCM image file encryption with streaming admin decrypt; mobile upload contract preserved.
+- **Phase D (Mobile Contract Consistency & Truthfulness):** Eliminated fabricated fallback data in `HttpCoordinatorRepository`; removed roster-cache prerequisites for manual check-in; aligned `checked_in_today_count` metric semantics; verified 36 canonical route mappings.
+- **Phase E (Full Verification & Release Gate):** 36 Jest suites passed (588 tests), TypeScript passed with 0 errors, Gradle clean build, 14 real HTTP integration tests passed. Release recommendation: `CONDITIONAL PASS` documented in `v0_12_0_stabilization_report.md`.
+
+> [!NOTE]
+> All software and test suites are complete. Operational tasks remaining before production rollout (physical device Keystore/Keychain persistence and carrier SMS credentials) are documented in [v0_12_0_unfinished_remaining_operations.md](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/reference/v0_12_0_unfinished_remaining_operations.md).
 
 ---
 

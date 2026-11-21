@@ -13,6 +13,7 @@ from __future__ import annotations
 import hashlib
 import io
 import logging
+import os
 import uuid as uuid_module
 from datetime import datetime, timezone
 from pathlib import Path
@@ -195,23 +196,42 @@ def sanitize_and_save_verification_jpeg(
 
     sha256_hex = hashlib.sha256(jpeg_bytes).hexdigest()
 
+    # Section 5.4: Encrypt sanitized JPEG in memory with active encryption key
+    from common.image_crypto import encrypt_image
+    envelope_bytes = encrypt_image(jpeg_bytes)
+
     random_suffix = uuid_module.uuid4().hex[:8]
     filename = f"{image_type}_{random_suffix}.jpg"
     relative_path = f"{clean_uuid}/{filename}"
 
-    verification_root = Path(settings.VERIFICATION_MEDIA_ROOT)
-    target_dir = verification_root / clean_uuid
+    verification_root = Path(settings.VERIFICATION_MEDIA_ROOT).resolve()
+    target_dir = (verification_root / clean_uuid).resolve()
+    if verification_root not in target_dir.parents and target_dir != verification_root:
+        raise ValidationError("Invalid destination directory path", code="invalid_path")
     target_dir.mkdir(parents=True, exist_ok=True)
     target_path = target_dir / filename
 
-    with open(target_path, "wb") as f:
-        f.write(jpeg_bytes)
+    # Write ciphertext to a private temp file in target dir, flush/fsync, and atomically replace
+    temp_filename = f".tmp_{filename}_{uuid_module.uuid4().hex[:8]}"
+    temp_path = target_dir / temp_filename
+
+    try:
+        with open(temp_path, "wb") as f:
+            f.write(envelope_bytes)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(temp_path, target_path)
+    except Exception:
+        if temp_path.exists():
+            try:
+                temp_path.unlink()
+            except OSError:
+                pass
+        raise
 
     logger.info(
-        "Saved verification image: %s (%d bytes, sha256=%s)",
-        relative_path,
-        len(jpeg_bytes),
-        sha256_hex[:16] + "...",
+        "Saved encrypted verification image envelope (%d bytes ciphertext)",
+        len(envelope_bytes),
     )
 
     return relative_path, sha256_hex

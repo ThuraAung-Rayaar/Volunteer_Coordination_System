@@ -323,3 +323,133 @@ class BffAuthTokenizedTests(TestCase):
             2,
             f"Expected exactly 2 domain queries (1 auth + 1 coord status), got {len(domain_queries)}: {domain_queries}",
         )
+
+    # ---------------------------------------------------------------------------
+    # Phase B1 Specific BFF Tests (Defects B1, B2, B4, B5)
+    # ---------------------------------------------------------------------------
+
+    def test_bff_purpose_propagation_end_to_end(self):
+        """
+        Defect B1: Propagate purpose end-to-end via BFF endpoints:
+        - Request with purpose='qr_registration'
+        - Verify with default purpose ('login') fails with 400 invalid_challenge
+        - Verify with purpose='qr_registration' succeeds with 200 OK
+        """
+        phone = _unique_phone()
+        with override_settings(DEBUG=True, ALLOW_DEV_CODE_IN_AUTH_RESPONSE=True, ENVIRONMENT="development"):
+            req_res = self.client.post(
+                "/api/v1/auth/tokenized/request-otp/",
+                {"phone": phone, "purpose": "qr_registration"},
+                format="json",
+            )
+            self.assertEqual(req_res.status_code, status.HTTP_200_OK)
+            session_token = req_res.data["auth_session_token"]
+            dev_code = req_res.data["dev_code"]
+
+            # Mismatch verification: defaults to 'login'
+            mismatch_res = self.client.post(
+                "/api/v1/auth/tokenized/verify-otp/",
+                {
+                    "auth_session_token": session_token,
+                    "code": dev_code,
+                    "purpose": "login",
+                },
+                format="json",
+            )
+            self.assertEqual(mismatch_res.status_code, status.HTTP_400_BAD_REQUEST)
+            self.assertEqual(mismatch_res.data.get("error", {}).get("code"), "invalid_challenge")
+
+            # Matching verification: explicitly specifies 'qr_registration'
+            match_res = self.client.post(
+                "/api/v1/auth/tokenized/verify-otp/",
+                {
+                    "auth_session_token": session_token,
+                    "code": dev_code,
+                    "purpose": "qr_registration",
+                    "display_name": "QR Volunteer",
+                },
+                format="json",
+            )
+            self.assertEqual(match_res.status_code, status.HTTP_200_OK)
+            self.assertIn("token", match_res.data)
+            self.assertEqual(match_res.data["user"]["display_name"], "QR Volunteer")
+
+    def test_bff_request_id_conflict_returns_409(self):
+        """
+        Defect B2: Submitting different phone or purpose with same request_id returns HTTP 409 request_id_conflict.
+        """
+        phone1 = _unique_phone()
+        phone2 = _unique_phone()
+        req_id = f"bff-req-{secrets.token_hex(6)}"
+
+        with override_settings(DEBUG=True, ALLOW_DEV_CODE_IN_AUTH_RESPONSE=True, ENVIRONMENT="development"):
+            r1 = self.client.post(
+                "/api/v1/auth/tokenized/request-otp/",
+                {"phone": phone1, "request_id": req_id},
+                format="json",
+            )
+            self.assertEqual(r1.status_code, status.HTTP_200_OK)
+
+            # Different phone
+            r2 = self.client.post(
+                "/api/v1/auth/tokenized/request-otp/",
+                {"phone": phone2, "request_id": req_id},
+                format="json",
+            )
+            self.assertEqual(r2.status_code, status.HTTP_409_CONFLICT)
+            self.assertEqual(r2.data.get("error", {}).get("code"), "request_id_conflict")
+
+    def test_bff_request_id_consumed_returns_409(self):
+        """
+        Defect B2: Submitting a request_id whose challenge was already consumed returns HTTP 409 request_id_exhausted.
+        """
+        phone = _unique_phone()
+        req_id = f"bff-consumed-{secrets.token_hex(6)}"
+
+        with override_settings(DEBUG=True, ALLOW_DEV_CODE_IN_AUTH_RESPONSE=True, ENVIRONMENT="development"):
+            r1 = self.client.post(
+                "/api/v1/auth/tokenized/request-otp/",
+                {"phone": phone, "request_id": req_id},
+                format="json",
+            )
+            self.assertEqual(r1.status_code, status.HTTP_200_OK)
+            session_token = r1.data["auth_session_token"]
+            dev_code = r1.data["dev_code"]
+
+            # Consume the challenge
+            v1 = self.client.post(
+                "/api/v1/auth/tokenized/verify-otp/",
+                {"auth_session_token": session_token, "code": dev_code},
+                format="json",
+            )
+            self.assertEqual(v1.status_code, status.HTTP_200_OK)
+
+            # Re-request with same consumed request_id
+            r2 = self.client.post(
+                "/api/v1/auth/tokenized/request-otp/",
+                {"phone": phone, "request_id": req_id},
+                format="json",
+            )
+            self.assertEqual(r2.status_code, status.HTTP_409_CONFLICT)
+            self.assertEqual(r2.data.get("error", {}).get("code"), "request_id_exhausted")
+
+    def test_bff_structured_delivery_metadata_fields(self):
+        """
+        Defect B4: Delivery metadata contains all required structured fields:
+        provider, channel, delivered, configured, accepted, message_id, error_category, retryability.
+        """
+        phone = _unique_phone()
+        with override_settings(DEBUG=True, ALLOW_DEV_CODE_IN_AUTH_RESPONSE=True, ENVIRONMENT="development"):
+            res = self.client.post(
+                "/api/v1/auth/tokenized/request-otp/",
+                {"phone": phone},
+                format="json",
+            )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        delivery = res.data["delivery"]
+        expected_keys = {
+            "provider", "channel", "delivered", "configured",
+            "accepted", "message_id", "error_category", "retryability",
+        }
+        for k in expected_keys:
+            self.assertIn(k, delivery, f"Missing delivery field: {k}")

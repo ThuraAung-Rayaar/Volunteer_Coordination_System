@@ -28,7 +28,7 @@ flowchart TD
     end
 
     subgraph DatabaseTier["PostgreSQL Engine Tier (postgres_sql/)"]
-        PG["PostgreSQL 14+ with btree_gist"]
+        PG["PostgreSQL 18+ with btree_gist"]
         TRIG["Stored Procedures & Triggers"]
         VIEWS["Read-Only Optimized Views"]
         AUDIT["Audit & Moderation Logs"]
@@ -52,7 +52,7 @@ flowchart TD
 
 | Subsystem | Version / Stack | Implementation Status | Quality & Verification Metrics |
 |---|---|---|---|
-| **Database Engine** | PostgreSQL 14+ (`postgres_sql/`) | **100% Complete (v0.6.0)** | 22 tables, 14 DB views, 28 stored functions/triggers, full `self_test.sql` coverage. |
+| **Database Engine** | PostgreSQL 18+ (`postgres_sql/`) | **100% Complete (v0.6.0)** | 22 tables, 14 DB views, 28 stored functions/triggers, full `self_test.sql` coverage. |
 | **Backend & BFF** | Django 5.1 / DRF 3.15 (`backend/`) | **100% Complete (v0.6.0)** | 19 service modules, 5 Django apps, OpenAPI 3.0 schema (206 KB), 11 Admin Web UI templates, unified URL dispatching (`/api/v1/`). |
 | **Mobile Client** | React Native 0.88.1 / TS 6.0 (`mobile/`) | **100% Complete (v0.10.0)** | 17 Drawer screens, Dual-Mode (`mock`/`http`), Core API transport, TokenStore, DTOs & Mappers, HTTP Repositories, 0 type errors, **28 test suites / 365 tests passing (100%)**. |
 | **BFF Integration** | React Native ↔ Django BFF | **100% Complete (Phases 0–9)** | Zero DB changes, zero backend changes, zero external dependencies, strict DRF allow-list compliance. |
@@ -91,7 +91,7 @@ This directory (`docs/`) contains comprehensive deep-dive analyses and verificat
 ## 4. Subsystems Summary
 
 ### 4.1 Database Layer (`postgres_sql/`)
-- **Schema Engine:** PostgreSQL 14+ with `btree_gist` extension for exclusion constraints.
+- **Schema Engine:** PostgreSQL 18+ with `btree_gist` extension for exclusion constraints and native `uuidv7()`.
 - **Key Tables:** `users`, `events`, `event_posts`, `event_applications`, `coordinator_assignments`, `attendance`, `attendance_geo_attempts`, `qr_tokens`, `audit_logs`.
 - **Core Stored Logic:** Stored functions manage auto-assignment algorithms, geofence Haversine calculations, coordinator handover with owner-as-monitor constraints, and rating updates.
 - **Data Privacy:** Raw phone numbers are strictly hashed (HMAC) and AES encrypted; volunteer contact details and physical capability profiles are shielded behind T2 privacy gates.

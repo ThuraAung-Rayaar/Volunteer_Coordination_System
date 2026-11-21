@@ -225,6 +225,31 @@ def get_event_summary(event_id: int | str) -> VEventSummary:
         raise ResourceMaskedNotFound(message="The requested event was not found.")
 
 
+def get_event_attendance_metrics(event_id: int | str) -> dict:
+    """
+    Return attendance metrics distinguishing all-time checked-in count
+    from properly scoped daily checked-in count without modifying v_event_summary (Section 6.5).
+    """
+    from apps.attendance.models import Attendance
+    from django.utils import timezone
+    eid = int(event_id)
+    today = timezone.now().date()
+    all_time_count = Attendance.objects.filter(
+        event_id=eid,
+        status__in=["checked_in", "completed"],
+    ).count()
+    today_count = Attendance.objects.filter(
+        event_id=eid,
+        status__in=["checked_in", "completed"],
+        checkin_at__date=today,
+    ).count()
+    return {
+        "event_id": eid,
+        "checked_in_count": all_time_count,  # All-time event total
+        "checked_in_today_count": today_count,  # Truly scoped to today
+    }
+
+
 # --- Admin Dashboard & Moderation Summary (administrative) -------------------
 
 def get_admin_dashboard() -> dict:

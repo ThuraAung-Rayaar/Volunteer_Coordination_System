@@ -307,6 +307,22 @@ class Section5ManualCheckInAcceptanceTests(TransactionTestCase):
             conditions_acknowledged_at=timezone.now(),
         )
 
+    def tearDown(self):
+        try:
+            with connection.cursor() as cur:
+                cur.execute("SET session_replication_role = 'replica';")
+                cur.execute("DELETE FROM attendance_geo_attempts WHERE attendance_id IN (SELECT id FROM attendance WHERE event_id = %s)", (self.event.id,))
+                cur.execute("DELETE FROM qr_tokens WHERE event_id = %s", (self.event.id,))
+                cur.execute("DELETE FROM attendance WHERE event_id = %s", (self.event.id,))
+                cur.execute("DELETE FROM assignments WHERE event_id = %s", (self.event.id,))
+                cur.execute("DELETE FROM event_applications WHERE event_id = %s", (self.event.id,))
+                cur.execute("DELETE FROM event_posts WHERE event_id = %s", (self.event.id,))
+                cur.execute("DELETE FROM events WHERE id = %s", (self.event.id,))
+                cur.execute("SET session_replication_role = 'origin';")
+        except Exception:
+            pass
+        super().tearDown()
+
     # 1. active event + onboarding -> 200, status checked_in, method coordinator_manual, already_checked_in=False
     def test_manual_checkin_success_authoritative_result(self):
         onboarding_service.acknowledge_event_onboarding(self.vol, self.event.id)

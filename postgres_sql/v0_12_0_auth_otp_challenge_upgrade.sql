@@ -1,7 +1,7 @@
 -- =============================================================================
 -- Migration: v0.12.0 Additive Upgrade — OTP Challenge Table & Stored Functions
 -- File: postgres_sql/v0_12_0_auth_otp_challenge_upgrade.sql
--- Target Database: PostgreSQL 14+ (Volunteer Coordination System)
+-- Target Database: PostgreSQL 18+ (Volunteer Coordination System)
 -- Purpose:
 --   Implements Phase 1 (AUTH-01, AUTH-04) of v0.12.0 Backend-Client Handshake Plan.
 --   Adds auth_otp_challenge table bound to auth_otp.id with dual-clock expiry,

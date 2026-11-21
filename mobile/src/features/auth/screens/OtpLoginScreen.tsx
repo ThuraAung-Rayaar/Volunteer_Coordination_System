@@ -6,6 +6,7 @@ import React, { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useCurrentUser } from '../../../app/UserContext';
 import type { RequestOtpResult, VerifyOtpResult } from '../../../app/UserContext';
+import type { OtpDeliveryDto, TokenizedOtpDeliveryDto } from '../../../data/dto/authDto';
 import {
   AppButton,
   AppCard,
@@ -19,6 +20,34 @@ import { hexToRgba, useAppTheme } from '../../../theme';
 
 export interface OtpLoginScreenProps {
   onLoginSuccess?: () => void;
+}
+
+/**
+ * Maps truthful provider delivery status into user-facing copy (Section 4.2, 4.3 B4).
+ * Strictly distinguishes "accepted by provider" from genuine handset "delivered".
+ */
+export function getDeliveryStatusDescription(
+  delivery?: TokenizedOtpDeliveryDto | OtpDeliveryDto,
+  status?: string,
+): string {
+  if (!delivery) return '';
+  const channel = delivery.channel || 'SMS';
+  if (delivery.delivered) {
+    return `Delivery channel: ${channel} (delivered)`;
+  }
+  if ('accepted' in delivery && delivery.accepted) {
+    return `Delivery channel: ${channel} (accepted by provider / queued)`;
+  }
+  if (status === 'accepted') {
+    return `Delivery channel: ${channel} (accepted by provider / queued)`;
+  }
+  if ('configured' in delivery && delivery.configured === false) {
+    return `Delivery channel: ${channel} (simulation mode / provider unconfigured)`;
+  }
+  if (status === 'console_simulated') {
+    return `Delivery channel: ${channel} (simulation mode / provider unconfigured)`;
+  }
+  return `Delivery channel: ${channel} (queued)`;
 }
 
 export function OtpLoginScreen({
@@ -55,12 +84,19 @@ export function OtpLoginScreen({
   const codeLength = challenge?.codeLength ?? 6;
 
   // Development build check: show dev banner ONLY in dev builds when dev_code is returned
+  // AND an external network provider is NOT configured (Section 4.2)
   const isDevBuild =
     (typeof __DEV__ !== 'undefined' && Boolean(__DEV__)) ||
     process.env.NODE_ENV !== 'production';
-  const effectiveDevCode = isDevBuild ? (challenge?.devCode ?? devCode) : null;
+  const isRealProvider = Boolean(
+    challenge?.delivery &&
+    'configured' in challenge.delivery &&
+    challenge.delivery.configured === true &&
+    challenge.delivery.provider !== 'console'
+  );
+  const effectiveDevCode = isDevBuild && !isRealProvider ? (challenge?.devCode ?? devCode) : null;
 
-  const handleSendOtp = async () => {
+  const executeSendOtp = async (explicitRequestId?: string) => {
     if (isLoading) return; // Prevent double-submit while in flight
     setErrorMessage(null);
     setFieldError(null);
@@ -73,37 +109,95 @@ export function OtpLoginScreen({
 
     clearChallenge?.();
     setIsLoading(true);
+    const requestId =
+      explicitRequestId ||
+      `req-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+
     try {
       let result: RequestOtpResult;
       if (requestOtp) {
-        result = await requestOtp(trimmedPhone, 'login');
+        result = explicitRequestId
+          ? await requestOtp(trimmedPhone, 'login', explicitRequestId)
+          : await requestOtp(trimmedPhone, 'login');
       } else if (requestTokenizedOtp) {
         result = await requestTokenizedOtp({
           phone: trimmedPhone,
           purpose: 'login',
+          requestId: explicitRequestId,
         });
       } else {
         throw new Error('Authentication service unavailable.');
       }
 
       if (result.success) {
-        if (result.devCode) {
+        // Truthful handling of provider delivery states (Section 4.3 B4):
+        // If provider is unconfigured, do NOT advance as if sent
+        if (result.status === 'provider_not_configured') {
+          setErrorMessage(
+            'SMS provider is not configured. Real network delivery is currently unavailable in this environment.',
+          );
+          return;
+        }
+
+        // If provider rejected delivery, do NOT advance as if sent
+        if (result.status === 'delivery_rejected') {
+          setErrorMessage(
+            'SMS delivery was rejected by telecom provider. Please verify your phone number and try again.',
+          );
+          return;
+        }
+
+        // If provider timed out with unknown outcome, do NOT advance as if sent
+        if (result.status === 'delivery_timeout') {
+          setErrorMessage(
+            'Provider network timeout. The delivery outcome is uncertain. Please check your handset or tap Resend.',
+          );
+          return;
+        }
+
+        if (result.devCode && !isRealProvider) {
           setDevCode(result.devCode);
           setCode(result.devCode);
         }
         setStep('otp');
       } else {
-        setErrorMessage(
-          result.error || 'Failed to send verification code. Please try again.',
-        );
+        if (result.errorCode === 'request_id_exhausted') {
+          setErrorMessage('This request has already been used or expired. Please tap Resend to request a new code.');
+        } else if (result.errorCode === 'request_id_conflict') {
+          setErrorMessage('Request parameter mismatch. Please tap Resend to request a new code.');
+        } else {
+          setErrorMessage(
+            result.error || 'Failed to send verification code. Please try again.',
+          );
+        }
       }
     } catch (err: unknown) {
       const msg =
         err instanceof Error ? err.message : 'Network connection error.';
-      setErrorMessage(msg);
+      if (msg.toLowerCase().includes('timeout')) {
+        setErrorMessage(
+          'Network request timed out. The delivery outcome is uncertain. You may request a new code.',
+        );
+      } else {
+        setErrorMessage(msg);
+      }
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleSendOtp = async () => {
+    await executeSendOtp();
+  };
+
+  const handleResendOtp = async () => {
+    // Generate a fresh request_id for user-requested resend (Section 4.2)
+    const newRequestId = `req-resend-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    setCode('');
+    setDevCode(null);
+    setErrorMessage(null);
+    setFieldError(null);
+    await executeSendOtp(newRequestId);
   };
 
   const handleVerifyOtp = async () => {
@@ -266,13 +360,7 @@ export function OtpLoginScreen({
               {challenge?.delivery ? (
                 <View style={styles.deliveryBlock}>
                   <AppText variant="caption" color={theme.colors.textSecondary}>
-                    Delivery channel: {challenge.delivery.channel || 'SMS'}
-                    {challenge.delivery.delivered
-                      ? ' (delivered)'
-                      : 'configured' in challenge.delivery &&
-                        challenge.delivery.configured === false
-                      ? ' (simulation mode / provider unconfigured)'
-                      : ' (queued)'}
+                    {getDeliveryStatusDescription(challenge.delivery, challenge.status)}
                   </AppText>
                 </View>
               ) : null}
@@ -339,7 +427,7 @@ export function OtpLoginScreen({
                 <AppButton
                   label="Resend Code"
                   variant="outline"
-                  onPress={handleSendOtp}
+                  onPress={handleResendOtp}
                   disabled={isLoading}
                 />
               </View>

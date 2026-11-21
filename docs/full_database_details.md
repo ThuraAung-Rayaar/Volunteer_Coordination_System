@@ -1,9 +1,11 @@
 # Complete Database Architecture & Schema Specification
 
 **Database Name:** `volunteer_coordination_db`  
-**Engine:** PostgreSQL  
+**Engine:** PostgreSQL 18.6 with `btree_gist` and native `uuidv7()`  
 **Host / Port:** `127.0.0.1:5432`  
-**Generated At:** 2026-11-20 22:15:27  
+**Contract Status:** DATABASE FROZEN — Immutable Schema Contract as of v0.12.0 Stabilization  
+**Generated At:** 2026-11-20 22:15:27 | **Audit Verified:** 2026-11-22 (Preflight PASS: `artifacts/v0_12_0_db_preflight_99db25a.md`)  
+**Safety Script:** `scripts/db_preflight_check.py` (Read-only validation of frozen contract)  
 
 ---
 

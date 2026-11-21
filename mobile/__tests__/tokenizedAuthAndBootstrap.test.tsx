@@ -564,4 +564,190 @@ describe('Phase 6A: Tokenized Challenge Handshake, authApi, UserContext & Bootst
       expect(capturedContext?.currentUser.email).toBe('volunteer@charity.org');
     });
   });
+
+  // =========================================================================
+  // 5. Phase B2 Mobile Authentication Criteria (Section 4.4, 4.5)
+  // =========================================================================
+
+  describe('Phase B2: Mobile Auth Acceptance & Invariants (Section 4.5)', () => {
+    it('CRITICAL: Challenge token never enters Authorization header under any condition', async () => {
+      let capturedHeaders: Record<string, string> = {};
+      const mockTransport: TransportAdapter = async (url, init) => {
+        capturedHeaders = (init?.headers as Record<string, string>) || {};
+        return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
+      };
+
+      const customClient = new ApiClient(mockTransport, memoryStore, sessionManager);
+
+      // 1. Perform requestTokenizedOtp
+      jest.spyOn(authApi, 'requestTokenizedOtp').mockResolvedValue({
+        ok: true,
+        status: 200,
+        data: {
+          status: 'dev_code_available',
+          auth_session_token: 'challenge-secret-token-xyz-987',
+          expires_in: 180,
+          code_length: 6,
+          delivery: {
+            provider: 'console',
+            channel: 'console',
+            delivered: false,
+            configured: false,
+          },
+          dev_code: '123456',
+        },
+      });
+
+      const res = await authApi.requestTokenizedOtp({ phone: '+959111222333', purpose: 'login' }, customClient);
+      expect(res.ok).toBe(true);
+
+      // 2. Perform an authenticated API call while holding the challenge token
+      await customClient.get('events/discovery/');
+
+      // Challenge token MUST NEVER be placed in Authorization header
+      expect(capturedHeaders.Authorization).toBeUndefined();
+      expect(capturedHeaders.authorization).toBeUndefined();
+    });
+
+    it('STRICT: Invalidate session ONLY on HTTP 401; preserve token on 403, 404, 409, 429, 500, or timeout', async () => {
+      await memoryStore.setToken('persistent-volunteer-token');
+      const unauthorizedSpy = jest.fn();
+      sessionManager.onUnauthorized(unauthorizedSpy);
+
+      const non401Statuses = [400, 403, 404, 409, 429, 500, 502, 503];
+
+      for (const st of non401Statuses) {
+        const mockTransport: TransportAdapter = async () =>
+          new Response(JSON.stringify({ error: { code: 'error', message: 'fail' } }), { status: st });
+
+        const client = new ApiClient(mockTransport, memoryStore, sessionManager);
+        await client.get('events/discovery/');
+
+        // Token must remain intact; handleUnauthorized must NOT be triggered
+        expect(await memoryStore.getToken()).toBe('persistent-volunteer-token');
+        expect(unauthorizedSpy).not.toHaveBeenCalled();
+      }
+
+      // Now verify that HTTP 401 DOES clear token and trigger listener
+      const mock401Transport: TransportAdapter = async () =>
+        new Response(JSON.stringify({ error: { code: 'unauthorized', message: 'Token invalid' } }), { status: 401 });
+
+      const client401 = new ApiClient(mock401Transport, memoryStore, sessionManager);
+      await client401.get('events/discovery/');
+
+      expect(await memoryStore.getToken()).toBeNull();
+      expect(unauthorizedSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('IDEMPOTENCY: Non-idempotent POST requests are NEVER retried automatically on timeout', async () => {
+      let callCount = 0;
+      const mockTransport: TransportAdapter = async () => {
+        callCount++;
+        // Simulate immediate abort/timeout
+        const err = new Error('The operation was aborted');
+        err.name = 'AbortError';
+        throw err;
+      };
+
+      const client = new ApiClient(mockTransport, memoryStore, sessionManager);
+      const res = await client.post('auth/tokenized/request-otp/', { phone: '+95912345678' }, { timeoutMs: 50 });
+
+      expect(res.ok).toBe(false);
+      // Transport must be invoked exactly ONCE: zero blind retries
+      expect(callCount).toBe(1);
+    });
+
+    it('Truthfully distinguishes provider delivery states: accepted, delivered, unconfigured, rejected, timeout', () => {
+      const { getDeliveryStatusDescription } = require('../src/features/auth/screens/OtpLoginScreen');
+
+      // Case 1: Real delivery confirmed to handset
+      const descDelivered = getDeliveryStatusDescription(
+        { provider: 'telecom', channel: 'SMS', delivered: true, configured: true },
+        'delivered',
+      );
+      expect(descDelivered).toBe('Delivery channel: SMS (delivered)');
+
+      // Case 2: Provider accepted/queued but NOT yet delivered to handset
+      const descAccepted = getDeliveryStatusDescription(
+        { provider: 'telecom', channel: 'SMS', delivered: false, configured: true, accepted: true },
+        'accepted',
+      );
+      expect(descAccepted).toBe('Delivery channel: SMS (accepted by provider / queued)');
+
+      // Case 3: Provider unconfigured / simulation mode
+      const descUnconfigured = getDeliveryStatusDescription(
+        { provider: 'console', channel: 'console', delivered: false, configured: false },
+        'console_simulated',
+      );
+      expect(descUnconfigured).toBe('Delivery channel: console (simulation mode / provider unconfigured)');
+    });
+
+    it('Clears challenge state on clearChallenge, phone change, and expiry', async () => {
+      act(() => {
+        setDataMode('http');
+      });
+
+      jest.spyOn(authApi, 'requestTokenizedOtp').mockResolvedValue({
+        ok: true,
+        status: 200,
+        data: {
+          status: 'dev_code_available',
+          auth_session_token: 'expiring-token-111',
+          expires_in: 180,
+          code_length: 6,
+          delivery: { provider: 'console', channel: 'console', delivered: false, configured: false },
+          dev_code: '123456',
+        },
+      });
+
+      let capturedContext: FullUserContextValue | undefined;
+      function Consumer() {
+        capturedContext = useCurrentUser();
+        return null;
+      }
+
+      await act(async () => {
+        root = ReactTestRenderer.create(
+          <UserProvider>
+            <Consumer />
+          </UserProvider>,
+        );
+      });
+
+      await act(async () => {
+        await capturedContext?.requestTokenizedOtp?.({ phone: '+95912345678' });
+      });
+      expect(capturedContext?.challenge?.authSessionToken).toBe('expiring-token-111');
+
+      // 1. Clear explicitly
+      act(() => {
+        capturedContext?.clearChallenge?.();
+      });
+      expect(capturedContext?.challenge).toBeNull();
+
+      // 2. Clear on new phone request
+      await act(async () => {
+        await capturedContext?.requestTokenizedOtp?.({ phone: '+95987654321' });
+      });
+      expect(capturedContext?.challenge?.phone).toBe('+95987654321');
+
+      // 3. Clear on expiry during verification
+      if (capturedContext?.challenge) {
+        capturedContext.challenge.expiresAt = Date.now() - 5000; // Shift to past
+      }
+
+      let verifyResult: unknown;
+      await act(async () => {
+        verifyResult = await capturedContext?.verifyTokenizedOtp?.({ code: '123456' });
+      });
+
+      expect(verifyResult).toEqual(
+        expect.objectContaining({
+          success: false,
+          error: 'Challenge expired. Please request a new code.',
+        }),
+      );
+      expect(capturedContext?.challenge).toBeNull();
+    });
+  });
 });

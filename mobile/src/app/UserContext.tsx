@@ -51,7 +51,9 @@ export interface EphemeralChallengeState {
   codeLength: number;
   delivery: TokenizedOtpDeliveryDto | OtpDeliveryDto;
   devCode?: string | null;
+  status?: string;
   phone?: string;
+  requestId?: string;
 }
 
 export interface RequestOtpResult {
@@ -62,22 +64,26 @@ export interface RequestOtpResult {
   codeLength?: number;
   delivery?: TokenizedOtpDeliveryDto | OtpDeliveryDto;
   devCode?: string | null;
+  idempotentReissue?: boolean;
   error?: string;
+  errorCode?: string;
 }
 
 export interface VerifyOtpResult {
   success: boolean;
   error?: string;
+  errorCode?: string;
 }
 
 export interface RequestTokenizedOtpParams {
-  phone?: string;
-  identityToken?: string;
+  phone: string;
   purpose?: 'login' | 'qr_registration';
+  requestId?: string;
 }
 
 export interface VerifyTokenizedOtpParams {
   code: string;
+  purpose?: 'login' | 'qr_registration';
   displayName?: string;
 }
 
@@ -93,6 +99,7 @@ export interface UserContextValue {
   requestOtp?: (
     phone: string,
     purpose?: 'login' | 'qr_registration',
+    requestId?: string,
   ) => Promise<RequestOtpResult>;
   verifyOtp?: (
     phone: string,
@@ -117,6 +124,7 @@ export interface FullUserContextValue extends UserContextValue {
   requestOtp: (
     phone: string,
     purpose?: 'login' | 'qr_registration',
+    requestId?: string,
   ) => Promise<RequestOtpResult>;
   verifyOtp: (
     phone: string,
@@ -322,16 +330,28 @@ export function UserProvider({
       // Clear any prior challenge on new phone, resend, or retry
       setChallenge(null);
 
+      if (!params.phone || !params.phone.trim()) {
+        return {
+          success: false,
+          error: 'Please enter your mobile phone number.',
+        };
+      }
+
       const res = await authApi.requestTokenizedOtp({
-        phone: params.phone,
-        identity_token: params.identityToken,
+        phone: params.phone.trim(),
         purpose: params.purpose || 'login',
+        request_id: params.requestId,
       });
 
       if (!res.ok) {
+        const errorCode =
+          'code' in res.error && typeof res.error.code === 'string'
+            ? res.error.code
+            : undefined;
         return {
           success: false,
           error: res.error.message,
+          errorCode,
         };
       }
 
@@ -342,7 +362,9 @@ export function UserProvider({
         codeLength: res.data.code_length,
         delivery: res.data.delivery,
         devCode: res.data.dev_code,
-        phone: params.phone,
+        status: res.data.status,
+        phone: params.phone.trim(),
+        requestId: params.requestId,
       };
 
       setChallenge(challengeData);
@@ -355,6 +377,7 @@ export function UserProvider({
         codeLength: res.data.code_length,
         delivery: res.data.delivery,
         devCode: res.data.dev_code,
+        idempotentReissue: res.data.idempotent_reissue,
       };
     },
     [],
@@ -385,21 +408,26 @@ export function UserProvider({
       const res = await authApi.verifyTokenizedOtp({
         auth_session_token: challenge.authSessionToken,
         code: params.code.trim(),
+        purpose: params.purpose,
         display_name: params.displayName?.trim(),
       });
 
       if (!res.ok) {
+        const errorCode =
+          'code' in res.error && typeof res.error.code === 'string'
+            ? res.error.code
+            : undefined;
         if (
           res.status === 409 ||
-          ('code' in res.error &&
-            (res.error.code === 'challenge_consumed' ||
-              res.error.code === 'challenge_expired'))
+          errorCode === 'challenge_consumed' ||
+          errorCode === 'challenge_expired'
         ) {
           setChallenge(null);
         }
         return {
           success: false,
           error: res.error.message,
+          errorCode,
         };
       }
 
@@ -441,11 +469,16 @@ export function UserProvider({
     async (
       phone: string,
       purpose: 'login' | 'qr_registration' = 'login',
+      requestId?: string,
     ): Promise<RequestOtpResult> => {
       setChallenge(null);
 
       // Attempt canonical tokenized request
-      const res = await authApi.requestTokenizedOtp({ phone, purpose });
+      const res = await authApi.requestTokenizedOtp({
+        phone,
+        purpose,
+        request_id: requestId,
+      });
       if (res.ok) {
         const challengeData: EphemeralChallengeState = {
           authSessionToken: res.data.auth_session_token,
@@ -454,7 +487,9 @@ export function UserProvider({
           codeLength: res.data.code_length,
           delivery: res.data.delivery,
           devCode: res.data.dev_code,
+          status: res.data.status,
           phone,
+          requestId,
         };
         setChallenge(challengeData);
         return {
@@ -465,6 +500,7 @@ export function UserProvider({
           codeLength: res.data.code_length,
           delivery: res.data.delivery,
           devCode: res.data.dev_code,
+          idempotentReissue: res.data.idempotent_reissue,
         };
       }
 

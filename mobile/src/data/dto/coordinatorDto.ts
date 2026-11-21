@@ -46,6 +46,7 @@ export interface EventSummaryViewDto {
   waitlisted_count: number;
   assignment_count: number;
   checked_in_count: number;
+  checked_in_today_count?: number;
   pending_confirmations: number;
 }
 

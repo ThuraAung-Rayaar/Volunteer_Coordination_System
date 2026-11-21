@@ -30,6 +30,10 @@ class TokenizedOtpDeliverySerializer(serializers.Serializer):
     channel = serializers.CharField()
     delivered = serializers.BooleanField()
     configured = serializers.BooleanField()
+    accepted = serializers.BooleanField(required=False, default=False)
+    message_id = serializers.CharField(required=False, allow_null=True)
+    error_category = serializers.CharField(required=False, allow_null=True)
+    retryability = serializers.CharField(required=False, allow_null=True)
 
 
 class TokenizedOtpRequestSerializer(serializers.Serializer):
@@ -62,6 +66,7 @@ class TokenizedOtpRequestResponseSerializer(serializers.Serializer):
     code_length = serializers.IntegerField()
     delivery = TokenizedOtpDeliverySerializer()
     dev_code = serializers.CharField(required=False, allow_null=True)
+    idempotent_reissue = serializers.BooleanField(required=False, default=False)
 
 
 class TokenizedOtpVerifySerializer(serializers.Serializer):
@@ -72,6 +77,11 @@ class TokenizedOtpVerifySerializer(serializers.Serializer):
     """
     auth_session_token = serializers.CharField(max_length=128)
     code = serializers.CharField(max_length=10)
+    purpose = serializers.ChoiceField(
+        choices=["login", "qr_registration"],
+        default="login",
+        required=False,
+    )
     display_name = serializers.CharField(
         max_length=150, required=False, allow_blank=True, default=""
     )

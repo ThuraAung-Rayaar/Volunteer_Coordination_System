@@ -809,8 +809,13 @@ class TestImageSanitization(TestCase):
         saved_path = Path(settings.VERIFICATION_MEDIA_ROOT) / rel_path
         self.assertTrue(saved_path.exists())
 
-        # Verify saved file is a valid JPEG
-        with Image.open(saved_path) as saved_img:
+        # Verify saved file is an encrypted envelope and decrypted payload is a valid JPEG
+        from common.image_crypto import decrypt_image
+        envelope_data = saved_path.read_bytes()
+        self.assertTrue(envelope_data.startswith(b"AGYI"))
+        decrypted_bytes, _ = decrypt_image(envelope_data)
+
+        with Image.open(io.BytesIO(decrypted_bytes)) as saved_img:
             self.assertEqual(saved_img.format, "JPEG")
             self.assertEqual(saved_img.mode, "RGB")
             # Verify EXIF is stripped

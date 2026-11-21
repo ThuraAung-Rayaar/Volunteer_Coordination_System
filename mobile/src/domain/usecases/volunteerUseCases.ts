@@ -752,11 +752,11 @@ export class VolunteerUseCases {
       eventId: h.eventId,
       eventTitle: h.eventTitle || 'Event',
       roleName: h.postTitle || 'Volunteer Role',
-      completedAt: h.checkoutAt ?? h.checkinAt ?? new Date().toISOString(),
+      completedAt: h.checkoutAt ?? h.checkinAt ?? '',
       attendanceStatus: 'completed' as const,
       verifiedHours: h.verifiedHours ?? 0,
       location: h.locationName || 'Location',
-      attendanceVerifiedAt: h.checkoutAt ?? h.checkinAt ?? new Date().toISOString(),
+      attendanceVerifiedAt: h.checkoutAt ?? h.checkinAt ?? '',
     }));
 
     return {

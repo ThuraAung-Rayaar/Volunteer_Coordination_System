@@ -1,3 +1,5 @@
+import logging
+
 from django.http import FileResponse, JsonResponse
 from django.shortcuts import render, redirect
 from django.utils import timezone
@@ -8,6 +10,8 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+
+logger = logging.getLogger(__name__)
 
 from apps.accounts.models import UserVerificationImages
 from apps.audit.models import Feedback
@@ -1554,6 +1558,15 @@ class AdminVerificationImageFileView(APIView):
 
     @extend_schema(responses={200: OpenApiTypes.BINARY})
     def get(self, request, image_id):
+        import hashlib
+        import io
+        from common.image_crypto import (
+            ImageCryptoError,
+            decrypt_image,
+            is_encrypted_envelope,
+            is_plaintext_jpeg,
+        )
+
         ensure_admin(request)  # raises masked 404 for non-admins
         image = UserVerificationImages.objects.filter(id=image_id).first()
         if image is None:
@@ -1565,8 +1578,44 @@ class AdminVerificationImageFileView(APIView):
             entity_id=image.id,
         )
         path = verification_service.resolve_private_image_path(image)
-        file_obj = open(path, "rb")
-        return FileResponse(file_obj, content_type="image/jpeg")
+        try:
+            with open(path, "rb") as f:
+                file_bytes = f.read()
+        except OSError as exc:
+            logger.error("Failed to read verification image file for image_id=%s: %s", image.id, type(exc).__name__)
+            raise ResourceMaskedNotFound()
+
+        # Section 5.5: Decrypt in memory via key ring or handle legacy plaintext
+        if is_encrypted_envelope(file_bytes):
+            try:
+                decrypted_bytes, _ = decrypt_image(file_bytes)
+            except ImageCryptoError as exc:
+                logger.error(
+                    "Decryption failed for verification image %s: %s",
+                    image.id,
+                    type(exc).__name__,
+                )
+                raise ResourceMaskedNotFound()
+        elif is_plaintext_jpeg(file_bytes):
+            # Support unmigrated legacy plaintext during transition period
+            decrypted_bytes = file_bytes
+        else:
+            logger.error("Unrecognized or corrupted image envelope for image %s", image.id)
+            raise ResourceMaskedNotFound()
+
+        # Section 5.5: Verify decrypted SHA-256 against stored file_sha256
+        if image.file_sha256:
+            computed_sha256 = hashlib.sha256(decrypted_bytes).hexdigest()
+            if computed_sha256.lower() != image.file_sha256.lower():
+                logger.error("SHA-256 integrity check failed for verification image %s", image.id)
+                raise ResourceMaskedNotFound()
+
+        # Section 5.5: Stream in-memory JPEG bytes with protective headers
+        response = FileResponse(io.BytesIO(decrypted_bytes), content_type="image/jpeg")
+        response["Cache-Control"] = "private, no-store"
+        response["X-Content-Type-Options"] = "nosniff"
+        response["Content-Disposition"] = f'inline; filename="verification_{image.id}.jpg"'
+        return response
 
 
 class AdminReviewVerificationImageView(APIView):

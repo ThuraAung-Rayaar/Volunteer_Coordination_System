@@ -55,7 +55,7 @@ export function ApplicationReviewCard({
             weight="bold"
             color={theme.colors.textPrimary}
           >
-            {application.applicantName}
+            {application.applicantName || 'Applicant'}
           </AppText>
           <AppText
             variant="caption"
@@ -63,11 +63,13 @@ export function ApplicationReviewCard({
             style={styles.appliedDate}
           >
             Applied on{' '}
-            {new Date(application.appliedAt).toLocaleDateString(undefined, {
-              month: 'short',
-              day: 'numeric',
-              year: 'numeric',
-            })}
+            {application.appliedAt
+              ? new Date(application.appliedAt).toLocaleDateString(undefined, {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric',
+                })
+              : 'N/A'}
           </AppText>
         </View>
 

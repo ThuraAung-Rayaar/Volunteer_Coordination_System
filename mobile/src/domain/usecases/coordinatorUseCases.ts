@@ -60,9 +60,9 @@ export class CoordinatorUseCases {
       };
     }
     return {
-      isVerified: true,
-      completedEvents: 5,
-      ratingAverage: 4.8,
+      isVerified: false,
+      completedEvents: 0,
+      ratingAverage: null,
     };
   }
 

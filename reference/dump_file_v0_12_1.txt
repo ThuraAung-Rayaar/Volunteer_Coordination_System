@@ -1,0 +1,136 @@
+================================================================================
+SESSION v0_12_1 SYSTEM BASELINE AND PRE-FLIGHT SITUATION DUMP
+================================================================================
+Timestamp: 2026-11-21 21:55:00 UTC+06:30
+Session Target: v0_12_1 Stabilization
+Baseline Git Commit: 99db25a7ba26d26ad5d803e028ce405b827e926d ("remove error file")
+Active Working Branch: main
+Git Status: Clean tracked source files; uncommitted local user reference/doc files preserved.
+
+================================================================================
+DATABASE & RUNTIME ENVIRONMENT BASELINE
+================================================================================
+PostgreSQL Version: PostgreSQL 18.6 on x86_64-windows, compiled by msvc-19.44.35229, 64-bit
+Target Database (Protected Prototype): volunteer_coordination_db
+Database Host: 127.0.0.1:5432
+Database User: postgres
+Test Database (Disposable Allow-List): test_volunteer_coordination_db
+Database Freeze Status: STRICTLY ENFORCED. Zero DDL/DML, zero schema alterations, zero migrations.
+UserVerificationImages Prototype Row Count: 76
+
+Python Runtime: Python 3.12.4 (.venv)
+Django Settings Module: config.settings.local (development/test)
+Django System Check: System check identified no issues (0 silenced).
+
+Image Storage Configuration:
+VERIFICATION_MEDIA_ROOT: c:\Users\USER\Documents\INTERN\Project\Volunteer_HR_Management\python_stack\private_media\verification_images
+Private Directory Exists: True
+Private Directory Isolated from MEDIA_ROOT: True (MEDIA_ROOT = c:\Users\USER\Documents\INTERN\Project\Volunteer_HR_Management\python_stack\media)
+Total Files on Disk: 91
+Total File Bytes: 207,876
+
+================================================================================
+FILE: c:\Users\USER\Documents\INTERN\Project\Volunteer_HR_Management\python_stack\.env.example
+================================================================================
+# Django Settings
+DEBUG=True
+SECRET_KEY=django-insecure-f7(wutn^($y(7%in-uwbzw6auh6vnuc(zr7yc@vdt70xx(a8nd
+DJANGO_SECRET_KEY=django-insecure-f7(wutn^($y(7%in-uwbzw6auh6vnuc(zr7yc@vdt70xx(a8nd
+ALLOWED_HOSTS=localhost,127.0.0.1
+PHONE_HASH_HMAC_SECRET=your-hmac-secret-at-least-32-chars
+PHONE_ENCRYPTION_KEY=your-fernet-key-32-urlsafe-base64-bytes
+
+# PostgreSQL Database Configuration
+DB_NAME=volunteer_coordination_db
+DB_USER=postgres
+DB_PASSWORD=postgres
+DB_HOST=127.0.0.1
+DB_PORT=5432
+
+# Map Engine & Tile Server
+CARTO_API_KEY=your-carto-basemap-api-key
+
+================================================================================
+FILE: c:\Users\USER\Documents\INTERN\Project\Volunteer_HR_Management\python_stack\backend\config\settings\base.py (excerpt: security & media)
+================================================================================
+PHONE_HASH_HMAC_SECRET = os.getenv(
+    'PHONE_HASH_HMAC_SECRET',
+    'dev-hmac-secret-at-least-32-chars-long-abcdef'
+)
+OTP_CODE_HMAC_SECRET = os.getenv(
+    'OTP_CODE_HMAC_SECRET',
+    'dev-otp-code-hmac-secret-at-least-32-chars-long-distinct'
+)
+AUTH_SESSION_TOKEN_SECRET = os.getenv(
+    'AUTH_SESSION_TOKEN_SECRET',
+    'dev-auth-session-token-secret-at-least-32-chars-distinct'
+)
+PHONE_ENCRYPTION_KEY = os.getenv(
+    'PHONE_ENCRYPTION_KEY',
+    'IcY3lXCl1k0P1NawgjDSeCYOqcNRWJStRaqbWN21nGs='
+)
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+VERIFICATION_MEDIA_ROOT = BASE_DIR / 'private_media' / 'verification_images'
+VERIFICATION_MAX_UPLOAD_BYTES = 5 * 1024 * 1024   # 5 MB
+VERIFICATION_MIN_DIMENSION = 200                  # px
+VERIFICATION_MAX_DIMENSION = 6000                 # px
+
+================================================================================
+FILE: c:\Users\USER\Documents\INTERN\Project\Volunteer_HR_Management\python_stack\backend\apps\accounts\models.py (excerpt: UserVerificationImages)
+================================================================================
+class UserVerificationImages(models.Model):
+    class ImageType(models.TextChoices):
+        MOCK_SELFIE = 'mock_selfie', 'Mock Selfie'
+        ID_LICENSE = 'id_license', 'ID License'
+        DRIVER_LICENSE = 'driver_license', 'Driver License'
+
+    class Status(models.TextChoices):
+        PENDING = 'pending', 'Pending'
+        APPROVED = 'approved', 'Approved'
+        REJECTED = 'rejected', 'Rejected'
+
+    class ComparisonStatus(models.TextChoices):
+        PENDING = 'pending', 'Pending'
+        MATCH = 'match', 'Match'
+        NO_MATCH = 'no_match', 'No Match'
+        NEEDS_REVIEW = 'needs_review', 'Needs Review'
+
+    id = models.BigAutoField(primary_key=True)
+    user = models.ForeignKey("accounts.Users", models.PROTECT, related_name="verification_images")
+    image_type = models.CharField(
+        max_length=30,
+        choices=ImageType.choices,
+    )
+    image_path = models.CharField(max_length=255)
+    file_format = models.CharField(max_length=10, default="jpeg")
+    file_sha256 = models.CharField(max_length=64, blank=True, null=True)
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.PENDING,
+    )
+    comparison_status = models.CharField(
+        max_length=20,
+        choices=ComparisonStatus.choices,
+        default=ComparisonStatus.PENDING,
+    )
+    comparison_score = models.DecimalField(max_digits=5, decimal_places=4, blank=True, null=True)
+    is_current = models.BooleanField(default=True)
+    reviewed_by = models.ForeignKey(
+        "accounts.Users",
+        models.PROTECT,
+        related_name="userverificationimages_reviewed_by_set",
+        blank=True,
+        null=True,
+    )
+    reviewed_at = models.DateTimeField(blank=True, null=True)
+    note = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        managed = False
+        db_table = "user_verification_images"
+

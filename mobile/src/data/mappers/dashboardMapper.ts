@@ -83,7 +83,7 @@ export function mapDashboardSummary(
         (att.event_id != null ? assignmentByEventId.get(Number(att.event_id)) : undefined);
 
       const verifiedAt =
-        att.checkout_at || att.checkin_at || new Date().toISOString();
+        att.checkout_at || att.checkin_at || '';
       const hours = calculateVerifiedHours(
         att.checkin_at,
         att.checkout_at,

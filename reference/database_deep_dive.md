@@ -1,7 +1,7 @@
 # Volunteer HR Management — Full Database Reference
 
 > **Schema version:** v0.11.1 (Unified PostgreSQL, Database-First Engine)  
-> **Updated:** 2026-11-19 | **Target engine:** PostgreSQL 14+ with `btree_gist`  
+> **Updated:** 2026-11-19 | **Target engine:** PostgreSQL 18+ with `btree_gist`  
 > **Source files:**
 > - [updated_volunteer_coordination_system_Database.sql](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/postgres_sql/updated_volunteer_coordination_system_Database.sql)
 > - [self_test.sql](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/postgres_sql/self_test.sql)

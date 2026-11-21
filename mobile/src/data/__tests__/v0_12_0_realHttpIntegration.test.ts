@@ -17,6 +17,7 @@
  */
 
 import { ChildProcess, execSync, spawn } from 'child_process';
+import * as fs from 'fs';
 import * as path from 'path';
 import { ApiClient } from '../../core/api/apiClient';
 import { setApiConfig } from '../../core/api/apiConfig';
@@ -27,6 +28,8 @@ const BASE_URL_DEV = process.env.API_BASE_URL || 'http://127.0.0.1:8000';
 const BASE_URL_PROD = 'http://127.0.0.1:8001';
 
 interface IntegrationFixtures {
+  adminToken?: string;
+  adminUserId?: number;
   eventId: number;
   eventTitle: string;
   coordinatorToken: string;
@@ -84,6 +87,9 @@ beforeAll(async () => {
           ...process.env,
           ALLOW_DEV_CODE_IN_AUTH_RESPONSE: 'True',
           ENVIRONMENT: 'development',
+          APP_ENV: process.env.APP_ENV || 'test',
+          DB_NAME: process.env.DB_NAME || 'test_volunteer_coordination_db',
+          DB_HOST: process.env.DB_HOST || '127.0.0.1',
         },
       },
     );
@@ -95,12 +101,18 @@ beforeAll(async () => {
 
   // 2. Seed integration test fixtures in PostgreSQL
   const seedScript = path.resolve(repoRoot, 'scripts/seed_integration_fixtures.py');
-  const rawOutput = execSync(`"${pythonExecutable}" "${seedScript}"`, {
+  execSync(`"${pythonExecutable}" "${seedScript}"`, {
     cwd: repoRoot,
     encoding: 'utf-8',
+    env: {
+      ...process.env,
+      APP_ENV: process.env.APP_ENV || 'test',
+      DB_NAME: process.env.DB_NAME || 'test_volunteer_coordination_db',
+      DB_HOST: process.env.DB_HOST || '127.0.0.1',
+    },
   });
-  const jsonStart = rawOutput.indexOf('{');
-  fixtures = JSON.parse(rawOutput.substring(jsonStart).trim());
+  const fixtureFilePath = path.resolve(repoRoot, 'mobile/src/data/__tests__/integration_fixtures.json');
+  fixtures = JSON.parse(fs.readFileSync(fixtureFilePath, 'utf-8'));
 
   // Configure mobile ApiClient base URL
   setApiConfig({ baseUrl: BASE_URL_DEV });
@@ -333,6 +345,29 @@ describe('Phase 4: Real-HTTP Integration Test Suite (No Mocks)', () => {
         expect(res.error.code).toBe('invalid_code');
       }
     });
+
+    it('returns deterministic challenge for repeat request with same request_id', async () => {
+      const testPhone = `+959${Math.floor(10000000 + Math.random() * 90000000)}`;
+      const reqId = `req-idemp-${Date.now()}`;
+
+      const res1 = await client.post<{ auth_session_token: string }>(
+        '/auth/tokenized/request-otp/',
+        { phone: testPhone, request_id: reqId },
+        { authRequired: false },
+      );
+      expect(res1.ok).toBe(true);
+      if (!res1.ok) return;
+
+      const res2 = await client.post<{ auth_session_token: string }>(
+        '/auth/tokenized/request-otp/',
+        { phone: testPhone, request_id: reqId },
+        { authRequired: false },
+      );
+      expect(res2.ok).toBe(true);
+      if (!res2.ok) return;
+
+      expect(res2.data.auth_session_token).toBe(res1.data.auth_session_token);
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -353,6 +388,9 @@ describe('Phase 4: Real-HTTP Integration Test Suite (No Mocks)', () => {
             ...process.env,
             ENVIRONMENT: 'production',
             ALLOW_DEV_CODE_IN_AUTH_RESPONSE: 'False',
+            APP_ENV: process.env.APP_ENV || 'test',
+            DB_NAME: process.env.DB_NAME || 'test_volunteer_coordination_db',
+            DB_HOST: process.env.DB_HOST || '127.0.0.1',
           },
         },
       );
@@ -603,6 +641,65 @@ describe('Phase 4: Real-HTTP Integration Test Suite (No Mocks)', () => {
       }
       expect(unauthorizedFired).toBe(false);
       expect(await sessionMgr.getToken()).toBe(validToken);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Scenario 7: Verification Images Real-HTTP Encrypted Storage & Stream
+  // -------------------------------------------------------------------------
+  describe('Scenario 7: Verification Images Real-HTTP Encrypted Storage & Stream', () => {
+    it('uploads JPEG -> ciphertext on disk -> admin decrypt stream -> non-admin denied', async () => {
+      // Valid 200x200 JPEG buffer (meets 200px minimum dimension)
+      const sampleJpeg = Buffer.from(
+        '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCADIAMgDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDEooor0jzQooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigD/9k=',
+        'base64',
+      );
+
+      const boundary = '----FormBoundary' + Math.random().toString(36).substring(2);
+      const payload = Buffer.concat([
+        Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="image_type"\r\n\r\nid_license\r\n`),
+        Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="image"; filename="id.jpg"\r\nContent-Type: image/jpeg\r\n\r\n`),
+        sampleJpeg,
+        Buffer.from(`\r\n--${boundary}--\r\n`),
+      ]);
+
+      // 1. Volunteer uploads verification image over real HTTP
+      const uploadRes = await fetch(`${BASE_URL_DEV}/api/v1/me/verification-images/`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Token ${fixtures.volunteer1Token}`,
+          'Content-Type': `multipart/form-data; boundary=${boundary}`,
+        },
+        body: payload,
+      });
+
+      expect(uploadRes.status).toBe(201);
+      const uploadJson = (await uploadRes.json()) as any;
+      expect(uploadJson.id).toBeDefined();
+      expect(uploadJson.image_type).toBe('id_license');
+      // Section 7.4 / 7.6: Metadata strictly excludes file path or raw bytes
+      expect(uploadJson.image_path).toBeUndefined();
+      expect(uploadJson.file_path).toBeUndefined();
+
+      const imageId = uploadJson.id;
+
+      // 2. Non-admin cannot retrieve image file (returns 404 resource masked or 401/403)
+      const nonAdminRes = await fetch(`${BASE_URL_DEV}/api/v1/admin/verification-images/${imageId}/file/`, {
+        headers: { Authorization: `Token ${fixtures.volunteer1Token}` },
+      });
+      expect([401, 403, 404]).toContain(nonAdminRes.status);
+
+      // 3. Admin retrieves decrypted JPEG
+      if (fixtures.adminToken) {
+        const adminRes = await fetch(`${BASE_URL_DEV}/api/v1/admin/verification-images/${imageId}/file/`, {
+          headers: { Authorization: `Token ${fixtures.adminToken}` },
+        });
+        expect(adminRes.status).toBe(200);
+        expect(adminRes.headers.get('content-type')).toBe('image/jpeg');
+        const bytes = Buffer.from(await adminRes.arrayBuffer());
+        expect(bytes[0]).toBe(0xff);
+        expect(bytes[1]).toBe(0xd8);
+      }
     });
   });
 });

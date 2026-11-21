@@ -302,3 +302,327 @@ class TokenizedAuthServiceTests(TestCase):
         self.assertTrue(verify_res["ok"])
         self.assertIn("token", verify_res)
         self.assertEqual(verify_res["user"].display_name, "Legacy Volunteer")
+
+    # ---------------------------------------------------------------------------
+    # Phase B1 Specific Tests: Delivery Adapter Boundary, Idempotency, Purpose (Section 4.5)
+    # ---------------------------------------------------------------------------
+
+    def test_delivery_adapter_receives_normalized_phone_and_matching_hash_code(self):
+        """
+        OtpDeliveryAdapter receives normalized phone and same code whose HMAC hash was persisted.
+        """
+        captured = {}
+
+        class CapturingAdapter(auth_service.OtpDeliveryAdapter):
+            def deliver(self, phone: str, raw_code: str, purpose: str):
+                captured["phone"] = phone
+                captured["code"] = raw_code
+                captured["purpose"] = purpose
+                return auth_service.OtpDeliveryResult(
+                    provider="mock_sms",
+                    channel="sms",
+                    configured=True,
+                    accepted=True,
+                    delivered=False,
+                    message_id="msg-12345",
+                )
+
+        phone = _unique_phone()
+        norm_phone = normalize_phone(phone)
+        orig_adapter = auth_service._otp_delivery_adapter
+        try:
+            auth_service.set_otp_delivery_adapter(CapturingAdapter())
+            with override_settings(DEBUG=True, ALLOW_DEV_CODE_IN_AUTH_RESPONSE=True, ENVIRONMENT="test"):
+                res = auth_service.request_tokenized_login_otp(phone, purpose="login")
+
+            self.assertEqual(captured["phone"], norm_phone)
+            self.assertEqual(len(captured["code"]), 6)
+            self.assertEqual(captured["purpose"], "login")
+
+            # Verify persisted hash in database matches captured code hash
+            token_hash = compute_challenge_token_hash(res["auth_session_token"])
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT o.code_hash
+                      FROM auth_otp o
+                      JOIN auth_otp_challenge c ON c.otp_id = o.id
+                     WHERE c.challenge_token_hash = %s
+                    """,
+                    [token_hash],
+                )
+                db_otp_hash = cursor.fetchone()[0]
+
+            self.assertEqual(db_otp_hash, compute_otp_hash(captured["code"]))
+            self.assertEqual(res["status"], "accepted")
+            self.assertEqual(res["delivery"]["provider"], "mock_sms")
+            self.assertTrue(res["delivery"]["accepted"])
+            self.assertFalse(res["delivery"]["delivered"])
+            self.assertEqual(res["delivery"]["message_id"], "msg-12345")
+        finally:
+            auth_service.set_otp_delivery_adapter(orig_adapter)
+
+    def test_adapter_dispatch_occurs_only_after_commit(self):
+        """
+        Section 4.2 Transaction Ordering: The OTP challenge row MUST already exist
+        and be durably visible when the delivery adapter deliver() method is called.
+        """
+        verified_state = {}
+
+        class VerifyingCommitAdapter(auth_service.OtpDeliveryAdapter):
+            def deliver(self, phone: str, raw_code: str, purpose: str):
+                p_hash = compute_phone_hash(phone)
+                # Query DB from inside the adapter call to ensure commit already took place
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        "SELECT COUNT(*) FROM auth_otp WHERE phone_hash = %s",
+                        [p_hash],
+                    )
+                    count = cursor.fetchone()[0]
+                verified_state["db_row_exists"] = count > 0
+                return auth_service.OtpDeliveryResult(
+                    provider="mock_sms",
+                    channel="sms",
+                    configured=True,
+                    accepted=True,
+                )
+
+        phone = _unique_phone()
+        orig_adapter = auth_service._otp_delivery_adapter
+        try:
+            auth_service.set_otp_delivery_adapter(VerifyingCommitAdapter())
+            with override_settings(DEBUG=True, ALLOW_DEV_CODE_IN_AUTH_RESPONSE=True, ENVIRONMENT="test"):
+                auth_service.request_tokenized_login_otp(phone)
+
+            self.assertTrue(verified_state.get("db_row_exists"))
+        finally:
+            auth_service.set_otp_delivery_adapter(orig_adapter)
+
+    def test_adapter_not_called_when_db_persistence_fails(self):
+        """
+        If database persistence fails or is rejected before commit (e.g. account closed),
+        the delivery adapter MUST NOT be invoked.
+        """
+        adapter_called = {"called": False}
+
+        class TrackingAdapter(auth_service.OtpDeliveryAdapter):
+            def deliver(self, phone: str, raw_code: str, purpose: str):
+                adapter_called["called"] = True
+                return auth_service.OtpDeliveryResult(provider="mock", channel="sms")
+
+        phone = _unique_phone()
+        norm = normalize_phone(phone)
+        p_hash = compute_phone_hash(norm)
+        Users.objects.create(
+            phone_hash=p_hash,
+            phone_enc=encrypt_phone(norm),
+            display_name="Closed",
+            account_status="closed",
+            is_active=False,
+        )
+
+        orig_adapter = auth_service._otp_delivery_adapter
+        try:
+            auth_service.set_otp_delivery_adapter(TrackingAdapter())
+            with self.assertRaises(DomainError):
+                auth_service.request_tokenized_login_otp(phone)
+
+            self.assertFalse(adapter_called["called"])
+        finally:
+            auth_service.set_otp_delivery_adapter(orig_adapter)
+
+    def test_provider_not_configured_truthful_response(self):
+        """
+        When external provider is unconfigured, response returns status 'provider_not_configured'
+        and truthful delivery metadata with dev_code suppressed.
+        """
+        phone = _unique_phone()
+        with override_settings(
+            DEBUG=True,
+            ALLOW_DEV_CODE_IN_AUTH_RESPONSE=True,
+            ENVIRONMENT="development",
+            OTP_DELIVERY_ENABLED=True,
+            OTP_DELIVERY_PROVIDER="external_telecom",
+            OTP_PROVIDER_BASE_URL="",
+            OTP_PROVIDER_API_KEY="",
+        ):
+            res = auth_service.request_tokenized_login_otp(phone)
+
+        self.assertEqual(res["status"], "provider_not_configured")
+        self.assertFalse(res["delivery"]["configured"])
+        self.assertFalse(res["delivery"]["delivered"])
+        self.assertFalse(res["delivery"]["accepted"])
+        self.assertEqual(res["delivery"]["error_category"], "unconfigured")
+        self.assertEqual(res["delivery"]["retryability"], "safe_retry")
+        self.assertNotIn("dev_code", res)
+
+    def test_provider_delivery_states_mapping(self):
+        """
+        Provider delivery states map truthfully to response status:
+        - delivered: True -> status 'delivered'
+        - accepted: True -> status 'accepted'
+        - delivery_rejected -> status 'delivery_rejected'
+        - timeout / network_error -> status 'delivery_timeout'
+        """
+        phone = _unique_phone()
+        orig_adapter = auth_service._otp_delivery_adapter
+
+        class CustomStateAdapter(auth_service.OtpDeliveryAdapter):
+            def __init__(self, result):
+                self.result = result
+
+            def deliver(self, phone: str, raw_code: str, purpose: str):
+                return self.result
+
+        try:
+            # Case 1: Genuine handset receipt confirmed
+            auth_service.set_otp_delivery_adapter(CustomStateAdapter(
+                auth_service.OtpDeliveryResult(
+                    provider="telecom", channel="sms", configured=True, accepted=True, delivered=True
+                )
+            ))
+            with override_settings(DEBUG=False, ALLOW_DEV_CODE_IN_AUTH_RESPONSE=False, ENVIRONMENT="production"):
+                r1 = auth_service.request_tokenized_login_otp(_unique_phone())
+            self.assertEqual(r1["status"], "delivered")
+            self.assertTrue(r1["delivery"]["delivered"])
+
+            # Case 2: Rejected by provider
+            auth_service.set_otp_delivery_adapter(CustomStateAdapter(
+                auth_service.OtpDeliveryResult(
+                    provider="telecom", channel="sms", configured=True, accepted=False,
+                    delivered=False, error_category="delivery_rejected", retryability="not_safe_to_retry"
+                )
+            ))
+            with override_settings(DEBUG=False, ALLOW_DEV_CODE_IN_AUTH_RESPONSE=False, ENVIRONMENT="production"):
+                r2 = auth_service.request_tokenized_login_otp(_unique_phone())
+            self.assertEqual(r2["status"], "delivery_rejected")
+            self.assertEqual(r2["delivery"]["error_category"], "delivery_rejected")
+
+            # Case 3: Timeout / network error
+            auth_service.set_otp_delivery_adapter(CustomStateAdapter(
+                auth_service.OtpDeliveryResult(
+                    provider="telecom", channel="sms", configured=True, accepted=False,
+                    delivered=False, error_category="timeout", retryability="unknown_outcome"
+                )
+            ))
+            with override_settings(DEBUG=False, ALLOW_DEV_CODE_IN_AUTH_RESPONSE=False, ENVIRONMENT="production"):
+                r3 = auth_service.request_tokenized_login_otp(_unique_phone())
+            self.assertEqual(r3["status"], "delivery_timeout")
+            self.assertEqual(r3["delivery"]["error_category"], "timeout")
+        finally:
+            auth_service.set_otp_delivery_adapter(orig_adapter)
+
+    def test_request_id_consumed_raises_409_exhausted(self):
+        """
+        Defect B2: Repeating request with an already consumed request_id raises
+        HTTP 409 request_id_exhausted without crashing on unique hash collision.
+        """
+        phone = _unique_phone()
+        req_id = f"client-req-consumed-{secrets.token_hex(6)}"
+
+        with override_settings(DEBUG=True, ALLOW_DEV_CODE_IN_AUTH_RESPONSE=True, ENVIRONMENT="test"):
+            req_res = auth_service.request_tokenized_login_otp(phone, request_id=req_id)
+            session_token = req_res["auth_session_token"]
+            dev_code = req_res["dev_code"]
+
+            # Consume the challenge
+            verify_res = auth_service.verify_tokenized_login_otp(session_token, dev_code)
+            self.assertTrue(verify_res["ok"])
+
+            # Attempt to request again with same consumed request_id
+            with self.assertRaises(DomainError) as ctx:
+                auth_service.request_tokenized_login_otp(phone, request_id=req_id)
+
+            self.assertEqual(ctx.exception.code, "request_id_exhausted")
+            self.assertEqual(ctx.exception.status_code, 409)
+
+    def test_request_id_expired_raises_409_exhausted(self):
+        """
+        Defect B2: Repeating request with an expired request_id raises
+        HTTP 409 request_id_exhausted without crashing on unique hash collision.
+        """
+        phone = _unique_phone()
+        req_id = f"client-req-expired-{secrets.token_hex(6)}"
+
+        with override_settings(DEBUG=True, ALLOW_DEV_CODE_IN_AUTH_RESPONSE=True, ENVIRONMENT="test"):
+            req_res = auth_service.request_tokenized_login_otp(phone, request_id=req_id)
+            session_token = req_res["auth_session_token"]
+
+            # Shift created_at and expires_at into the past while respecting ck_auth_otp_challenge_expiry
+            token_hash = compute_challenge_token_hash(session_token)
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    UPDATE auth_otp_challenge
+                       SET created_at = now() - INTERVAL '200 seconds',
+                           expires_at = now() - INTERVAL '10 seconds'
+                     WHERE challenge_token_hash = %s
+                    """,
+                    [token_hash],
+                )
+
+            with self.assertRaises(DomainError) as ctx:
+                auth_service.request_tokenized_login_otp(phone, request_id=req_id)
+
+            self.assertEqual(ctx.exception.code, "request_id_exhausted")
+            self.assertEqual(ctx.exception.status_code, 409)
+
+    def test_request_id_conflict_with_different_phone_or_purpose_raises_409(self):
+        """
+        Defect B2: Using the same request_id with different phone or purpose raises
+        HTTP 409 request_id_conflict to prevent identity/purpose aliasing.
+        """
+        phone1 = _unique_phone()
+        phone2 = _unique_phone()
+        req_id = f"client-req-param-{secrets.token_hex(6)}"
+
+        with override_settings(DEBUG=True, ALLOW_DEV_CODE_IN_AUTH_RESPONSE=True, ENVIRONMENT="test"):
+            auth_service.request_tokenized_login_otp(phone1, purpose="login", request_id=req_id)
+
+            # Different phone
+            with self.assertRaises(DomainError) as ctx_phone:
+                auth_service.request_tokenized_login_otp(phone2, purpose="login", request_id=req_id)
+            self.assertEqual(ctx_phone.exception.code, "request_id_conflict")
+            self.assertEqual(ctx_phone.exception.status_code, 409)
+
+            # Different purpose
+            with self.assertRaises(DomainError) as ctx_purpose:
+                auth_service.request_tokenized_login_otp(phone1, purpose="qr_registration", request_id=req_id)
+            self.assertEqual(ctx_purpose.exception.code, "request_id_conflict")
+            self.assertEqual(ctx_purpose.exception.status_code, 409)
+
+    def test_purpose_propagation_qr_registration_success_and_mismatch_rejection(self):
+        """
+        Defect B1: Propagate purpose end-to-end:
+        - Request 'qr_registration' + verify 'qr_registration' -> SUCCESS
+        - Request 'qr_registration' + verify 'login' -> HTTP 400 invalid_challenge
+        - Request 'login' + verify 'qr_registration' -> HTTP 400 invalid_challenge
+        """
+        phone = _unique_phone()
+        with override_settings(DEBUG=True, ALLOW_DEV_CODE_IN_AUTH_RESPONSE=True, ENVIRONMENT="test"):
+            # Scenario A: qr_registration requested
+            r_qr = auth_service.request_tokenized_login_otp(phone, purpose="qr_registration")
+            token_qr = r_qr["auth_session_token"]
+            code_qr = r_qr["dev_code"]
+
+            # Verify with wrong purpose ('login') must fail
+            with self.assertRaises(DomainError) as ctx1:
+                auth_service.verify_tokenized_login_otp(token_qr, code_qr, purpose="login")
+            self.assertEqual(ctx1.exception.code, "invalid_challenge")
+            self.assertEqual(ctx1.exception.status_code, 400)
+
+            # Verify with matching purpose ('qr_registration') must succeed
+            v_qr = auth_service.verify_tokenized_login_otp(token_qr, code_qr, purpose="qr_registration")
+            self.assertTrue(v_qr["ok"])
+            self.assertIn("token", v_qr)
+
+            # Scenario B: login requested, verify with 'qr_registration'
+            phone2 = _unique_phone()
+            r_login = auth_service.request_tokenized_login_otp(phone2, purpose="login")
+            token_login = r_login["auth_session_token"]
+            code_login = r_login["dev_code"]
+
+            with self.assertRaises(DomainError) as ctx2:
+                auth_service.verify_tokenized_login_otp(token_login, code_login, purpose="qr_registration")
+            self.assertEqual(ctx2.exception.code, "invalid_challenge")
+            self.assertEqual(ctx2.exception.status_code, 400)

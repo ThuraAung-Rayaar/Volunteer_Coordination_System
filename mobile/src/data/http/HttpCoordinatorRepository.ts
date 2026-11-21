@@ -133,11 +133,16 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
     let pendingApplicationsCount = 0;
     let acceptedApplicantsCount = 0;
     let checkedInTodayCount = 0;
+    let checkedInAllTimeCount = 0;
 
     for (const e of events) {
       pendingApplicationsCount += e.pendingApplicationCount || 0;
       acceptedApplicantsCount += e.acceptedApplicantCount || 0;
-      checkedInTodayCount += e.checkedInCount || 0;
+      checkedInTodayCount +=
+        typeof e.checkedInTodayCount === 'number'
+          ? e.checkedInTodayCount
+          : e.checkedInCount || 0;
+      checkedInAllTimeCount += e.checkedInCount || 0;
     }
 
     return {
@@ -147,6 +152,7 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
       pendingApplicationsCount,
       acceptedApplicantsCount,
       checkedInTodayCount,
+      checkedInAllTimeCount,
     };
   }
 
@@ -210,14 +216,28 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
       acceptedApplicantCount: summary.accepted_count || 0,
       assignedCount: summary.assignment_count || 0,
       checkedInCount: summary.checked_in_count || 0,
-      latitude: typeof publicDetail?.latitude === 'number'
-        ? publicDetail.latitude
-        : parseFloat(String(publicDetail?.latitude || 0)) || 0,
-      longitude: typeof publicDetail?.longitude === 'number'
-        ? publicDetail.longitude
-        : parseFloat(String(publicDetail?.longitude || 0)) || 0,
+      latitude:
+        typeof publicDetail?.latitude === 'number'
+          ? publicDetail.latitude
+          : publicDetail?.latitude != null &&
+            publicDetail.latitude !== '' &&
+            !isNaN(Number(publicDetail.latitude))
+          ? Number(publicDetail.latitude)
+          : null,
+      longitude:
+        typeof publicDetail?.longitude === 'number'
+          ? publicDetail.longitude
+          : publicDetail?.longitude != null &&
+            publicDetail.longitude !== '' &&
+            !isNaN(Number(publicDetail.longitude))
+          ? Number(publicDetail.longitude)
+          : null,
       geoRadiusM: publicDetail?.geo_radius_m ?? 200,
-      geoCheckinEnabled: publicDetail?.geo_checkin_enabled ?? summary.geo_checkin_enabled ?? true,
+      geoCheckinEnabled: Boolean(
+        publicDetail?.geo_checkin_enabled ??
+          summary.geo_checkin_enabled ??
+          false,
+      ),
       geoCheckinOpensBeforeMin: 30,
       requireCheckinConfirmation: summary.pending_confirmations > 0,
       mapProvider: publicDetail?.map_provider || summary.map_provider || 'openstreetmap',
@@ -535,7 +555,7 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
       };
     }
 
-    // P0-02: Merge updated status into cached application item or refetch from event
+    // Merge updated status into cached application item or refetch from event
     let updatedItem = this.applicationCache.get(applicationId);
     if (updatedItem) {
       updatedItem = {
@@ -546,22 +566,31 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
     } else {
       const eventId = this.appToEventMap.get(applicationId);
       if (eventId) {
-        const apps = await this.getApplications(eventId);
-        updatedItem = apps.find(a => a.id === applicationId);
+        try {
+          const apps = await this.getApplications(eventId);
+          const found = apps.find(a => a.id === applicationId);
+          if (found) {
+            updatedItem = {
+              ...found,
+              status,
+            };
+            this.applicationCache.set(applicationId, updatedItem);
+          }
+        } catch {
+          // Refetch failed
+        }
       }
     }
 
+    // Section 6.4: Return minimal typed mutation result from server; NEVER fabricate applicant details or timestamps
     if (!updatedItem) {
+      const eventId = this.appToEventMap.get(applicationId) || '';
       updatedItem = {
-        id: applicationId,
-        eventId: this.appToEventMap.get(applicationId) || '',
-        eventTitle: 'Volunteer Event',
-        userId: '88',
-        applicantName: 'Volunteer Applicant',
-        status,
-        source: 'browse',
-        appliedAt: new Date().toISOString(),
+        id: String(res.data.id || applicationId),
+        eventId,
+        status: (res.data.status as CoordinatorApplicationStatus) || status,
       };
+      this.applicationCache.set(applicationId, updatedItem);
     }
 
     return {
@@ -776,7 +805,9 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
       const items = list.map(item => {
         const mapped = mapAttendanceRosterItem(item, eventId);
         this.attendanceCache.set(mapped.id, mapped);
-        this.attendanceCache.set(mapped.assignmentId, mapped);
+        if (mapped.assignmentId) {
+          this.attendanceCache.set(mapped.assignmentId, mapped);
+        }
         return mapped;
       });
       return items;
@@ -806,7 +837,9 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
       const items = list.map(item => {
         const mapped = mapAttendanceRosterItem(item, eventId);
         this.attendanceCache.set(mapped.id, mapped);
-        this.attendanceCache.set(mapped.assignmentId, mapped);
+        if (mapped.assignmentId) {
+          this.attendanceCache.set(mapped.assignmentId, mapped);
+        }
         return mapped;
       });
       return items;
@@ -974,6 +1007,20 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
       }
     }
 
+    // If still not in local cache, deterministically refetch from server roster
+    if (!cachedRecord) {
+      try {
+        const roster = await this.getAttendanceRoster(String(targetEventId));
+        cachedRecord = roster.find(
+          item =>
+            item.id === attendanceIdStr ||
+            item.userId === String(targetUserId),
+        );
+      } catch {
+        // Roster refetch failed
+      }
+    }
+
     if (cachedRecord) {
       cachedRecord.status = (data.status as any) || 'checked_in';
       // Authoritative method from server: never overwrite qr_scan / geo to manual
@@ -988,16 +1035,14 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
       }
     }
 
+    // Section 6.4: Authoritative mutation result with real fields only;
+    // never invent event title, volunteer name, post title, or assignment ID.
     const resultItem: CoordinatorAttendanceItem = cachedRecord
       ? { ...cachedRecord }
       : {
           id: attendanceIdStr,
           eventId: String(targetEventId),
-          eventTitle: 'Event',
-          assignmentId: attendanceIdStr,
           userId: String(targetUserId),
-          volunteerName: 'Volunteer',
-          postTitle: 'Assigned Role',
           status: (data.status as any) || 'checked_in',
           checkInMethod: (data.method as any) || 'coordinator_manual',
           checkedInAt: data.checkin_at,
