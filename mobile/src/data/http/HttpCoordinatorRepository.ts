@@ -159,103 +159,85 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
   public async getEventDetail(
     eventId: string,
   ): Promise<CoordinatorEventDetail | null> {
-    const [summaryRes, postsRes, eventsRes, publicDetailRes] = await Promise.all([
+    const [summaryRes, postsRes, eventsRes, configurationRes] = await Promise.all([
       coordinatorApi.getEventSummary(eventId, this.client),
       coordinatorApi.getEventPosts(eventId, this.client).catch(() => null),
       coordinatorApi.getMyEvents(this.client).catch(() => null),
-      eventApi.getEventDetail(eventId, this.client).catch(() => null),
+      coordinatorApi.getEventConfiguration(eventId, this.client),
     ]);
 
     if (!summaryRes.ok) {
-      if (summaryRes.status === 404) {
-        return null;
-      }
-      throw new Error(`Failed to load event detail: ${summaryRes.error.message}`);
+      if (summaryRes.status === 404) return null;
+      throw new Error(`Failed to load event summary: ${summaryRes.error.message}`);
+    }
+    if (!configurationRes.ok) {
+      if (configurationRes.status === 404) return null;
+      throw new Error(
+        `Failed to load manager event configuration: ${configurationRes.error.message}`,
+      );
     }
 
     const summary = summaryRes.data;
+    const configuration = configurationRes.data;
     const events: CoordinatorEventListItemDto[] =
       eventsRes && eventsRes.ok && eventsRes.data?.results ? eventsRes.data.results : [];
     const currentEventItem = events.find(e => String(e.id) === String(eventId));
 
-    const publicDetail =
-      publicDetailRes && publicDetailRes.ok ? publicDetailRes.data : null;
+    const rawPosts: PublicEventPostDto[] =
+      postsRes && postsRes.ok
+        ? Array.isArray(postsRes.data)
+          ? postsRes.data
+          : postsRes.data?.results || []
+        : [];
 
-    let rawPosts: PublicEventPostDto[] = [];
-    if (publicDetail?.posts && Array.isArray(publicDetail.posts) && publicDetail.posts.length > 0) {
-      rawPosts = publicDetail.posts;
-    } else if (postsRes && postsRes.ok) {
-      rawPosts = Array.isArray(postsRes.data)
-        ? postsRes.data
-        : postsRes.data?.results || [];
-    }
-
-    const isMonitor = currentEventItem?.is_read_only_monitor ?? false;
+    const toCoordinate = (value: string | number | null | undefined): number | null => {
+      if (value === null || value === undefined || value === '') return null;
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : null;
+    };
 
     return {
-      id: String(summary.id),
-      title: publicDetail?.title || summary.title,
-      description: publicDetail?.description || '',
-      status:
-        (publicDetail?.status as CoordinatorEventStatus) ||
-        (summary.status as CoordinatorEventStatus) ||
-        'draft',
-      purposeType:
-        (publicDetail?.purpose_type as EventPurposeType) || 'charity_event',
-      startAt: publicDetail?.start_at || summary.start_at,
-      endAt: publicDetail?.end_at || summary.end_at,
-      applicationDeadline: publicDetail?.application_deadline ?? undefined,
-      locationName: publicDetail?.location_name || 'Designated Location',
-      landmarkText: publicDetail?.landmark_text ?? undefined,
-      charityFields: (publicDetail?.charity_fields as any[]) || [],
-      ownerId: currentEventItem ? String(currentEventItem.owner_id) : this.coordinatorIdentity.id,
-      currentCoordinatorId: currentEventItem ? String(currentEventItem.current_coordinator_id) : this.coordinatorIdentity.id,
-      coordinatorName: publicDetail?.coordinator_name || this.coordinatorIdentity.displayName,
-      isOwnerAsMonitor: isMonitor,
+      id: String(configuration.id),
+      title: configuration.title,
+      description: configuration.description ?? '',
+      status: configuration.status as CoordinatorEventStatus,
+      purposeType: configuration.purpose_type as EventPurposeType,
+      startAt: configuration.start_at,
+      endAt: configuration.end_at,
+      applicationDeadline: configuration.application_deadline ?? undefined,
+      locationName: configuration.location_name ?? '',
+      landmarkText: configuration.landmark_text ?? undefined,
+      charityFields: currentEventItem?.charity_fields ?? [],
+      ownerId: String(configuration.owner_id),
+      currentCoordinatorId: String(configuration.current_coordinator_id),
+      coordinatorName: currentEventItem?.coordinator_name || this.coordinatorIdentity.displayName,
+      isOwnerAsMonitor: currentEventItem?.is_read_only_monitor ?? false,
       pendingApplicationCount: summary.pending_count || 0,
       acceptedApplicantCount: summary.accepted_count || 0,
       assignedCount: summary.assignment_count || 0,
       checkedInCount: summary.checked_in_count || 0,
-      latitude:
-        typeof publicDetail?.latitude === 'number'
-          ? publicDetail.latitude
-          : publicDetail?.latitude != null &&
-            publicDetail.latitude !== '' &&
-            !isNaN(Number(publicDetail.latitude))
-          ? Number(publicDetail.latitude)
-          : null,
-      longitude:
-        typeof publicDetail?.longitude === 'number'
-          ? publicDetail.longitude
-          : publicDetail?.longitude != null &&
-            publicDetail.longitude !== '' &&
-            !isNaN(Number(publicDetail.longitude))
-          ? Number(publicDetail.longitude)
-          : null,
-      geoRadiusM: publicDetail?.geo_radius_m ?? 200,
-      geoCheckinEnabled: Boolean(
-        publicDetail?.geo_checkin_enabled ??
-          summary.geo_checkin_enabled ??
-          false,
-      ),
-      geoCheckinOpensBeforeMin: publicDetail?.geo_checkin_opens_before_min ?? 30,
-      requireCheckinConfirmation: publicDetail?.require_checkin_confirmation ?? true,
-      mapProvider: publicDetail?.map_provider || summary.map_provider || 'openstreetmap',
-      acceptanceMode: (publicDetail?.acceptance_mode as any) || (summary.acceptance_mode as any) || 'manual',
-      autoAssignEnabled: publicDetail?.auto_assign_enabled ?? summary.auto_assign_enabled ?? false,
-      groupSize: publicDetail?.group_size ?? undefined,
-      leaderStrategy: publicDetail?.leader_strategy ?? 'none',
-      maxParticipants: publicDetail?.max_participants ?? summary.max_participants ?? 0,
-      mealsProvided: Boolean(publicDetail?.meals_provided),
-      lodgingProvided: Boolean(publicDetail?.lodging_provided),
-      travelSupportProvided: Boolean(publicDetail?.travel_support_provided),
-      compensationKind: (publicDetail?.compensation_kind as any) || 'unpaid',
-      compensationNote: publicDetail?.compensation_note ?? undefined,
-      onboardingText: publicDetail?.onboarding_text ?? undefined,
-      onboardingVersion: publicDetail?.onboarding_version ?? 1,
-      requireOnboardingAck: Boolean(publicDetail?.require_onboarding_ack),
-      qrRegistrationEnabled: Boolean(publicDetail?.qr_registration_enabled),
-      posts: rawPosts.map(p => mapPublicEventPost(p, summary.id)),
+      latitude: toCoordinate(configuration.latitude),
+      longitude: toCoordinate(configuration.longitude),
+      geoRadiusM: configuration.geo_radius_m ?? 200,
+      geoCheckinEnabled: configuration.geo_checkin_enabled,
+      geoCheckinOpensBeforeMin: configuration.geo_checkin_opens_before_min,
+      requireCheckinConfirmation: configuration.require_checkin_confirmation,
+      mapProvider: configuration.map_provider,
+      acceptanceMode: configuration.acceptance_mode,
+      autoAssignEnabled: configuration.auto_assign_enabled,
+      groupSize: configuration.group_size ?? undefined,
+      leaderStrategy: configuration.leader_strategy,
+      maxParticipants: configuration.max_participants ?? 0,
+      mealsProvided: configuration.meals_provided,
+      lodgingProvided: configuration.lodging_provided,
+      travelSupportProvided: configuration.travel_support_provided,
+      compensationKind: configuration.compensation_kind,
+      compensationNote: configuration.compensation_note ?? undefined,
+      onboardingText: configuration.onboarding_text ?? undefined,
+      onboardingVersion: configuration.onboarding_version,
+      requireOnboardingAck: configuration.require_onboarding_ack,
+      qrRegistrationEnabled: configuration.qr_registration_enabled,
+      posts: rawPosts.map(post => mapPublicEventPost(post, configuration.id)),
     };
   }
 
