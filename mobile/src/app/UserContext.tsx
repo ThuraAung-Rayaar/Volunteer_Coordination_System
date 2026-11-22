@@ -327,6 +327,47 @@ export function UserProvider({
    */
   const requestTokenizedOtp = useCallback(
     async (params: RequestTokenizedOtpParams): Promise<RequestOtpResult> => {
+      // Template Mode is a fully local UI preview: never call the BFF for OTP.
+      if (getDataMode() === 'mock') {
+        if (!params.phone || !params.phone.trim()) {
+          return { success: false, error: 'Please enter your mobile phone number.' };
+        }
+        const demoCode = '123456';
+        const authSessionToken = `template-challenge-${Date.now()}`;
+        const expiresIn = 180;
+        const delivery: TokenizedOtpDeliveryDto = {
+          provider: 'template',
+          channel: 'local-template',
+          delivered: false,
+          configured: false,
+          accepted: true,
+          message_id: null,
+          error_category: null,
+          retryability: null,
+        };
+        const challengeData: EphemeralChallengeState = {
+          authSessionToken,
+          expiresIn,
+          expiresAt: Date.now() + expiresIn * 1000,
+          codeLength: 6,
+          delivery,
+          devCode: demoCode,
+          status: 'template_simulated',
+          phone: params.phone.trim(),
+          requestId: params.requestId || `template-${Date.now()}`,
+        };
+        setChallenge(challengeData);
+        return {
+          success: true,
+          status: 'template_simulated',
+          authSessionToken,
+          expiresIn,
+          codeLength: 6,
+          delivery,
+          devCode: demoCode,
+        };
+      }
+
       // Clear any prior challenge on new phone, resend, or retry
       setChallenge(null);
 
@@ -405,6 +446,23 @@ export function UserProvider({
         };
       }
 
+      if (getDataMode() === 'mock') {
+        const expectedCode = challenge.devCode || '123456';
+        if (params.code.trim() !== expectedCode) {
+          return { success: false, error: 'Incorrect demo verification code.' };
+        }
+        if (params.displayName?.trim()) {
+          setCurrentUser(previous => ({
+            ...previous,
+            displayName: params.displayName!.trim(),
+            phone: challenge.phone ?? previous.phone,
+          }));
+        }
+        setChallenge(null);
+        setIsAuthenticated(true);
+        return { success: true };
+      }
+
       const res = await authApi.verifyTokenizedOtp({
         auth_session_token: challenge.authSessionToken,
         code: params.code.trim(),
@@ -471,6 +529,9 @@ export function UserProvider({
       purpose: 'login' | 'qr_registration' = 'login',
       requestId?: string,
     ): Promise<RequestOtpResult> => {
+      if (getDataMode() === 'mock') {
+        return requestTokenizedOtp({ phone, purpose, requestId });
+      }
       setChallenge(null);
 
       // Attempt canonical tokenized request
@@ -519,7 +580,7 @@ export function UserProvider({
         devCode: legacyRes.data.dev_code,
       };
     },
-    [],
+    [requestTokenizedOtp],
   );
 
   /**
@@ -532,6 +593,23 @@ export function UserProvider({
       code: string,
       displayName?: string,
     ): Promise<VerifyOtpResult> => {
+      if (getDataMode() === 'mock') {
+        const expectedCode = challenge?.devCode || '123456';
+        if (code.trim() !== expectedCode) {
+          return { success: false, error: 'Incorrect demo verification code.' };
+        }
+        if (displayName?.trim()) {
+          setCurrentUser(previous => ({
+            ...previous,
+            displayName: displayName.trim(),
+            phone: phone.trim() || previous.phone,
+          }));
+        }
+        setChallenge(null);
+        setIsAuthenticated(true);
+        return { success: true };
+      }
+
       // If we hold an active tokenized challenge, use verifyTokenizedOtp (NO phone sent!)
       if (challenge && challenge.authSessionToken) {
         return verifyTokenizedOtp({ code, displayName });
