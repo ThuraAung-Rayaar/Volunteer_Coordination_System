@@ -410,7 +410,7 @@ describe('DashboardScreen UI & Visibility Rules', () => {
 
     // Verify feedback banner is shown and commitment count is updated
     str = safeStringify(renderer.toJSON());
-    expect(str).toContain('cancelled (Participation cancelled in local mock state');
+    expect(str).toContain('cancelled. Participation cancelled in local mock state');
   });
 
   it('strictly filters completed activities requiring attendanceStatus=completed', async () => {

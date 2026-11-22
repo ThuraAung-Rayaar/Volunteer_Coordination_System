@@ -66,7 +66,7 @@ export function mapDashboardSummary(
       const endAtMs = Date.parse(a.schedule_end);
       return Number.isFinite(endAtMs) && endAtMs >= now.getTime();
     })
-    .map(a => ({
+    .map((a): UpcomingCommitment => ({
       id: String(a.id),
       eventId: String(a.event_id),
       eventTitle: a.event_title || 'Volunteer Event',
