@@ -249,6 +249,32 @@ describe('coordinatorMapper', () => {
   });
 
   describe('mapEventUpdateDraftToRequest', () => {
+    it('preserves explicit nulls when clearing optional event fields in PATCH', () => {
+      const payload = mapEventUpdateDraftToRequest({
+        description: null,
+        landmarkText: null,
+        latitude: null,
+        longitude: null,
+        applicationDeadline: null,
+        groupSize: null,
+        maxParticipants: null,
+        compensationNote: null,
+        onboardingText: null,
+      });
+
+      expect(payload).toEqual({
+        description: null,
+        landmark_text: null,
+        latitude: null,
+        longitude: null,
+        application_deadline: null,
+        group_size: null,
+        max_participants: null,
+        compensation_note: null,
+        onboarding_text: null,
+      });
+    });
+
     it('sends only fields explicitly supplied for an event PATCH', () => {
       const payload = mapEventUpdateDraftToRequest({
         title: '  Updated title  ',
