@@ -575,8 +575,8 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
     const normalizedUserId = volunteerUserId !== undefined && String(volunteerUserId).trim()
       ? Number(volunteerUserId)
       : undefined;
-    if (normalizedUserId !== undefined && !Number.isInteger(normalizedUserId)) {
-      return { success: false, message: 'Volunteer user ID must be a whole number.' };
+    if (normalizedUserId !== undefined && (!Number.isInteger(normalizedUserId) || normalizedUserId < 1)) {
+      return { success: false, message: 'Volunteer user ID must be a positive whole number.' };
     }
     if (!normalizedUserId && !volunteerUuid?.trim()) {
       return { success: false, message: 'Provide either a volunteer user ID or UUID.' };

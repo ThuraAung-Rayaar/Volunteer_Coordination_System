@@ -166,16 +166,15 @@ export function CoordinatorApplicationsScreen({
       setFeedbackBanner('Enter either a volunteer user ID or a volunteer UUID, not both.');
       return;
     }
-    if (userIdValue && (!/^\\d+$/.test(userIdValue) || Number(userIdValue) < 1)) {
+    if (userIdValue && (!Number.isInteger(Number(userIdValue)) || Number(userIdValue) < 1)) {
       setFeedbackBanner('Volunteer user ID must be a positive whole number.');
       return;
     }
     const postIdValue = invitePostId.trim();
-    if (postIdValue && (!/^\\d+$/.test(postIdValue) || Number(postIdValue) < 1)) {
+    if (postIdValue && (!Number.isInteger(Number(postIdValue)) || Number(postIdValue) < 1)) {
       setFeedbackBanner('Post ID must be a positive whole number or left blank.');
       return;
     }
-
     setIsInviting(true);
     try {
       const result = await repo.inviteVolunteer(
