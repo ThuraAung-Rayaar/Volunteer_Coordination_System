@@ -102,8 +102,9 @@ export function CreateEventWizardScreen({
   const [longitude, setLongitude] = useState('96.1500');
   const [geoRadiusM, setGeoRadiusM] = useState('200');
   const [geoCheckinEnabled, setGeoCheckinEnabled] = useState(false);
-  const [geoOpensBeforeMin] = useState('30');
+  const [geoOpensBeforeMin, setGeoOpensBeforeMin] = useState('30');
   const [requireConfirmation, setRequireConfirmation] = useState(true);
+  const [mapProvider, setMapProvider] = useState<'openstreetmap' | 'google'>('openstreetmap');
 
   // Step 3: Schedule & Deadlines (Separated date and 24h MMT time)
   const [startDate, setStartDate] = useState('2026-12-10');
@@ -203,6 +204,14 @@ export function CreateEventWizardScreen({
       if (isNaN(radiusNum) || radiusNum < 20 || radiusNum > 5000) {
         setErrorMessage(
           'Geofence radius must be between 20 and 5000 meters.',
+        );
+        return;
+      }
+
+      const geoWindowNum = parseInt(geoOpensBeforeMin.trim(), 10);
+      if (isNaN(geoWindowNum) || geoWindowNum < 0 || geoWindowNum > 240) {
+        setErrorMessage(
+          'Geo check-in opening window must be between 0 and 240 minutes.',
         );
         return;
       }
@@ -322,9 +331,9 @@ export function CreateEventWizardScreen({
         longitude: lngNum,
         geoRadiusM: radiusNum,
         geoCheckinEnabled,
-        geoCheckinOpensBeforeMin: parseInt(geoOpensBeforeMin, 10) || 30,
+        geoCheckinOpensBeforeMin: parseInt(geoOpensBeforeMin.trim(), 10),
         requireCheckinConfirmation: requireConfirmation,
-        mapProvider: 'openstreetmap',
+        mapProvider,
         startAt: startAtIso,
         endAt: endAtIso,
         applicationDeadline: deadlineIso,
@@ -638,6 +647,34 @@ export function CreateEventWizardScreen({
                 style={styles.fieldSpacing}
               />
 
+              <AppInput
+                label="Geo Check-In Opens Before Event (0–240 minutes)"
+                value={geoOpensBeforeMin}
+                onChangeText={setGeoOpensBeforeMin}
+                placeholder="30"
+                style={styles.fieldSpacing}
+              />
+
+              <AppText variant="caption" weight="semibold" color={theme.colors.textSecondary} style={styles.labelMargin}>
+                Map Provider
+              </AppText>
+              <View style={styles.chipsRow}>
+                <FilterChip
+                  label="OpenStreetMap"
+                  selected={mapProvider === 'openstreetmap'}
+                  onPress={() => setMapProvider('openstreetmap')}
+                />
+                <FilterChip
+                  label="Google Maps"
+                  selected={mapProvider === 'google'}
+                  onPress={() => setMapProvider('google')}
+                />
+              </View>
+
+              <AppText variant="caption" color={theme.colors.textSecondary} style={styles.stepHint}>
+                Template preview only. Native map display and device geofence execution are not active in this screen.
+              </AppText>
+
               {/* Geofence Radar Visual Preview (.map, .fence, .pin) */}
               <View
                 style={[
@@ -949,14 +986,14 @@ export function CreateEventWizardScreen({
                   onPress={() => setLeaderStrategy('none')}
                 />
                 <FilterChip
-                  label="First Assigned"
-                  selected={leaderStrategy === 'first_assigned'}
-                  onPress={() => setLeaderStrategy('first_assigned')}
+                  label="First Experienced"
+                  selected={leaderStrategy === 'first_experienced'}
+                  onPress={() => setLeaderStrategy('first_experienced')}
                 />
                 <FilterChip
-                  label="Highest Rated"
-                  selected={leaderStrategy === 'highest_rated'}
-                  onPress={() => setLeaderStrategy('highest_rated')}
+                  label="Manual Selection"
+                  selected={leaderStrategy === 'manual'}
+                  onPress={() => setLeaderStrategy('manual')}
                 />
               </View>
             </AppCard>
@@ -1000,14 +1037,9 @@ export function CreateEventWizardScreen({
                   onPress={() => setCompensationKind('unpaid')}
                 />
                 <FilterChip
-                  label="Stipend"
-                  selected={compensationKind === 'stipend'}
-                  onPress={() => setCompensationKind('stipend')}
-                />
-                <FilterChip
-                  label="Travel Reimbursement"
-                  selected={compensationKind === 'travel_reimbursement'}
-                  onPress={() => setCompensationKind('travel_reimbursement')}
+                  label="Arranged Outside System"
+                  selected={compensationKind === 'arranged_outside_system'}
+                  onPress={() => setCompensationKind('arranged_outside_system')}
                 />
               </View>
 
@@ -1098,6 +1130,9 @@ export function CreateEventWizardScreen({
                 </AppText>
                 <AppText variant="caption" color={theme.colors.textSecondary}>
                   Coordinates: {latitude}, {longitude}
+                </AppText>
+                <AppText variant="caption" color={theme.colors.textSecondary}>
+                  Geo window: {geoOpensBeforeMin} minutes • Map provider: {mapProvider}
                 </AppText>
               </View>
 
