@@ -20,7 +20,7 @@ import type { CreateEventWizardDraft } from '../../../domain/models/coordinator'
 
 describe('coordinatorMapper', () => {
   describe('mapCreateEventDraftToRequest', () => {
-    it('correctly normalizes leaderStrategy and compensationKind enum choices', () => {
+    it('preserves BFF-supported leader and compensation choices without semantic translation', () => {
       const draft: CreateEventWizardDraft = {
         title: 'Community Garden Workshop',
         description: 'Hands-on organic gardening training',
@@ -41,12 +41,12 @@ describe('coordinatorMapper', () => {
         acceptanceMode: 'manual',
         autoAssignEnabled: true,
         groupSize: 5,
-        leaderStrategy: 'highest_rated', // Mobile enum to be translated
+        leaderStrategy: 'first_experienced',
         maxParticipants: 30,
         mealsProvided: true,
         lodgingProvided: false,
         travelSupportProvided: true,
-        compensationKind: 'stipend', // Mobile enum to be translated
+        compensationKind: 'arranged_outside_system',
         compensationNote: '50,000 MMK daily',
         onboardingText: 'Wear garden boots',
         requireOnboardingAck: true,
@@ -56,11 +56,9 @@ describe('coordinatorMapper', () => {
       const requestDto = mapCreateEventDraftToRequest(draft);
 
       expect(requestDto.title).toBe('Community Garden Workshop');
-      // Translated enum: 'highest_rated' -> 'first_experienced'
       expect(requestDto.leader_strategy).toBe('first_experienced');
-      // Translated enum: 'stipend' -> 'arranged_outside_system'
       expect(requestDto.compensation_kind).toBe('arranged_outside_system');
-      expect(requestDto.compensation_note).toContain('Stipend Support: 50,000 MMK daily');
+      expect(requestDto.compensation_note).toBe('50,000 MMK daily');
       expect(requestDto.start_at).toBe('2026-12-15T08:00:00+06:30');
       expect(requestDto.end_at).toBe('2026-12-15T12:00:00+06:30');
       expect(requestDto.application_deadline).toBe('2026-12-10T18:00:00+06:30');
