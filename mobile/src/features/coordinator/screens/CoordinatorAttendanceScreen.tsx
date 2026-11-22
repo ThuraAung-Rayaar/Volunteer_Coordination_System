@@ -218,6 +218,7 @@ export function CoordinatorAttendanceScreen({
   };
 
   const handleRevokeQrToken = async () => {
+    if (isMonitorMode) return;
     const targetId = revokeQrId.trim() || (createdQrToken ? String(createdQrToken.id) : '');
     if (!targetId) {
       setFeedbackBanner('Enter a QR token ID to revoke.');
@@ -292,6 +293,7 @@ export function CoordinatorAttendanceScreen({
           value={manualCheckInNote}
           onChangeText={setManualCheckInNote}
           placeholder="e.g. Identity and on-site attendance checked by coordinator"
+          editable={!isMonitorMode}
           multiline
           numberOfLines={2}
         />
@@ -312,8 +314,8 @@ export function CoordinatorAttendanceScreen({
             <FilterChip label="Walk-In Registration" selected={qrPurpose === 'walkin_registration'} onPress={() => setQrPurpose('walkin_registration')} />
             <FilterChip label="Join Event" selected={qrPurpose === 'join_event'} onPress={() => setQrPurpose('join_event')} />
           </View>
-          <AppInput label="Maximum Uses (optional)" value={qrMaxUses} onChangeText={setQrMaxUses} placeholder="Leave blank for BFF default" keyboardType="number-pad" />
-          <AppInput label="Lifetime in Minutes (1–10080)" value={qrTtlMinutes} onChangeText={setQrTtlMinutes} placeholder="60" keyboardType="number-pad" />
+          <AppInput label="Maximum Uses (optional)" value={qrMaxUses} onChangeText={setQrMaxUses} placeholder="Leave blank for BFF default" keyboardType="number-pad" editable={!isMonitorMode} />
+          <AppInput label="Lifetime in Minutes (1–10080)" value={qrTtlMinutes} onChangeText={setQrTtlMinutes} placeholder="60" keyboardType="number-pad" editable={!isMonitorMode} />
           <AppButton
             label="Create QR Token"
             variant="primary"
@@ -329,7 +331,7 @@ export function CoordinatorAttendanceScreen({
               <AppText variant="caption" color={theme.colors.textSecondary}>Expires: {createdQrToken.expiresAt}</AppText>
             </View>
           ) : null}
-          <AppInput label="QR Token ID to Revoke" value={revokeQrId} onChangeText={setRevokeQrId} placeholder="Enter the token ID" keyboardType="number-pad" />
+          <AppInput label="QR Token ID to Revoke" value={revokeQrId} onChangeText={setRevokeQrId} placeholder="Enter the token ID" keyboardType="number-pad" editable={!isMonitorMode} />
           <AppButton
             label="Revoke QR Token"
             variant="danger"

@@ -285,7 +285,7 @@ export function CoordinatorAssignmentsScreen({
       </ScrollView>
 
       {/* Manual Assignment Parameters — exact optional BFF inputs */}
-      {activeTab !== 'assigned' && unassignedApps.length > 0 ? (
+      {!isMonitorMode && activeTab !== 'assigned' && unassignedApps.length > 0 ? (
         <View style={styles.sectionWrapper}>
           <SectionHeader title="Manual Assignment Parameters" />
           <AppCard style={styles.assignmentOptionsCard}>
