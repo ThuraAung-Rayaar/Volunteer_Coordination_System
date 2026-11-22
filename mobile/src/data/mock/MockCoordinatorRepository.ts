@@ -926,6 +926,12 @@ export class MockCoordinatorRepository implements CoordinatorRepository {
     for (const event of this.events) {
       const post = event.posts.find(p => p.id === postId);
       if (post) {
+        if (event.isOwnerAsMonitor) {
+          return {
+            success: false,
+            message: 'Post management is disabled in read-only monitor mode.',
+          };
+        }
         post.status = 'closed';
         return {
           success: true,

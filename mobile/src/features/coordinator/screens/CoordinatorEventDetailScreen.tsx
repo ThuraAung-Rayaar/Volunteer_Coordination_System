@@ -105,6 +105,9 @@ export function CoordinatorEventDetailScreen({
     loadDetail();
   }, [loadDetail]);
 
+  const isMonitorMode = event?.isOwnerAsMonitor ?? false;
+  const isFinalState = event?.status === 'completed' || event?.status === 'cancelled';
+
   const handleConfirmTransition = async () => {
     if (!event || !pendingTargetStatus) {
       return;
@@ -267,10 +270,6 @@ export function CoordinatorEventDetailScreen({
       </CoordinatorGuard>
     );
   }
-
-  const isMonitorMode = event.isOwnerAsMonitor;
-  const isFinalState =
-    event.status === 'completed' || event.status === 'cancelled';
 
   return (
     <CoordinatorGuard navigation={navigation}>
