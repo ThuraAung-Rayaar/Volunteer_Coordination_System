@@ -20,8 +20,10 @@ import type {
 } from '../../../domain/models/coordinator';
 import type { MainDrawerScreenProps } from '../../../navigation/navigationTypes';
 import {
+  AppButton,
   AppHeader,
   AppIcon,
+  AppInput,
   AppText,
   EmptyState,
   FilterChip,
@@ -67,6 +69,13 @@ export function CoordinatorAttendanceScreen({
   >([]);
   const [activeFilter, setActiveFilter] = useState<RosterFilter>('all');
   const [feedbackBanner, setFeedbackBanner] = useState<string | null>(null);
+  const [manualCheckInNote, setManualCheckInNote] = useState('');
+  const [qrPurpose, setQrPurpose] = useState<'walkin_registration' | 'checkin' | 'join_event'>('checkin');
+  const [qrMaxUses, setQrMaxUses] = useState('');
+  const [qrTtlMinutes, setQrTtlMinutes] = useState('60');
+  const [isCreatingQr, setIsCreatingQr] = useState(false);
+  const [createdQrToken, setCreatedQrToken] = useState<{ id: number; rawToken: string; expiresAt: string } | null>(null);
+  const [revokeQrId, setRevokeQrId] = useState('');
 
   const loadData = useCallback(
     async (targetId?: string) => {
@@ -161,7 +170,7 @@ export function CoordinatorAttendanceScreen({
       result = await repo.manualCheckIn({
         eventId: targetEventId,
         volunteerUserId,
-        note: 'Manual on-site check-in verified by coordinator',
+        note: manualCheckInNote.trim() || undefined,
       });
     } else {
       result = await repo.manualCheckIn(attendanceId);
@@ -170,6 +179,60 @@ export function CoordinatorAttendanceScreen({
     setFeedbackBanner(result.message);
     if (result.success) {
       await loadData();
+    }
+  };
+
+  const handleCreateQrToken = async () => {
+    if (!selectedEvent || isMonitorMode) return;
+    const ttlMinutes = Number(qrTtlMinutes.trim());
+    if (!Number.isInteger(ttlMinutes) || ttlMinutes < 1 || ttlMinutes > 10080) {
+      setFeedbackBanner('QR token lifetime must be between 1 and 10080 minutes.');
+      return;
+    }
+    const maxUsesValue = qrMaxUses.trim() ? Number(qrMaxUses.trim()) : null;
+    if (maxUsesValue !== null && (!Number.isInteger(maxUsesValue) || maxUsesValue < 1)) {
+      setFeedbackBanner('Maximum uses must be a positive whole number, or left blank for the BFF default.');
+      return;
+    }
+
+    setIsCreatingQr(true);
+    try {
+      const result = await repo.createQrToken(
+        selectedEvent.id,
+        qrPurpose,
+        maxUsesValue,
+        ttlMinutes,
+      );
+      if (!result.success || !result.data) {
+        setFeedbackBanner(result.message);
+        return;
+      }
+      setCreatedQrToken(result.data);
+      setRevokeQrId(String(result.data.id));
+      setFeedbackBanner(result.message);
+    } catch (err) {
+      setFeedbackBanner(err instanceof Error ? err.message : 'Failed to create QR token.');
+    } finally {
+      setIsCreatingQr(false);
+    }
+  };
+
+  const handleRevokeQrToken = async () => {
+    if (isMonitorMode) return;
+    const targetId = revokeQrId.trim() || (createdQrToken ? String(createdQrToken.id) : '');
+    if (!targetId) {
+      setFeedbackBanner('Enter a QR token ID to revoke.');
+      return;
+    }
+    try {
+      const result = await repo.revokeQrToken(targetId);
+      setFeedbackBanner(result.message);
+      if (result.success) {
+        if (createdQrToken?.id === Number(targetId)) setCreatedQrToken(null);
+        setRevokeQrId('');
+      }
+    } catch (err) {
+      setFeedbackBanner(err instanceof Error ? err.message : 'Failed to revoke QR token.');
     }
   };
 
@@ -221,6 +284,69 @@ export function CoordinatorAttendanceScreen({
           </Pressable>
         </View>
       ) : null}
+
+      {/* Template-editable coordinator check-in note */}
+      <View style={styles.sectionSpacing}>
+        <SectionHeader title="Manual Check-In Note" />
+        <AppInput
+          label="Coordinator verification note (optional)"
+          value={manualCheckInNote}
+          onChangeText={setManualCheckInNote}
+          placeholder="e.g. Identity and on-site attendance checked by coordinator"
+          editable={!isMonitorMode}
+          multiline
+          numberOfLines={2}
+        />
+        <AppText variant="caption" color={theme.colors.textSecondary}>
+          This note is submitted with manual check-in. It is not used for geo or QR check-in.
+        </AppText>
+      </View>
+
+      {/* Coordinator QR-token management — existing BFF create/revoke routes */}
+      <View style={styles.sectionSpacing}>
+        <SectionHeader title="Coordinator QR Token" />
+        <View style={[styles.emptyQueueCard, { flexDirection: 'column', alignItems: 'stretch', gap: 10, backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+          <AppText variant="caption" color={theme.colors.textSecondary}>
+            Create a server-authoritative token for walk-in registration, event check-in, or joining an event.
+          </AppText>
+          <View style={styles.filterScroll}>
+            <FilterChip label="Check-In" selected={qrPurpose === 'checkin'} onPress={() => setQrPurpose('checkin')} />
+            <FilterChip label="Walk-In Registration" selected={qrPurpose === 'walkin_registration'} onPress={() => setQrPurpose('walkin_registration')} />
+            <FilterChip label="Join Event" selected={qrPurpose === 'join_event'} onPress={() => setQrPurpose('join_event')} />
+          </View>
+          <AppInput label="Maximum Uses (optional)" value={qrMaxUses} onChangeText={setQrMaxUses} placeholder="Leave blank for BFF default" keyboardType="number-pad" editable={!isMonitorMode} />
+          <AppInput label="Lifetime in Minutes (1–10080)" value={qrTtlMinutes} onChangeText={setQrTtlMinutes} placeholder="60" keyboardType="number-pad" editable={!isMonitorMode} />
+          <AppButton
+            label="Create QR Token"
+            variant="primary"
+            loading={isCreatingQr}
+            disabled={isMonitorMode || !selectedEvent}
+            onPress={handleCreateQrToken}
+          />
+          {createdQrToken ? (
+            <View style={[styles.qrTokenPreview, { borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceRaised }]}>
+              <AppText variant="caption" weight="bold" color={theme.colors.textPrimary}>Created Token #{createdQrToken.id}</AppText>
+              <AppText variant="caption" color={theme.colors.textSecondary}>
+                {repositories.dataMode === 'mock'
+                  ? 'Local template token only — it is not saved on the server.'
+                  : 'Server-issued token value — handle securely.'}
+              </AppText>
+              <AppText variant="body" weight="semibold" color={theme.colors.primary}>{createdQrToken.rawToken}</AppText>
+              <AppText variant="caption" color={theme.colors.textSecondary}>Expires: {createdQrToken.expiresAt}</AppText>
+            </View>
+          ) : null}
+          <AppInput label="QR Token ID to Revoke" value={revokeQrId} onChangeText={setRevokeQrId} placeholder="Enter the token ID" keyboardType="number-pad" editable={!isMonitorMode} />
+          <AppButton
+            label="Revoke QR Token"
+            variant="danger"
+            disabled={isMonitorMode || !revokeQrId.trim()}
+            onPress={handleRevokeQrToken}
+          />
+          {isMonitorMode ? (
+            <AppText variant="caption" color={theme.colors.accent}>QR token management is disabled in read-only monitor mode.</AppText>
+          ) : null}
+        </View>
+      </View>
 
       {/* Section 1: Pending Geo Confirmation Queue */}
       <View style={styles.sectionSpacing}>
@@ -398,5 +524,11 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     lineHeight: 18,
     textAlign: 'center',
+  },
+  qrTokenPreview: {
+    padding: 10,
+    borderWidth: 1,
+    borderRadius: 8,
+    gap: 4,
   },
 });

@@ -14,17 +14,9 @@ export type CoordinatorEventStatus =
 
 export type EventPurposeType = 'charity_event' | 'help_wanted_event';
 export type AcceptanceMode = 'manual' | 'auto';
-export type LeaderStrategy =
-  | 'none'
-  | 'first_experienced'
-  | 'manual'
-  | 'first_assigned'
-  | 'highest_rated';
-export type CompensationKind =
-  | 'unpaid'
-  | 'arranged_outside_system'
-  | 'stipend'
-  | 'travel_reimbursement';
+export type LeaderStrategy = 'none' | 'first_experienced' | 'manual';
+export type CompensationKind = 'unpaid' | 'arranged_outside_system';
+export type MapProvider = 'openstreetmap' | 'google';
 
 export interface CoordinatorOverviewMetrics {
   totalEventsCount: number;
@@ -61,42 +53,42 @@ export interface CoordinatorEventSummary {
 export interface CreateEventWizardDraft {
   // Step 1: Basics
   title: string;
-  description?: string;
+  description?: string | null;
   purposeType: EventPurposeType;
   charityFieldCodes: CharityCategoryCode[];
 
   // Step 2: Location
   locationName: string;
-  landmarkText?: string;
-  latitude: number;
-  longitude: number;
+  landmarkText?: string | null;
+  latitude: number | null;
+  longitude: number | null;
   geoRadiusM: number;
   geoCheckinEnabled: boolean;
   geoCheckinOpensBeforeMin: number;
   requireCheckinConfirmation: boolean;
-  mapProvider: string;
+  mapProvider: MapProvider;
 
   // Step 3: Schedule
   startAt: string;
   endAt: string;
-  applicationDeadline?: string;
+  applicationDeadline?: string | null;
 
   // Step 4: Capacity & Acceptance
   acceptanceMode: AcceptanceMode;
   autoAssignEnabled: boolean;
-  groupSize?: number;
+  groupSize?: number | null;
   leaderStrategy: LeaderStrategy;
-  maxParticipants?: number;
+  maxParticipants?: number | null;
 
   // Step 5: Support
   mealsProvided: boolean;
   lodgingProvided: boolean;
   travelSupportProvided: boolean;
   compensationKind: CompensationKind;
-  compensationNote?: string;
+  compensationNote?: string | null;
 
   // Step 6: Onboarding & QR
-  onboardingText?: string;
+  onboardingText?: string | null;
   requireOnboardingAck: boolean;
   qrRegistrationEnabled: boolean;
 }
@@ -108,19 +100,19 @@ export interface CoordinatorEventDetail extends CoordinatorEventSummary {
   geoCheckinEnabled: boolean;
   geoCheckinOpensBeforeMin: number;
   requireCheckinConfirmation: boolean;
-  mapProvider: string;
-  applicationDeadline?: string;
+  mapProvider: MapProvider;
+  applicationDeadline?: string | null;
   acceptanceMode: AcceptanceMode;
   autoAssignEnabled: boolean;
-  groupSize?: number;
+  groupSize?: number | null;
   leaderStrategy: LeaderStrategy;
-  maxParticipants?: number;
+  maxParticipants?: number | null;
   mealsProvided: boolean;
   lodgingProvided: boolean;
   travelSupportProvided: boolean;
   compensationKind: CompensationKind;
-  compensationNote?: string;
-  onboardingText?: string;
+  compensationNote?: string | null;
+  onboardingText?: string | null;
   onboardingVersion: number;
   requireOnboardingAck: boolean;
   qrRegistrationEnabled: boolean;

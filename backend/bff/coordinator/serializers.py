@@ -5,6 +5,49 @@ from bff.volunteer.serializers import EventSummarySerializer
 from common.permissions import AllowListSerializerMixin
 
 
+class CoordinatorEventConfigurationSerializer(serializers.ModelSerializer):
+    """Manager-only configuration detail; never used by the public event browse API."""
+
+    class Meta:
+        model = Events
+        fields = [
+            "id",
+            "owner_id",
+            "current_coordinator_id",
+            "title",
+            "description",
+            "purpose_type",
+            "location_name",
+            "landmark_text",
+            "latitude",
+            "longitude",
+            "geo_radius_m",
+            "geo_checkin_enabled",
+            "geo_checkin_opens_before_min",
+            "require_checkin_confirmation",
+            "map_provider",
+            "start_at",
+            "end_at",
+            "application_deadline",
+            "status",
+            "acceptance_mode",
+            "auto_assign_enabled",
+            "group_size",
+            "leader_strategy",
+            "max_participants",
+            "meals_provided",
+            "lodging_provided",
+            "travel_support_provided",
+            "compensation_kind",
+            "compensation_note",
+            "onboarding_text",
+            "onboarding_version",
+            "require_onboarding_ack",
+            "qr_registration_enabled",
+        ]
+        read_only_fields = fields
+
+
 class EventCreateSerializer(AllowListSerializerMixin, serializers.Serializer):
     title = serializers.CharField(max_length=255)
     description = serializers.CharField(required=False, allow_blank=True, allow_null=True)

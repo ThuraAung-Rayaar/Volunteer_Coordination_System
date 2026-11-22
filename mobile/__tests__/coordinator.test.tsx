@@ -485,10 +485,10 @@ describe('Coordinator Screens Component Integration', () => {
       publishButton!.props.onPress();
     });
 
-    // Verify confirmation modal with Demo Preview warning
+    // Verify confirmation modal with Template Preview warning
     json = safeStringify(renderer.toJSON());
     expect(json).toContain('Confirm Status Transition');
-    expect(json).toContain('Demo Preview — not submitted to server');
-    expect(json).toContain('Confirm (Demo)');
+    expect(json).toContain('Template Preview — local state only');
+    expect(json).toContain('Confirm (Template)');
   });
 });

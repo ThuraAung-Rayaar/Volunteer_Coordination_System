@@ -105,6 +105,7 @@ export function mapPublicEventPost(
     requiredSkills: Array.isArray(dto.required_skills) ? dto.required_skills : [],
     leaderNeeded: Boolean(dto.leader_needed),
     newVolunteersAllowed: Boolean(dto.new_volunteers_allowed),
+    priority: dto.priority ?? 100,
     status: normalizePostStatus(dto.status),
   };
 }

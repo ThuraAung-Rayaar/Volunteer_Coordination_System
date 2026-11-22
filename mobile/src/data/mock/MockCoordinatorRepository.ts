@@ -53,6 +53,8 @@ export class MockCoordinatorRepository implements CoordinatorRepository {
   private applications: CoordinatorApplicationItem[];
   private assignments: CoordinatorAssignmentItem[];
   private attendance: CoordinatorAttendanceItem[];
+  private qrTokens: Map<number, { eventId: string; rawToken: string; expiresAt: string }>;
+  private nextQrTokenId: number;
   private coordinatorIdentity: MockCoordinatorIdentity;
   private idGenerator: IdGenerator;
   private clock: Clock;
@@ -70,6 +72,8 @@ export class MockCoordinatorRepository implements CoordinatorRepository {
     this.applications = deepClone(initialApplications);
     this.assignments = deepClone(initialAssignments);
     this.attendance = deepClone(initialAttendance);
+    this.qrTokens = new Map();
+    this.nextQrTokenId = 1001;
     this.coordinatorIdentity = options?.coordinatorIdentity
       ? { ...options.coordinatorIdentity }
       : {
@@ -100,6 +104,8 @@ export class MockCoordinatorRepository implements CoordinatorRepository {
     this.attendance = deepClone(
       attendance ?? createCoordinatorAttendanceFixture(),
     );
+    this.qrTokens.clear();
+    this.nextQrTokenId = 1001;
     if (options?.coordinatorIdentity) {
       this.coordinatorIdentity = { ...options.coordinatorIdentity };
     }
@@ -304,15 +310,51 @@ export class MockCoordinatorRepository implements CoordinatorRepository {
         message: 'Event not found',
       };
     }
+    if (event.isOwnerAsMonitor) {
+      return {
+        success: false,
+        message: 'Event editing is disabled in read-only monitor mode.',
+      };
+    }
+    if (event.status === 'completed' || event.status === 'cancelled') {
+      return {
+        success: false,
+        message: 'Finalized events cannot be edited.',
+      };
+    }
+
     if (data.title !== undefined) event.title = data.title.trim();
-    if (data.description !== undefined)
-      event.description = data.description.trim();
-    if (data.locationName !== undefined)
-      event.locationName = data.locationName.trim();
-    if (data.onboardingText !== undefined) {
-      event.onboardingText = data.onboardingText.trim();
+    if (data.description !== undefined) event.description = data.description?.trim() ?? '';
+    if (data.purposeType !== undefined) event.purposeType = data.purposeType;
+    if (data.charityFieldCodes !== undefined) event.charityFields = [...data.charityFieldCodes];
+    if (data.locationName !== undefined) event.locationName = data.locationName.trim();
+    if (data.landmarkText !== undefined) event.landmarkText = data.landmarkText?.trim() || undefined;
+    if (data.latitude !== undefined) event.latitude = data.latitude;
+    if (data.longitude !== undefined) event.longitude = data.longitude;
+    if (data.geoRadiusM !== undefined) event.geoRadiusM = data.geoRadiusM;
+    if (data.geoCheckinEnabled !== undefined) event.geoCheckinEnabled = data.geoCheckinEnabled;
+    if (data.geoCheckinOpensBeforeMin !== undefined) event.geoCheckinOpensBeforeMin = data.geoCheckinOpensBeforeMin;
+    if (data.requireCheckinConfirmation !== undefined) event.requireCheckinConfirmation = data.requireCheckinConfirmation;
+    if (data.mapProvider !== undefined) event.mapProvider = data.mapProvider;
+    if (data.startAt !== undefined) event.startAt = data.startAt;
+    if (data.endAt !== undefined) event.endAt = data.endAt;
+    if (data.applicationDeadline !== undefined) event.applicationDeadline = data.applicationDeadline ?? undefined;
+    if (data.acceptanceMode !== undefined) event.acceptanceMode = data.acceptanceMode;
+    if (data.autoAssignEnabled !== undefined) event.autoAssignEnabled = data.autoAssignEnabled;
+    if (data.groupSize !== undefined) event.groupSize = data.groupSize ?? undefined;
+    if (data.leaderStrategy !== undefined) event.leaderStrategy = data.leaderStrategy;
+    if (data.maxParticipants !== undefined) event.maxParticipants = data.maxParticipants ?? undefined;
+    if (data.mealsProvided !== undefined) event.mealsProvided = data.mealsProvided;
+    if (data.lodgingProvided !== undefined) event.lodgingProvided = data.lodgingProvided;
+    if (data.travelSupportProvided !== undefined) event.travelSupportProvided = data.travelSupportProvided;
+    if (data.compensationKind !== undefined) event.compensationKind = data.compensationKind;
+    if (data.compensationNote !== undefined) event.compensationNote = data.compensationNote?.trim() || undefined;
+    if (data.onboardingText !== undefined && (data.onboardingText?.trim() ?? '') !== (event.onboardingText ?? '')) {
+      event.onboardingText = data.onboardingText?.trim() || undefined;
       event.onboardingVersion = (event.onboardingVersion || 1) + 1;
     }
+    if (data.requireOnboardingAck !== undefined) event.requireOnboardingAck = data.requireOnboardingAck;
+    if (data.qrRegistrationEnabled !== undefined) event.qrRegistrationEnabled = data.qrRegistrationEnabled;
     return {
       success: true,
       message: 'Demo only — not submitted to server',
@@ -809,26 +851,47 @@ export class MockCoordinatorRepository implements CoordinatorRepository {
       expiresAt: string;
     }>
   > {
+    const event = this.events.find(item => item.id === eventId);
+    if (!event) return { success: false, message: 'Event not found.' };
+    if (event.isOwnerAsMonitor) {
+      return { success: false, message: 'QR token management is disabled in read-only monitor mode.' };
+    }
+    if (!Number.isInteger(ttlMinutes) || ttlMinutes < 1 || ttlMinutes > 10080) {
+      return { success: false, message: 'Token lifetime must be between 1 and 10080 minutes.' };
+    }
+    if (maxUses !== undefined && maxUses !== null && (!Number.isInteger(maxUses) || maxUses < 1)) {
+      return { success: false, message: 'Maximum uses must be a positive whole number.' };
+    }
+
+    const id = this.nextQrTokenId++;
     const expiresAt = new Date(
       this.clock().getTime() + ttlMinutes * 60 * 1000,
     ).toISOString();
+    const rawToken = `template-qr-${id}-${eventId}-${purpose}-${this.clock().getTime()}`;
+    this.qrTokens.set(id, { eventId, rawToken, expiresAt });
     return {
       success: true,
-      message: 'QR token created successfully (Demo only)',
-      data: {
-        id: 1001,
-        rawToken: `mock-qr-${eventId}-${purpose}-${Date.now()}`,
-        expiresAt,
-      },
+      message: 'Local template QR token created — not submitted to the server.',
+      data: { id, rawToken, expiresAt },
     };
   }
 
   public async revokeQrToken(
-    _qrId: string,
+    qrId: string,
   ): Promise<CoordinatorOperationResult> {
+    const id = Number(qrId);
+    const token = this.qrTokens.get(id);
+    if (!Number.isInteger(id) || !token) {
+      return { success: false, message: 'Template QR token not found.' };
+    }
+    const event = this.events.find(item => item.id === token.eventId);
+    if (event?.isOwnerAsMonitor) {
+      return { success: false, message: 'QR token management is disabled in read-only monitor mode.' };
+    }
+    this.qrTokens.delete(id);
     return {
       success: true,
-      message: 'QR token revoked successfully (Demo only)',
+      message: 'Local template QR token revoked.',
     };
   }
 
@@ -836,76 +899,88 @@ export class MockCoordinatorRepository implements CoordinatorRepository {
     eventId: string,
     post: {
       title: string;
+      description?: string;
       requiredHeadcount: number;
-      physicalLevel?: string;
+      physicalLevel?: 'none' | 'light' | 'medium' | 'heavy';
       requiredSkills?: string[];
       leaderNeeded?: boolean;
       newVolunteersAllowed?: boolean;
+      priority?: number;
     },
-  ): Promise<CoordinatorOperationResult<EventPost>> {
+  ): Promise<CoordinatorOperationResult<{ id: string; status: 'open' | 'full' | 'closed' }>> {
     const event = this.events.find(e => e.id === eventId);
-    if (!event) {
-      return {
-        success: false,
-        message: 'Event not found',
-      };
+    if (!event) return { success: false, message: 'Event not found' };
+    if (event.isOwnerAsMonitor) {
+      return { success: false, message: 'Post editing is disabled in read-only monitor mode.' };
+    }
+    if (!post.title.trim() || !Number.isInteger(post.requiredHeadcount) || post.requiredHeadcount < 1) {
+      return { success: false, message: 'Post title and a positive whole-number headcount are required.' };
     }
     const newPost: EventPost = {
       id: this.idGenerator('post'),
       eventId,
-      title: post.title,
+      title: post.title.trim(),
+      description: post.description?.trim(),
       requiredHeadcount: post.requiredHeadcount,
       filledHeadcount: 0,
       remainingCapacity: post.requiredHeadcount,
-      physicalLevel: (post.physicalLevel as any) || 'light',
-      requiredSkills: post.requiredSkills || [],
+      physicalLevel: post.physicalLevel ?? 'light',
+      requiredSkills: post.requiredSkills ?? [],
       leaderNeeded: post.leaderNeeded ?? false,
       newVolunteersAllowed: post.newVolunteersAllowed ?? true,
+      priority: post.priority ?? 100,
       status: 'open',
     };
     event.posts.push(newPost);
     return {
       success: true,
       message: 'Demo only — not submitted to server',
-      data: deepClone(newPost),
+      data: { id: newPost.id, status: newPost.status },
     };
   }
 
   public async updateEventPost(
     postId: string,
     updates: {
+      title?: string;
+      description?: string;
       requiredHeadcount?: number;
-      status?: string;
-      physicalLevel?: string;
+      status?: 'open' | 'full' | 'closed';
+      physicalLevel?: 'none' | 'light' | 'medium' | 'heavy';
       requiredSkills?: string[];
+      leaderNeeded?: boolean;
+      newVolunteersAllowed?: boolean;
+      priority?: number;
     },
-  ): Promise<CoordinatorOperationResult<EventPost>> {
+  ): Promise<CoordinatorOperationResult<{ id: string; status: 'open' | 'full' | 'closed' }>> {
     for (const event of this.events) {
       const post = event.posts.find(p => p.id === postId);
-      if (post) {
-        if (updates.requiredHeadcount !== undefined) {
-          post.requiredHeadcount = updates.requiredHeadcount;
-          post.remainingCapacity = Math.max(
-            0,
-            post.requiredHeadcount - post.filledHeadcount,
-          );
-        }
-        if (updates.status !== undefined) post.status = updates.status as any;
-        if (updates.physicalLevel !== undefined)
-          post.physicalLevel = updates.physicalLevel as any;
-        if (updates.requiredSkills !== undefined)
-          post.requiredSkills = updates.requiredSkills;
-        return {
-          success: true,
-          message: 'Demo only — not submitted to server',
-          data: deepClone(post),
-        };
+      if (!post) continue;
+      if (event.isOwnerAsMonitor) {
+        return { success: false, message: 'Post editing is disabled in read-only monitor mode.' };
       }
+      if (updates.title !== undefined) post.title = updates.title.trim();
+      if (updates.description !== undefined) post.description = updates.description.trim();
+      if (updates.requiredHeadcount !== undefined) {
+        if (!Number.isInteger(updates.requiredHeadcount) || updates.requiredHeadcount < post.filledHeadcount) {
+          return { success: false, message: 'Headcount must be a positive whole number and cannot be below assigned capacity.' };
+        }
+        post.requiredHeadcount = updates.requiredHeadcount;
+        post.remainingCapacity = Math.max(0, post.requiredHeadcount - post.filledHeadcount);
+      }
+      if (updates.status !== undefined) post.status = updates.status;
+      if (updates.physicalLevel !== undefined) post.physicalLevel = updates.physicalLevel;
+      if (updates.requiredSkills !== undefined) post.requiredSkills = [...updates.requiredSkills];
+      if (updates.leaderNeeded !== undefined) post.leaderNeeded = updates.leaderNeeded;
+      if (updates.newVolunteersAllowed !== undefined) post.newVolunteersAllowed = updates.newVolunteersAllowed;
+      if (updates.priority !== undefined) post.priority = updates.priority;
+      return {
+        success: true,
+        message: 'Demo only — not submitted to server',
+        data: { id: post.id, status: post.status },
+      };
     }
-    return {
-      success: false,
-      message: 'Post not found',
-    };
+    return { success: false, message: 'Post not found' };
   }
 
   public async closeEventPost(
@@ -914,6 +989,12 @@ export class MockCoordinatorRepository implements CoordinatorRepository {
     for (const event of this.events) {
       const post = event.posts.find(p => p.id === postId);
       if (post) {
+        if (event.isOwnerAsMonitor) {
+          return {
+            success: false,
+            message: 'Post management is disabled in read-only monitor mode.',
+          };
+        }
         post.status = 'closed';
         return {
           success: true,
@@ -929,22 +1010,24 @@ export class MockCoordinatorRepository implements CoordinatorRepository {
 
   public async inviteVolunteer(
     eventId: string,
-    volunteerUserId: string | number,
+    volunteerUserId?: string | number,
     postId?: string | number,
     note?: string,
+    volunteerUuid?: string,
   ): Promise<CoordinatorOperationResult<CoordinatorApplicationItem>> {
     const event = this.events.find(e => e.id === eventId);
-    if (!event) {
-      return {
-        success: false,
-        message: 'Event not found',
-      };
+    if (!event) return { success: false, message: 'Event not found' };
+    if (event.isOwnerAsMonitor) {
+      return { success: false, message: 'Invitations are disabled in read-only monitor mode.' };
+    }
+    if (!volunteerUserId && !volunteerUuid?.trim()) {
+      return { success: false, message: 'Provide either a volunteer user ID or UUID.' };
     }
     const appItem: CoordinatorApplicationItem = {
       id: this.idGenerator('app-inv'),
       eventId,
       eventTitle: event.title,
-      userId: String(volunteerUserId),
+      userId: String(volunteerUuid?.trim() || volunteerUserId),
       applicantName: 'Invited Volunteer',
       source: 'invite',
       postId: postId ? String(postId) : undefined,

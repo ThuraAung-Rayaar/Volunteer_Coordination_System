@@ -20,8 +20,11 @@ import type {
 } from '../../../domain/models/coordinator';
 import type { MainDrawerScreenProps } from '../../../navigation/navigationTypes';
 import {
+  AppButton,
+  AppCard,
   AppHeader,
   AppIcon,
+  AppInput,
   AppText,
   EmptyState,
   FilterChip,
@@ -63,6 +66,11 @@ export function CoordinatorApplicationsScreen({
   const [activeFilter, setActiveFilter] = useState<FilterOption>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [feedbackBanner, setFeedbackBanner] = useState<string | null>(null);
+  const [inviteUserId, setInviteUserId] = useState('');
+  const [inviteVolunteerUuid, setInviteVolunteerUuid] = useState('');
+  const [invitePostId, setInvitePostId] = useState('');
+  const [inviteNote, setInviteNote] = useState('');
+  const [isInviting, setIsInviting] = useState(false);
 
   const loadData = useCallback(
     async (targetId?: string) => {
@@ -150,6 +158,53 @@ export function CoordinatorApplicationsScreen({
     }
   };
 
+  const handleInviteVolunteer = async () => {
+    if (!selectedEventId || isMonitorMode) return;
+    const userIdValue = inviteUserId.trim();
+    const uuidValue = inviteVolunteerUuid.trim();
+    if (Boolean(userIdValue) === Boolean(uuidValue)) {
+      setFeedbackBanner('Enter either a volunteer user ID or a volunteer UUID, not both.');
+      return;
+    }
+    if (userIdValue && (!Number.isInteger(Number(userIdValue)) || Number(userIdValue) < 1)) {
+      setFeedbackBanner('Volunteer user ID must be a positive whole number.');
+      return;
+    }
+    const postIdValue = invitePostId.trim();
+    if (postIdValue && (!Number.isInteger(Number(postIdValue)) || Number(postIdValue) < 1)) {
+      setFeedbackBanner('Post ID must be a positive whole number or left blank.');
+      return;
+    }
+    setIsInviting(true);
+    try {
+      const result = await repo.inviteVolunteer(
+        selectedEventId,
+        userIdValue ? Number(userIdValue) : undefined,
+        postIdValue ? Number(postIdValue) : undefined,
+        inviteNote.trim() || undefined,
+        uuidValue || undefined,
+      );
+      if (!result.success) {
+        setFeedbackBanner(result.message);
+        return;
+      }
+      if (result.data) {
+        setApplications(prev => [result.data!, ...prev]);
+      } else {
+        await loadData();
+      }
+      setInviteUserId('');
+      setInviteVolunteerUuid('');
+      setInvitePostId('');
+      setInviteNote('');
+      setFeedbackBanner(result.message);
+    } catch (err) {
+      setFeedbackBanner(err instanceof Error ? err.message : 'Failed to invite volunteer.');
+    } finally {
+      setIsInviting(false);
+    }
+  };
+
   const handleBack = () => {
     if (navigation && navigation.canGoBack()) {
       navigation.goBack();
@@ -200,6 +255,65 @@ export function CoordinatorApplicationsScreen({
           </Pressable>
         </View>
       ) : null}
+
+      {/* Invite Volunteer — existing BFF supports user ID or UUID */}
+      <AppCard style={styles.inviteCard}>
+        <View style={styles.inviteHeader}>
+          <AppText variant="body" weight="bold" color={theme.colors.textPrimary}>
+            Invite a Volunteer
+          </AppText>
+          {isMonitorMode ? (
+            <AppText variant="caption" color={theme.colors.accent}>Read-only monitor mode</AppText>
+          ) : null}
+        </View>
+        <AppText variant="caption" color={theme.colors.textSecondary}>
+          Provide exactly one identifier. This uses the existing coordinator invite endpoint.
+        </AppText>
+        <AppInput
+          label="Volunteer User ID"
+          value={inviteUserId}
+          onChangeText={setInviteUserId}
+          placeholder="Numeric user ID"
+          keyboardType="number-pad"
+          style={styles.inviteField}
+          editable={!isMonitorMode && !isInviting}
+        />
+        <AppInput
+          label="Volunteer UUID"
+          value={inviteVolunteerUuid}
+          onChangeText={setInviteVolunteerUuid}
+          placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+          autoCapitalize="none"
+          style={styles.inviteField}
+          editable={!isMonitorMode && !isInviting}
+        />
+        <AppInput
+          label="Target Post ID (optional)"
+          value={invitePostId}
+          onChangeText={setInvitePostId}
+          placeholder="Leave blank for general event invitation"
+          keyboardType="number-pad"
+          style={styles.inviteField}
+          editable={!isMonitorMode && !isInviting}
+        />
+        <AppInput
+          label="Invitation Note (optional)"
+          value={inviteNote}
+          onChangeText={setInviteNote}
+          placeholder="Add a short invitation message"
+          multiline
+          numberOfLines={2}
+          style={styles.inviteField}
+          editable={!isMonitorMode && !isInviting}
+        />
+        <AppButton
+          label="Send Invitation"
+          variant="primary"
+          loading={isInviting}
+          disabled={isMonitorMode || !selectedEventId}
+          onPress={handleInviteVolunteer}
+        />
+      </AppCard>
 
       {/* Search Input */}
       <View style={styles.searchWrapper}>
@@ -309,6 +423,19 @@ const styles = StyleSheet.create({
   },
   searchWrapper: {
     marginBottom: 10,
+  },
+  inviteCard: {
+    padding: 14,
+    marginBottom: 12,
+    gap: 8,
+  },
+  inviteHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  inviteField: {
+    marginTop: 2,
   },
   filterScroll: {
     gap: 8,

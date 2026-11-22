@@ -196,8 +196,8 @@ describe('SettingsScreen', () => {
         });
 
         const json = safeStringify(renderer.toJSON());
-        expect(json).toContain('API & Data Mode Diagnostics');
-        expect(json).toContain('Active Data Mode: MOCK');
+        expect(json).toContain('Template & API Diagnostics');
+        expect(json).toContain('Active Data Mode: TEMPLATE');
         expect(json).toContain('API Base URL:');
         expect(json).toContain('Test BFF Connection');
 
@@ -229,7 +229,7 @@ describe('SettingsScreen', () => {
         });
 
         const json = safeStringify(renderer.toJSON());
-        expect(json).not.toContain('API & Data Mode Diagnostics');
+        expect(json).not.toContain('Template & API Diagnostics');
         expect(json).not.toContain('Test BFF Connection');
 
         await ReactTestRenderer.act(async () => {
@@ -269,10 +269,10 @@ describe('SettingsScreen', () => {
         let json = safeStringify(renderer.toJSON());
         expect(json).toContain('Active Data Mode: HTTP');
 
-        // Switch back to Mock
+        // Switch back to Template Mode
         const mockButton = renderer.root
           .findAllByProps({ accessibilityRole: 'button' })
-          .find(b => b.props.accessibilityLabel === 'Switch to Mock');
+          .find(b => b.props.accessibilityLabel === 'Switch to Template Mode');
         expect(mockButton).toBeDefined();
 
         await ReactTestRenderer.act(async () => {
@@ -281,7 +281,7 @@ describe('SettingsScreen', () => {
 
         expect(getDataMode()).toBe('mock');
         json = safeStringify(renderer.toJSON());
-        expect(json).toContain('Active Data Mode: MOCK');
+        expect(json).toContain('Active Data Mode: TEMPLATE');
 
         await ReactTestRenderer.act(async () => {
           renderer.unmount();

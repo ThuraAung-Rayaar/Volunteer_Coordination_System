@@ -68,6 +68,7 @@ export interface EventPost {
   requiredSkills: string[];
   leaderNeeded: boolean;
   newVolunteersAllowed: boolean;
+  priority?: number;
   status: PostStatus;
 }
 

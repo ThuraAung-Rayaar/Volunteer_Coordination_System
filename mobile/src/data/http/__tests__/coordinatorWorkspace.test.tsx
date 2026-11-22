@@ -305,6 +305,9 @@ describe('Phase 7: Coordinator Workspace Integration', () => {
         },
       });
       jest
+        .spyOn(coordinatorApi, 'getEventConfiguration')
+        .mockResolvedValue({ ok: true, status: 200, data: mockPublicDetail as any });
+      jest
         .spyOn(eventApi, 'getEventDetail')
         .mockResolvedValue({ ok: true, status: 200, data: mockPublicDetail });
 
@@ -411,13 +414,13 @@ describe('Phase 7: Coordinator Workspace Integration', () => {
         endAt: '2026-12-15T15:00:00Z',
         acceptanceMode: 'manual',
         autoAssignEnabled: true,
-        leaderStrategy: 'first_assigned', // Should map to 'first_experienced'
+        leaderStrategy: 'first_experienced', // BFF supported choice
         maxParticipants: 50,
         mealsProvided: true,
         lodgingProvided: false,
         travelSupportProvided: false,
-        compensationKind: 'stipend', // Should map to 'arranged_outside_system'
-        compensationNote: '15 USD lunch stipend',
+        compensationKind: 'arranged_outside_system', // BFF supported choice
+        compensationNote: 'Stipend Support: 15 USD lunch stipend',
         requireOnboardingAck: false,
         qrRegistrationEnabled: false,
       };

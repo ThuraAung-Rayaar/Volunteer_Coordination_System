@@ -59,6 +59,7 @@ class PublicEventPostSerializer(serializers.Serializer):
     required_skills = serializers.ListField(child=serializers.CharField(), read_only=True)
     leader_needed = serializers.BooleanField(read_only=True)
     new_volunteers_allowed = serializers.BooleanField(read_only=True)
+    priority = serializers.IntegerField(read_only=True)
     required_headcount = serializers.IntegerField(read_only=True)
     assigned_count = serializers.IntegerField(read_only=True)
     remaining = serializers.IntegerField(read_only=True)

@@ -36,46 +36,13 @@ import type {
 import type { CharityCategoryCode } from '../../domain/models/event';
 
 /**
- * Maps wizard draft to EventCreateRequestDto matching EventCreateSerializer.
- * Translates mobile domain choices into backend allow-listed serializer choices:
- * - leaderStrategy ('first_assigned' | 'highest_rated' -> 'first_experienced')
- * - compensationKind ('stipend' | 'travel_reimbursement' -> 'arranged_outside_system')
+ * Maps the event wizard draft directly to the current BFF allow-list contract.
+ * Domain choices match EventCreateSerializer, so a selected value is never
+ * silently translated into a different meaning.
  */
 export function mapCreateEventDraftToRequest(
   draft: CreateEventWizardDraft,
 ): EventCreateRequestDto {
-  let leaderStrategy: 'none' | 'first_experienced' | 'manual' = 'none';
-  if (
-    draft.leaderStrategy === 'first_experienced' ||
-    draft.leaderStrategy === 'manual'
-  ) {
-    leaderStrategy = draft.leaderStrategy;
-  } else if (
-    draft.leaderStrategy === 'first_assigned' ||
-    draft.leaderStrategy === 'highest_rated'
-  ) {
-    leaderStrategy = 'first_experienced';
-  }
-
-  let compensationKind: 'unpaid' | 'arranged_outside_system' = 'unpaid';
-  let compensationNote: string | null = draft.compensationNote ?? null;
-
-  if (draft.compensationKind === 'arranged_outside_system') {
-    compensationKind = 'arranged_outside_system';
-  } else if (
-    draft.compensationKind === 'stipend' ||
-    draft.compensationKind === 'travel_reimbursement'
-  ) {
-    compensationKind = 'arranged_outside_system';
-    const kindLabel =
-      draft.compensationKind === 'stipend'
-        ? 'Stipend Support'
-        : 'Travel Reimbursement';
-    compensationNote = draft.compensationNote
-      ? `${kindLabel}: ${draft.compensationNote}`
-      : kindLabel;
-  }
-
   return {
     title: draft.title.trim(),
     description: draft.description ? draft.description.trim() : null,
@@ -88,25 +55,67 @@ export function mapCreateEventDraftToRequest(
     geo_checkin_enabled: Boolean(draft.geoCheckinEnabled),
     geo_checkin_opens_before_min: draft.geoCheckinOpensBeforeMin ?? 30,
     require_checkin_confirmation: Boolean(draft.requireCheckinConfirmation),
-    map_provider: draft.mapProvider === 'google' ? 'google' : 'openstreetmap',
+    map_provider: draft.mapProvider,
     start_at: draft.startAt,
     end_at: draft.endAt,
     application_deadline: draft.applicationDeadline ?? null,
     acceptance_mode: draft.acceptanceMode,
     auto_assign_enabled: Boolean(draft.autoAssignEnabled),
     group_size: draft.groupSize ?? null,
-    leader_strategy: leaderStrategy,
+    leader_strategy: draft.leaderStrategy,
     max_participants: draft.maxParticipants ?? null,
     meals_provided: Boolean(draft.mealsProvided),
     lodging_provided: Boolean(draft.lodgingProvided),
     travel_support_provided: Boolean(draft.travelSupportProvided),
-    compensation_kind: compensationKind,
-    compensation_note: compensationNote,
+    compensation_kind: draft.compensationKind,
+    compensation_note: draft.compensationNote ?? null,
     onboarding_text: draft.onboardingText ? draft.onboardingText.trim() : null,
     require_onboarding_ack: Boolean(draft.requireOnboardingAck),
     qr_registration_enabled: Boolean(draft.qrRegistrationEnabled),
     charity_field_codes: draft.charityFieldCodes || [],
   };
+}
+
+/**
+ * Maps only fields explicitly provided for an event PATCH.
+ * A partial edit must not inherit defaults from the create-event mapper.
+ */
+export function mapEventUpdateDraftToRequest(
+  draft: Partial<CreateEventWizardDraft>,
+): Partial<EventCreateRequestDto> {
+  const payload: Partial<EventCreateRequestDto> = {};
+
+  if (draft.title !== undefined) payload.title = draft.title.trim();
+  if (draft.description !== undefined) payload.description = draft.description?.trim() || null;
+  if (draft.purposeType !== undefined) payload.purpose_type = draft.purposeType;
+  if (draft.charityFieldCodes !== undefined) payload.charity_field_codes = [...draft.charityFieldCodes];
+  if (draft.locationName !== undefined) payload.location_name = draft.locationName.trim() || null;
+  if (draft.landmarkText !== undefined) payload.landmark_text = draft.landmarkText?.trim() || null;
+  if (draft.latitude !== undefined) payload.latitude = draft.latitude;
+  if (draft.longitude !== undefined) payload.longitude = draft.longitude;
+  if (draft.geoRadiusM !== undefined) payload.geo_radius_m = draft.geoRadiusM;
+  if (draft.geoCheckinEnabled !== undefined) payload.geo_checkin_enabled = draft.geoCheckinEnabled;
+  if (draft.geoCheckinOpensBeforeMin !== undefined) payload.geo_checkin_opens_before_min = draft.geoCheckinOpensBeforeMin;
+  if (draft.requireCheckinConfirmation !== undefined) payload.require_checkin_confirmation = draft.requireCheckinConfirmation;
+  if (draft.mapProvider !== undefined) payload.map_provider = draft.mapProvider;
+  if (draft.startAt !== undefined) payload.start_at = draft.startAt;
+  if (draft.endAt !== undefined) payload.end_at = draft.endAt;
+  if (draft.applicationDeadline !== undefined) payload.application_deadline = draft.applicationDeadline || null;
+  if (draft.acceptanceMode !== undefined) payload.acceptance_mode = draft.acceptanceMode;
+  if (draft.autoAssignEnabled !== undefined) payload.auto_assign_enabled = draft.autoAssignEnabled;
+  if (draft.groupSize !== undefined) payload.group_size = draft.groupSize;
+  if (draft.leaderStrategy !== undefined) payload.leader_strategy = draft.leaderStrategy;
+  if (draft.maxParticipants !== undefined) payload.max_participants = draft.maxParticipants;
+  if (draft.mealsProvided !== undefined) payload.meals_provided = draft.mealsProvided;
+  if (draft.lodgingProvided !== undefined) payload.lodging_provided = draft.lodgingProvided;
+  if (draft.travelSupportProvided !== undefined) payload.travel_support_provided = draft.travelSupportProvided;
+  if (draft.compensationKind !== undefined) payload.compensation_kind = draft.compensationKind;
+  if (draft.compensationNote !== undefined) payload.compensation_note = draft.compensationNote?.trim() || null;
+  if (draft.onboardingText !== undefined) payload.onboarding_text = draft.onboardingText?.trim() || null;
+  if (draft.requireOnboardingAck !== undefined) payload.require_onboarding_ack = draft.requireOnboardingAck;
+  if (draft.qrRegistrationEnabled !== undefined) payload.qr_registration_enabled = draft.qrRegistrationEnabled;
+
+  return payload;
 }
 
 /**

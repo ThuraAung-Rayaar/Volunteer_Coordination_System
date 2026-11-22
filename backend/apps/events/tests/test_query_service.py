@@ -187,6 +187,7 @@ class QueryServiceTests(PublicEventReadBase):
         posts = query_service.get_event_posts(self.published_event.id, verified_visible=True)
         self.assertEqual(len(posts), 1)
         self.assertEqual(posts[0]["title"], "Sapling Planter")
+        self.assertEqual(posts[0]["priority"], self.published_event.posts.get(title="Sapling Planter").priority)
 
     def test_filter_by_date_starts_after(self):
         """starts_after date filter functions correctly."""

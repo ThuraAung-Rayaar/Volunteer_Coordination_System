@@ -19,6 +19,7 @@ import type {
   GeoAttemptReview,
   VolunteerUuidLookup,
 } from '../../domain/models/coordinator';
+import type { CharityCategoryCode } from '../../domain/models/event';
 import type {
   CoordinatorOperationResult,
   CoordinatorRepository,
@@ -34,13 +35,14 @@ import {
   mapCoordinatorEventSummary,
   mapCoordinatorHistoryItem,
   mapCreateEventDraftToRequest,
+  mapEventUpdateDraftToRequest,
   mapEventPostCapacity,
   mapGeoAttemptReview,
   mapVolunteerUuidLookup,
 } from '../mappers/coordinatorMapper';
 import { mapPublicEventPost } from '../mappers/eventMapper';
 import type { PublicEventPostDto } from '../dto/eventDto';
-import type { EventPost } from '../../domain/models/event';
+import type { PostStatus } from '../../domain/models/event';
 import type {
   AttendanceRosterDto,
   CoordinatorApplicationDto,
@@ -159,102 +161,95 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
   public async getEventDetail(
     eventId: string,
   ): Promise<CoordinatorEventDetail | null> {
-    const [summaryRes, postsRes, eventsRes, publicDetailRes] = await Promise.all([
+    const [summaryRes, postsRes, eventsRes, configurationRes] = await Promise.all([
       coordinatorApi.getEventSummary(eventId, this.client),
-      coordinatorApi.getEventPosts(eventId, this.client).catch(() => null),
-      coordinatorApi.getMyEvents(this.client).catch(() => null),
-      eventApi.getEventDetail(eventId, this.client).catch(() => null),
+      coordinatorApi.getEventPosts(eventId, this.client),
+      coordinatorApi.getMyEvents(this.client),
+      coordinatorApi.getEventConfiguration(eventId, this.client),
     ]);
 
     if (!summaryRes.ok) {
-      if (summaryRes.status === 404) {
-        return null;
-      }
-      throw new Error(`Failed to load event detail: ${summaryRes.error.message}`);
+      if (summaryRes.status === 404) return null;
+      throw new Error(`Failed to load event summary: ${summaryRes.error.message}`);
+    }
+    if (!configurationRes || !configurationRes.ok) {
+      if (configurationRes?.status === 404) return null;
+      throw new Error(
+        `Failed to load manager event configuration: ${configurationRes?.error?.message ?? 'Unknown error'}`,
+      );
+    }
+
+    if (!eventsRes.ok) {
+      throw new Error(
+        `Failed to verify coordinator event permissions: ${eventsRes.error.message}`,
+      );
+    }
+    if (!postsRes.ok) {
+      throw new Error(
+        `Failed to load event posts: ${postsRes.error.message}`,
+      );
     }
 
     const summary = summaryRes.data;
-    const events: CoordinatorEventListItemDto[] =
-      eventsRes && eventsRes.ok && eventsRes.data?.results ? eventsRes.data.results : [];
+    const configuration = configurationRes.data;
+    const events: CoordinatorEventListItemDto[] = eventsRes.data?.results ?? [];
     const currentEventItem = events.find(e => String(e.id) === String(eventId));
-
-    const publicDetail =
-      publicDetailRes && publicDetailRes.ok ? publicDetailRes.data : null;
-
-    let rawPosts: PublicEventPostDto[] = [];
-    if (publicDetail?.posts && Array.isArray(publicDetail.posts) && publicDetail.posts.length > 0) {
-      rawPosts = publicDetail.posts;
-    } else if (postsRes && postsRes.ok) {
-      rawPosts = Array.isArray(postsRes.data)
-        ? postsRes.data
-        : postsRes.data?.results || [];
+    if (!currentEventItem) {
+      throw new Error('Cannot verify event manager/monitor permissions for this event.');
     }
 
-    const isMonitor = currentEventItem?.is_read_only_monitor ?? false;
+    const rawPosts: PublicEventPostDto[] = Array.isArray(postsRes.data)
+      ? postsRes.data
+      : postsRes.data?.results || [];
+
+    const toCoordinate = (value: string | number | null | undefined): number | null => {
+      if (value === null || value === undefined || value === '') return null;
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : null;
+    };
 
     return {
-      id: String(summary.id),
-      title: publicDetail?.title || summary.title,
-      description: publicDetail?.description || '',
-      status:
-        (publicDetail?.status as CoordinatorEventStatus) ||
-        (summary.status as CoordinatorEventStatus) ||
-        'draft',
-      purposeType:
-        (publicDetail?.purpose_type as EventPurposeType) || 'charity_event',
-      startAt: publicDetail?.start_at || summary.start_at,
-      endAt: publicDetail?.end_at || summary.end_at,
-      applicationDeadline: publicDetail?.application_deadline ?? undefined,
-      locationName: publicDetail?.location_name || 'Designated Location',
-      landmarkText: publicDetail?.landmark_text ?? undefined,
-      charityFields: (publicDetail?.charity_fields as any[]) || [],
-      ownerId: currentEventItem ? String(currentEventItem.owner_id) : this.coordinatorIdentity.id,
-      currentCoordinatorId: currentEventItem ? String(currentEventItem.current_coordinator_id) : this.coordinatorIdentity.id,
-      coordinatorName: publicDetail?.coordinator_name || this.coordinatorIdentity.displayName,
-      isOwnerAsMonitor: isMonitor,
+      id: String(configuration.id),
+      title: configuration.title,
+      description: configuration.description ?? '',
+      status: configuration.status as CoordinatorEventStatus,
+      purposeType: configuration.purpose_type as EventPurposeType,
+      startAt: configuration.start_at,
+      endAt: configuration.end_at,
+      applicationDeadline: configuration.application_deadline ?? undefined,
+      locationName: configuration.location_name ?? '',
+      landmarkText: configuration.landmark_text ?? undefined,
+      charityFields: (currentEventItem.charity_fields || []) as CharityCategoryCode[],
+      ownerId: String(configuration.owner_id),
+      currentCoordinatorId: String(configuration.current_coordinator_id),
+      coordinatorName: currentEventItem.coordinator_name || this.coordinatorIdentity.displayName,
+      isOwnerAsMonitor: currentEventItem.is_read_only_monitor,
       pendingApplicationCount: summary.pending_count || 0,
       acceptedApplicantCount: summary.accepted_count || 0,
       assignedCount: summary.assignment_count || 0,
       checkedInCount: summary.checked_in_count || 0,
-      latitude:
-        typeof publicDetail?.latitude === 'number'
-          ? publicDetail.latitude
-          : publicDetail?.latitude != null &&
-            publicDetail.latitude !== '' &&
-            !isNaN(Number(publicDetail.latitude))
-          ? Number(publicDetail.latitude)
-          : null,
-      longitude:
-        typeof publicDetail?.longitude === 'number'
-          ? publicDetail.longitude
-          : publicDetail?.longitude != null &&
-            publicDetail.longitude !== '' &&
-            !isNaN(Number(publicDetail.longitude))
-          ? Number(publicDetail.longitude)
-          : null,
-      geoRadiusM: publicDetail?.geo_radius_m ?? 200,
-      geoCheckinEnabled: Boolean(
-        publicDetail?.geo_checkin_enabled ??
-          summary.geo_checkin_enabled ??
-          false,
-      ),
-      geoCheckinOpensBeforeMin: 30,
-      requireCheckinConfirmation: summary.pending_confirmations > 0,
-      mapProvider: publicDetail?.map_provider || summary.map_provider || 'openstreetmap',
-      acceptanceMode: (publicDetail?.acceptance_mode as any) || (summary.acceptance_mode as any) || 'manual',
-      autoAssignEnabled: summary.auto_assign_enabled ?? false,
-      leaderStrategy: 'none',
-      maxParticipants: publicDetail?.max_participants ?? summary.max_participants ?? 0,
-      mealsProvided: Boolean(publicDetail?.meals_provided),
-      lodgingProvided: Boolean(publicDetail?.lodging_provided),
-      travelSupportProvided: Boolean(publicDetail?.travel_support_provided),
-      compensationKind: (publicDetail?.compensation_kind as any) || 'unpaid',
-      compensationNote: publicDetail?.compensation_note ?? undefined,
-      onboardingText: publicDetail?.onboarding_text ?? undefined,
-      onboardingVersion: publicDetail?.onboarding_version ?? 1,
-      requireOnboardingAck: false,
-      qrRegistrationEnabled: false,
-      posts: rawPosts.map(p => mapPublicEventPost(p, summary.id)),
+      latitude: toCoordinate(configuration.latitude),
+      longitude: toCoordinate(configuration.longitude),
+      geoRadiusM: configuration.geo_radius_m ?? 200,
+      geoCheckinEnabled: configuration.geo_checkin_enabled,
+      geoCheckinOpensBeforeMin: configuration.geo_checkin_opens_before_min,
+      requireCheckinConfirmation: configuration.require_checkin_confirmation,
+      mapProvider: configuration.map_provider,
+      acceptanceMode: configuration.acceptance_mode,
+      autoAssignEnabled: configuration.auto_assign_enabled,
+      groupSize: configuration.group_size ?? undefined,
+      leaderStrategy: configuration.leader_strategy,
+      maxParticipants: configuration.max_participants ?? 0,
+      mealsProvided: configuration.meals_provided,
+      lodgingProvided: configuration.lodging_provided,
+      travelSupportProvided: configuration.travel_support_provided,
+      compensationKind: configuration.compensation_kind,
+      compensationNote: configuration.compensation_note ?? undefined,
+      onboardingText: configuration.onboarding_text ?? undefined,
+      onboardingVersion: configuration.onboarding_version,
+      requireOnboardingAck: configuration.require_onboarding_ack,
+      qrRegistrationEnabled: configuration.qr_registration_enabled,
+      posts: rawPosts.map(post => mapPublicEventPost(post, configuration.id)),
     };
   }
 
@@ -283,7 +278,7 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
     eventId: string,
     data: Partial<CreateEventWizardDraft>,
   ): Promise<CoordinatorOperationResult<CoordinatorEventDetail>> {
-    const payload = mapCreateEventDraftToRequest(data as CreateEventWizardDraft);
+    const payload = mapEventUpdateDraftToRequest(data);
     const res = await coordinatorApi.updateEvent(eventId, payload, this.client);
     if (!res.ok) {
       return {
@@ -383,93 +378,75 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
     eventId: string,
     post: {
       title: string;
+      description?: string;
       requiredHeadcount: number;
-      physicalLevel?: string;
+      physicalLevel?: 'none' | 'light' | 'medium' | 'heavy';
       requiredSkills?: string[];
       leaderNeeded?: boolean;
       newVolunteersAllowed?: boolean;
+      priority?: number;
     },
-  ): Promise<CoordinatorOperationResult<EventPost>> {
+  ): Promise<CoordinatorOperationResult<{ id: string; status: PostStatus }>> {
     const res = await coordinatorApi.createEventPost(
       eventId,
       {
-        title: post.title,
+        title: post.title.trim(),
+        description: post.description?.trim() || null,
         required_headcount: post.requiredHeadcount,
-        physical_level: (post.physicalLevel as any) || 'light',
-        required_skills: post.requiredSkills || [],
+        physical_level: post.physicalLevel ?? 'light',
+        required_skills: post.requiredSkills ?? [],
         leader_needed: post.leaderNeeded ?? false,
         new_volunteers_allowed: post.newVolunteersAllowed ?? true,
+        priority: post.priority ?? 100,
       },
       this.client,
     );
     if (!res.ok) {
-      return {
-        success: false,
-        message: res.error.message,
-      };
+      return { success: false, message: res.error.message };
     }
-    const createdPost: EventPost = {
-      id: String(res.data.id),
-      eventId,
-      title: post.title,
-      requiredHeadcount: post.requiredHeadcount,
-      filledHeadcount: 0,
-      remainingCapacity: post.requiredHeadcount,
-      physicalLevel: (post.physicalLevel as any) || 'light',
-      requiredSkills: post.requiredSkills || [],
-      leaderNeeded: post.leaderNeeded ?? false,
-      newVolunteersAllowed: post.newVolunteersAllowed ?? true,
-      status: 'open',
-    };
     return {
       success: true,
       message: 'Post created successfully',
-      data: createdPost,
+      data: { id: String(res.data.id), status: res.data.status as PostStatus },
     };
   }
 
   public async updateEventPost(
     postId: string,
     updates: {
+      title?: string;
+      description?: string;
       requiredHeadcount?: number;
-      status?: string;
-      physicalLevel?: string;
+      status?: 'open' | 'full' | 'closed';
+      physicalLevel?: 'none' | 'light' | 'medium' | 'heavy';
       requiredSkills?: string[];
+      leaderNeeded?: boolean;
+      newVolunteersAllowed?: boolean;
+      priority?: number;
     },
-  ): Promise<CoordinatorOperationResult<EventPost>> {
+  ): Promise<CoordinatorOperationResult<{ id: string; status: PostStatus }>> {
     const res = await coordinatorApi.updateEventPost(
       postId,
       {
+        title: updates.title?.trim(),
+        description: updates.description?.trim(),
         required_headcount: updates.requiredHeadcount,
-        status: (updates.status as any) || undefined,
-        physical_level: (updates.physicalLevel as any) || undefined,
+        status: updates.status,
+        physical_level: updates.physicalLevel,
         required_skills: updates.requiredSkills,
+        leader_needed: updates.leaderNeeded,
+        new_volunteers_allowed: updates.newVolunteersAllowed,
+        priority: updates.priority,
       },
       this.client,
     );
     if (!res.ok) {
-      return {
-        success: false,
-        message: res.error.message,
-      };
+      return { success: false, message: res.error.message };
     }
-    const updatedPost: EventPost = {
-      id: postId,
-      eventId: '',
-      title: 'Event Post',
-      requiredHeadcount: updates.requiredHeadcount ?? 1,
-      filledHeadcount: 0,
-      remainingCapacity: updates.requiredHeadcount ?? 1,
-      physicalLevel: (updates.physicalLevel as any) || 'light',
-      requiredSkills: updates.requiredSkills || [],
-      leaderNeeded: false,
-      newVolunteersAllowed: true,
-      status: (updates.status as any) || 'open',
-    };
     return {
       success: true,
       message: 'Post updated successfully',
-      data: updatedPost,
+      data: { id: String(res.data.id), status: res.data.status as PostStatus },
     };
   }
 
@@ -602,14 +579,25 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
 
   public async inviteVolunteer(
     eventId: string,
-    volunteerUserId: string | number,
+    volunteerUserId?: string | number,
     postId?: string | number,
     note?: string,
+    volunteerUuid?: string,
   ): Promise<CoordinatorOperationResult<CoordinatorApplicationItem>> {
+    const normalizedUserId = volunteerUserId !== undefined && String(volunteerUserId).trim()
+      ? Number(volunteerUserId)
+      : undefined;
+    if (normalizedUserId !== undefined && (!Number.isInteger(normalizedUserId) || normalizedUserId < 1)) {
+      return { success: false, message: 'Volunteer user ID must be a positive whole number.' };
+    }
+    if (!normalizedUserId && !volunteerUuid?.trim()) {
+      return { success: false, message: 'Provide either a volunteer user ID or UUID.' };
+    }
     const res = await coordinatorApi.inviteVolunteer(
       eventId,
       {
-        volunteer_user_id: Number(volunteerUserId),
+        volunteer_user_id: normalizedUserId,
+        volunteer_uuid: volunteerUuid?.trim() || undefined,
         post_id: postId ? Number(postId) : null,
         note: note || null,
       },

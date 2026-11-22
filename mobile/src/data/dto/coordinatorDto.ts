@@ -27,6 +27,46 @@ export interface CoordinatorEventListItemDto {
 }
 
 /**
+ * Manager-only event configuration returned by GET /api/v1/coordinator/events/{id}/.
+ * This DTO must never be substituted with the public event detail response.
+ */
+export interface CoordinatorEventConfigurationDto {
+  id: number;
+  owner_id: number;
+  current_coordinator_id: number;
+  title: string;
+  description?: string | null;
+  purpose_type: 'charity_event' | 'help_wanted_event';
+  location_name?: string | null;
+  landmark_text?: string | null;
+  latitude?: string | number | null;
+  longitude?: string | number | null;
+  geo_radius_m?: number | null;
+  geo_checkin_enabled: boolean;
+  geo_checkin_opens_before_min: number;
+  require_checkin_confirmation: boolean;
+  map_provider: 'openstreetmap' | 'google';
+  start_at: string;
+  end_at: string;
+  application_deadline?: string | null;
+  status: string;
+  acceptance_mode: 'auto' | 'manual';
+  auto_assign_enabled: boolean;
+  group_size?: number | null;
+  leader_strategy: 'none' | 'first_experienced' | 'manual';
+  max_participants?: number | null;
+  meals_provided: boolean;
+  lodging_provided: boolean;
+  travel_support_provided: boolean;
+  compensation_kind: 'unpaid' | 'arranged_outside_system';
+  compensation_note?: string | null;
+  onboarding_text?: string | null;
+  onboarding_version: number;
+  require_onboarding_ack: boolean;
+  qr_registration_enabled: boolean;
+}
+
+/**
  * Comprehensive event summary view matching `EventSummarySerializer` / `v_event_summary`.
  * Returned by `GET /api/v1/coordinator/events/{id}/summary/`.
  */
@@ -97,6 +137,7 @@ export interface EventPostCreateRequestDto {
   required_skills?: string[];
   leader_needed?: boolean;
   new_volunteers_allowed?: boolean;
+  priority?: number;
 }
 
 /**
@@ -110,6 +151,7 @@ export interface EventPostUpdateRequestDto {
   required_skills?: string[];
   leader_needed?: boolean;
   new_volunteers_allowed?: boolean;
+  priority?: number;
   status?: 'open' | 'full' | 'closed';
 }
 

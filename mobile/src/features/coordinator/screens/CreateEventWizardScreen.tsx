@@ -16,6 +16,7 @@ import { useRepositories } from '../../../app/RepositoryProvider';
 import type {
   AcceptanceMode,
   CompensationKind,
+  CreateEventWizardDraft,
   EventPurposeType,
   LeaderStrategy,
 } from '../../../domain/models/coordinator';
@@ -48,6 +49,19 @@ export interface CreateEventWizardScreenProps
   repository?: CoordinatorRepository;
 }
 
+function toMyanmarDateTimeParts(value?: string | null): { date: string; time: string } {
+  if (!value) return { date: '', time: '' };
+  const timestamp = new Date(value).getTime();
+  if (!Number.isFinite(timestamp)) return { date: '', time: '' };
+  // Shift the instant to Myanmar Time (UTC+06:30), independent of device timezone.
+  const mmt = new Date(timestamp + 390 * 60 * 1000);
+  const pad = (part: number) => String(part).padStart(2, '0');
+  return {
+    date: `${mmt.getUTCFullYear()}-${pad(mmt.getUTCMonth() + 1)}-${pad(mmt.getUTCDate())}`,
+    time: `${pad(mmt.getUTCHours())}:${pad(mmt.getUTCMinutes())}`,
+  };
+}
+
 const TOTAL_STEPS = 7;
 const STEP_TITLES = [
   'Basics',
@@ -61,12 +75,15 @@ const STEP_TITLES = [
 
 export function CreateEventWizardScreen({
   navigation,
+  route,
   repository: propRepository,
 }: CreateEventWizardScreenProps): React.JSX.Element {
   const { theme } = useAppTheme();
   const { currentUser } = useCurrentUser();
   const repositories = useRepositories();
   const repository = propRepository ?? repositories.coordinatorRepository ?? defaultCoordinatorRepository;
+  const eventId = route?.params?.eventId;
+  const isEditMode = Boolean(eventId);
 
   useEffect(() => {
     if (
@@ -85,6 +102,8 @@ export function CreateEventWizardScreen({
   const [currentStep, setCurrentStep] = useState(1);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingExisting, setIsLoadingExisting] = useState(Boolean(eventId));
+  const [existingEventStatus, setExistingEventStatus] = useState<string | null>(null);
 
   // Step 1: Basics
   const [title, setTitle] = useState('');
@@ -102,8 +121,9 @@ export function CreateEventWizardScreen({
   const [longitude, setLongitude] = useState('96.1500');
   const [geoRadiusM, setGeoRadiusM] = useState('200');
   const [geoCheckinEnabled, setGeoCheckinEnabled] = useState(false);
-  const [geoOpensBeforeMin] = useState('30');
+  const [geoOpensBeforeMin, setGeoOpensBeforeMin] = useState('30');
   const [requireConfirmation, setRequireConfirmation] = useState(true);
+  const [mapProvider, setMapProvider] = useState<'openstreetmap' | 'google'>('openstreetmap');
 
   // Step 3: Schedule & Deadlines (Separated date and 24h MMT time)
   const [startDate, setStartDate] = useState('2026-12-10');
@@ -144,6 +164,86 @@ export function CreateEventWizardScreen({
   const [requireOnboardingAck, setRequireOnboardingAck] = useState(true);
   const [qrRegistrationEnabled, setQrRegistrationEnabled] = useState(true);
 
+  // Reuse the same seven-step form for manager-authorized event editing.
+  useEffect(() => {
+    if (!eventId) {
+      setIsLoadingExisting(false);
+      setExistingEventStatus(null);
+      return;
+    }
+
+    let active = true;
+    setIsLoadingExisting(true);
+    setErrorMessage(null);
+
+    repository.getEventDetail(eventId)
+      .then(existing => {
+        if (!active) return;
+        if (!existing) {
+          setErrorMessage('Event not found or you do not have permission to edit it.');
+          return;
+        }
+        if (existing.isOwnerAsMonitor) {
+          setErrorMessage('This event is read-only while another coordinator manages it.');
+          return;
+        }
+        if (existing.status === 'completed' || existing.status === 'cancelled') {
+          setErrorMessage('Finalized events cannot be edited.');
+          return;
+        }
+
+        const start = toMyanmarDateTimeParts(existing.startAt);
+        const end = toMyanmarDateTimeParts(existing.endAt);
+        const deadline = toMyanmarDateTimeParts(existing.applicationDeadline);
+
+        setExistingEventStatus(existing.status);
+        setTitle(existing.title);
+        setDescription(existing.description ?? '');
+        setPurposeType(existing.purposeType);
+        setCharityFieldCodes((existing.charityFields ?? []) as CharityCategoryCode[]);
+        setLocationName(existing.locationName ?? '');
+        setLandmarkText(existing.landmarkText ?? '');
+        setLatitude(existing.latitude === null || existing.latitude === undefined ? '' : String(existing.latitude));
+        setLongitude(existing.longitude === null || existing.longitude === undefined ? '' : String(existing.longitude));
+        setGeoRadiusM(String(existing.geoRadiusM ?? 200));
+        setGeoCheckinEnabled(existing.geoCheckinEnabled);
+        setGeoOpensBeforeMin(String(existing.geoCheckinOpensBeforeMin));
+        setRequireConfirmation(existing.requireCheckinConfirmation);
+        setMapProvider(existing.mapProvider);
+        setStartDate(start.date);
+        setStartTime(start.time);
+        setEndDate(end.date);
+        setEndTime(end.time);
+        setDeadlineDate(deadline.date);
+        setDeadlineTime(deadline.time);
+        setAcceptanceMode(existing.acceptanceMode);
+        setAutoAssignEnabled(existing.autoAssignEnabled);
+        setGroupSize(existing.groupSize === undefined ? '' : String(existing.groupSize));
+        setLeaderStrategy(existing.leaderStrategy);
+        setMaxParticipants(existing.maxParticipants === undefined ? '' : String(existing.maxParticipants));
+        setMealsProvided(existing.mealsProvided);
+        setLodgingProvided(existing.lodgingProvided);
+        setTravelSupportProvided(existing.travelSupportProvided);
+        setCompensationKind(existing.compensationKind);
+        setCompensationNote(existing.compensationNote ?? '');
+        setOnboardingText(existing.onboardingText ?? '');
+        setRequireOnboardingAck(existing.requireOnboardingAck);
+        setQrRegistrationEnabled(existing.qrRegistrationEnabled);
+      })
+      .catch(err => {
+        if (active) {
+          setErrorMessage(err instanceof Error ? err.message : 'Failed to load event for editing.');
+        }
+      })
+      .finally(() => {
+        if (active) setIsLoadingExisting(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [eventId, repository]);
+
   // Charity Category Selection (Limit 1 to 3)
   const toggleCharityCategory = (code: CharityCategoryCode) => {
     setCharityFieldCodes(prev => {
@@ -180,29 +280,41 @@ export function CreateEventWizardScreen({
 
     // Validate Step 2: Location
     if (currentStep === 2) {
-      if (!locationName.trim()) {
-        setErrorMessage('Location name is required.');
+      const hasLatitude = Boolean(latitude.trim());
+      const hasLongitude = Boolean(longitude.trim());
+      if (hasLatitude !== hasLongitude) {
+        setErrorMessage('Enter both latitude and longitude, or leave both blank.');
         return;
       }
 
-      const latNum = parseFloat(latitude.trim());
-      if (isNaN(latNum) || latNum < -90 || latNum > 90) {
-        setErrorMessage('Latitude must be a valid number between -90 and 90.');
-        return;
-      }
+      if (hasLatitude && hasLongitude) {
+        const latNum = parseFloat(latitude.trim());
+        if (isNaN(latNum) || latNum < -90 || latNum > 90) {
+          setErrorMessage('Latitude must be a valid number between -90 and 90.');
+          return;
+        }
 
-      const lngNum = parseFloat(longitude.trim());
-      if (isNaN(lngNum) || lngNum < -180 || lngNum > 180) {
-        setErrorMessage(
-          'Longitude must be a valid number between -180 and 180.',
-        );
-        return;
+        const lngNum = parseFloat(longitude.trim());
+        if (isNaN(lngNum) || lngNum < -180 || lngNum > 180) {
+          setErrorMessage(
+            'Longitude must be a valid number between -180 and 180.',
+          );
+          return;
+        }
       }
 
       const radiusNum = parseInt(geoRadiusM.trim(), 10);
       if (isNaN(radiusNum) || radiusNum < 20 || radiusNum > 5000) {
         setErrorMessage(
           'Geofence radius must be between 20 and 5000 meters.',
+        );
+        return;
+      }
+
+      const geoWindowNum = parseInt(geoOpensBeforeMin.trim(), 10);
+      if (isNaN(geoWindowNum) || geoWindowNum < 0 || geoWindowNum > 240) {
+        setErrorMessage(
+          'Geo check-in opening window must be between 0 and 240 minutes.',
         );
         return;
       }
@@ -271,6 +383,7 @@ export function CreateEventWizardScreen({
 
   // Save Draft (Step 7)
   const handleSaveDraft = async () => {
+    if (isLoadingExisting || (isEditMode && existingEventStatus === null)) return;
     setIsSubmitting(true);
     setErrorMessage(null);
 
@@ -306,53 +419,64 @@ export function CreateEventWizardScreen({
       return;
     }
 
-    const latNum = parseFloat(latitude.trim());
-    const lngNum = parseFloat(longitude.trim());
+    const latNum = latitude.trim() ? parseFloat(latitude.trim()) : null;
+    const lngNum = longitude.trim() ? parseFloat(longitude.trim()) : null;
     const radiusNum = parseInt(geoRadiusM.trim(), 10);
 
     try {
-      const result = await repository.createDraftEvent({
+      const draft: CreateEventWizardDraft = {
         title,
-        description: description || undefined,
+        description: description.trim() ? description : isEditMode ? null : undefined,
         purposeType,
         charityFieldCodes,
         locationName,
-        landmarkText: landmarkText || undefined,
+        landmarkText: landmarkText.trim() ? landmarkText : isEditMode ? null : undefined,
         latitude: latNum,
         longitude: lngNum,
         geoRadiusM: radiusNum,
         geoCheckinEnabled,
-        geoCheckinOpensBeforeMin: parseInt(geoOpensBeforeMin, 10) || 30,
+        geoCheckinOpensBeforeMin: parseInt(geoOpensBeforeMin.trim(), 10),
         requireCheckinConfirmation: requireConfirmation,
-        mapProvider: 'openstreetmap',
+        mapProvider,
         startAt: startAtIso,
         endAt: endAtIso,
-        applicationDeadline: deadlineIso,
+        applicationDeadline: deadlineIso ?? (isEditMode ? null : undefined),
         acceptanceMode,
         autoAssignEnabled,
-        groupSize: groupSize.trim() ? parseInt(groupSize.trim(), 10) : undefined,
+        groupSize: groupSize.trim() ? parseInt(groupSize.trim(), 10) : isEditMode ? null : undefined,
         leaderStrategy,
         maxParticipants: maxParticipants.trim()
           ? parseInt(maxParticipants.trim(), 10)
-          : undefined,
+          : isEditMode ? null : undefined,
         mealsProvided,
         lodgingProvided,
         travelSupportProvided,
         compensationKind,
-        compensationNote: compensationNote || undefined,
-        onboardingText: onboardingText || undefined,
+        compensationNote: compensationNote.trim() ? compensationNote : isEditMode ? null : undefined,
+        onboardingText: onboardingText.trim() ? onboardingText : isEditMode ? null : undefined,
         requireOnboardingAck,
         qrRegistrationEnabled,
-      });
+      };
+      const result = eventId
+        ? await repository.updateEvent(eventId, draft)
+        : await repository.createDraftEvent(draft);
 
       if (result.success && result.data) {
-        navigation?.navigate?.('CoordinatorEvents');
+        if (eventId) {
+          navigation?.navigate?.('CoordinatorEventDetail', { eventId });
+        } else {
+          navigation?.navigate?.('CoordinatorEvents');
+        }
       } else {
         setErrorMessage(result.message);
       }
     } catch (err) {
       setErrorMessage(
-        err instanceof Error ? err.message : 'Failed to create draft event',
+        err instanceof Error
+          ? err.message
+          : isEditMode
+            ? 'Failed to update event'
+            : 'Failed to create draft event',
       );
     } finally {
       setIsSubmitting(false);
@@ -413,7 +537,7 @@ export function CreateEventWizardScreen({
     <CoordinatorGuard navigation={navigation}>
       <View style={[styles.root, { backgroundColor: theme.colors.background }]}>
         <AppHeader
-          title="Create Event Wizard"
+          title={isEditMode ? 'Edit Event' : 'Create Event Wizard'}
           subtitle={`Step ${currentStep} of ${TOTAL_STEPS}: ${STEP_TITLES[currentStep - 1]}`}
           onBackPress={handleCancel}
         />
@@ -637,6 +761,34 @@ export function CreateEventWizardScreen({
                 placeholder="200"
                 style={styles.fieldSpacing}
               />
+
+              <AppInput
+                label="Geo Check-In Opens Before Event (0–240 minutes)"
+                value={geoOpensBeforeMin}
+                onChangeText={setGeoOpensBeforeMin}
+                placeholder="30"
+                style={styles.fieldSpacing}
+              />
+
+              <AppText variant="caption" weight="semibold" color={theme.colors.textSecondary} style={styles.labelMargin}>
+                Map Provider
+              </AppText>
+              <View style={styles.chipsRow}>
+                <FilterChip
+                  label="OpenStreetMap"
+                  selected={mapProvider === 'openstreetmap'}
+                  onPress={() => setMapProvider('openstreetmap')}
+                />
+                <FilterChip
+                  label="Google Maps"
+                  selected={mapProvider === 'google'}
+                  onPress={() => setMapProvider('google')}
+                />
+              </View>
+
+              <AppText variant="caption" color={theme.colors.textSecondary} style={styles.stepHint}>
+                Template preview only. Native map display and device geofence execution are not active in this screen.
+              </AppText>
 
               {/* Geofence Radar Visual Preview (.map, .fence, .pin) */}
               <View
@@ -949,14 +1101,14 @@ export function CreateEventWizardScreen({
                   onPress={() => setLeaderStrategy('none')}
                 />
                 <FilterChip
-                  label="First Assigned"
-                  selected={leaderStrategy === 'first_assigned'}
-                  onPress={() => setLeaderStrategy('first_assigned')}
+                  label="First Experienced"
+                  selected={leaderStrategy === 'first_experienced'}
+                  onPress={() => setLeaderStrategy('first_experienced')}
                 />
                 <FilterChip
-                  label="Highest Rated"
-                  selected={leaderStrategy === 'highest_rated'}
-                  onPress={() => setLeaderStrategy('highest_rated')}
+                  label="Manual Selection"
+                  selected={leaderStrategy === 'manual'}
+                  onPress={() => setLeaderStrategy('manual')}
                 />
               </View>
             </AppCard>
@@ -1000,14 +1152,9 @@ export function CreateEventWizardScreen({
                   onPress={() => setCompensationKind('unpaid')}
                 />
                 <FilterChip
-                  label="Stipend"
-                  selected={compensationKind === 'stipend'}
-                  onPress={() => setCompensationKind('stipend')}
-                />
-                <FilterChip
-                  label="Travel Reimbursement"
-                  selected={compensationKind === 'travel_reimbursement'}
-                  onPress={() => setCompensationKind('travel_reimbursement')}
+                  label="Arranged Outside System"
+                  selected={compensationKind === 'arranged_outside_system'}
+                  onPress={() => setCompensationKind('arranged_outside_system')}
                 />
               </View>
 
@@ -1060,7 +1207,7 @@ export function CreateEventWizardScreen({
           {currentStep === 7 && (
             <AppCard style={styles.cardSpacing}>
               <AppText variant="title" weight="bold" color={theme.colors.textPrimary}>
-                Review Event Configuration
+                {isEditMode ? 'Review Event Changes' : 'Review Event Configuration'}
               </AppText>
 
               {/* Demo-only banner */}
@@ -1078,11 +1225,14 @@ export function CreateEventWizardScreen({
                   weight="bold"
                   color={theme.colors.warning}
                 >
-                  ⚠️ Demo only — not submitted to server
+                  {repositories.dataMode === 'mock'
+                    ? 'Template Preview — not submitted to server'
+                    : 'HTTP Mode — event draft will be submitted to the BFF'}
                 </AppText>
                 <AppText variant="caption" color={theme.colors.textSecondary}>
-                  Saving will create an in-memory draft event fixture for this
-                  session.
+                  {repositories.dataMode === 'mock'
+                    ? 'Saving updates a local in-memory event fixture for this session.'
+                    : 'Saving sends the event draft to the configured Django BFF.'}
                 </AppText>
               </View>
 
@@ -1098,6 +1248,9 @@ export function CreateEventWizardScreen({
                 </AppText>
                 <AppText variant="caption" color={theme.colors.textSecondary}>
                   Coordinates: {latitude}, {longitude}
+                </AppText>
+                <AppText variant="caption" color={theme.colors.textSecondary}>
+                  Geo window: {geoOpensBeforeMin} minutes • Map provider: {mapProvider}
                 </AppText>
               </View>
 
@@ -1142,7 +1295,9 @@ export function CreateEventWizardScreen({
                   IMMUTABLE SYSTEM ATTRIBUTES (ENFORCED BY SERVICE)
                 </AppText>
                 <AppText variant="caption" color={theme.colors.textSecondary}>
-                  {`Status: Draft • Onboarding Version: 1 • Coordinator: ${
+                  {`${isEditMode
+                    ? `Existing status: ${existingEventStatus ?? 'unchanged'} • Status is unchanged by this form • Onboarding version is server-managed • Coordinator: `
+                    : 'Status: Draft • Onboarding Version: 1 • Coordinator: '}${
                     currentUser?.displayName ??
                     ('getCoordinatorIdentity' in repository &&
                     typeof (repository as any).getCoordinatorIdentity === 'function'
@@ -1175,9 +1330,12 @@ export function CreateEventWizardScreen({
                 />
               ) : (
                 <AppButton
-                  label="Save Draft (Demo)"
+                  label={isEditMode
+                    ? repositories.dataMode === 'mock' ? 'Save Changes (Template)' : 'Save Event Changes'
+                    : repositories.dataMode === 'mock' ? 'Save Draft (Template)' : 'Create Draft Event'}
                   variant="primary"
-                  loading={isSubmitting}
+                  loading={isSubmitting || isLoadingExisting}
+                  disabled={isLoadingExisting || (isEditMode && existingEventStatus === null)}
                   onPress={handleSaveDraft}
                 />
               )}

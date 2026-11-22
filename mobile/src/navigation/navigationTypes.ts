@@ -24,7 +24,7 @@ export type MainDrawerParamList = {
     returnTo?: 'Dashboard' | 'Events' | 'MyApplications' | 'MyAssignments';
   };
   CoordinatorEvents: undefined;
-  CreateEventWizard: undefined;
+  CreateEventWizard: { eventId?: string } | undefined;
   CoordinatorEventDetail: { eventId: string };
   CoordinatorApplications: { eventId?: string } | undefined;
   CoordinatorAssignments: { eventId?: string } | undefined;

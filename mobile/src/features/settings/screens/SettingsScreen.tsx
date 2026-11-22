@@ -210,14 +210,14 @@ export function SettingsScreen({
           <AppText variant="caption" color={theme.colors.textSecondary}>
             {isHttpMode()
               ? 'Mode: HTTP Live BFF (Connected to Django Service)'
-              : 'Mode: Local Typed Mock Fixtures (No Live API Calls)'}
+              : 'Mode: Template Mode (Local Demo Fixtures Only — No Live API Calls)'}
           </AppText>
         </AppCard>
 
         {/* Development Connection & Mode Diagnostics */}
         {typeof __DEV__ !== 'undefined' && __DEV__ ? (
           <>
-            <SectionHeader title="API & Data Mode Diagnostics" />
+            <SectionHeader title="Template & API Diagnostics" />
             <AppCard style={styles.cardSpacing}>
               <AppText
                 variant="caption"
@@ -232,7 +232,7 @@ export function SettingsScreen({
                 weight="bold"
                 color={theme.colors.textPrimary}
               >
-                {`Active Data Mode: ${currentMode.toUpperCase()}`}
+                {`Active Data Mode: ${currentMode === 'mock' ? 'TEMPLATE' : 'HTTP'}`}
               </AppText>
 
               <AppText
@@ -284,11 +284,11 @@ export function SettingsScreen({
 
               <View style={[styles.rowGap, styles.marginTop]}>
                 <AppButton
-                  label="Mock Mode"
+                  label="Template Mode"
                   variant={currentMode === 'mock' ? 'primary' : 'secondary'}
                   onPress={() => handleSetDataMode('mock')}
                   style={styles.flexOne}
-                  accessibilityLabel="Switch to Mock"
+                  accessibilityLabel="Switch to Template Mode"
                 />
                 <AppButton
                   label="HTTP Mode"

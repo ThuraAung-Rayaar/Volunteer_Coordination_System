@@ -8,6 +8,7 @@ import {
   mapCoordinatorAssignment,
   mapCoordinatorEventSummary,
   mapCreateEventDraftToRequest,
+  mapEventUpdateDraftToRequest,
 } from '../coordinatorMapper';
 import type {
   AttendanceRosterDto,
@@ -20,7 +21,7 @@ import type { CreateEventWizardDraft } from '../../../domain/models/coordinator'
 
 describe('coordinatorMapper', () => {
   describe('mapCreateEventDraftToRequest', () => {
-    it('correctly normalizes leaderStrategy and compensationKind enum choices', () => {
+    it('preserves BFF-supported leader and compensation choices without semantic translation', () => {
       const draft: CreateEventWizardDraft = {
         title: 'Community Garden Workshop',
         description: 'Hands-on organic gardening training',
@@ -41,12 +42,12 @@ describe('coordinatorMapper', () => {
         acceptanceMode: 'manual',
         autoAssignEnabled: true,
         groupSize: 5,
-        leaderStrategy: 'highest_rated', // Mobile enum to be translated
+        leaderStrategy: 'first_experienced',
         maxParticipants: 30,
         mealsProvided: true,
         lodgingProvided: false,
         travelSupportProvided: true,
-        compensationKind: 'stipend', // Mobile enum to be translated
+        compensationKind: 'arranged_outside_system',
         compensationNote: '50,000 MMK daily',
         onboardingText: 'Wear garden boots',
         requireOnboardingAck: true,
@@ -56,11 +57,9 @@ describe('coordinatorMapper', () => {
       const requestDto = mapCreateEventDraftToRequest(draft);
 
       expect(requestDto.title).toBe('Community Garden Workshop');
-      // Translated enum: 'highest_rated' -> 'first_experienced'
       expect(requestDto.leader_strategy).toBe('first_experienced');
-      // Translated enum: 'stipend' -> 'arranged_outside_system'
       expect(requestDto.compensation_kind).toBe('arranged_outside_system');
-      expect(requestDto.compensation_note).toContain('Stipend Support: 50,000 MMK daily');
+      expect(requestDto.compensation_note).toBe('50,000 MMK daily');
       expect(requestDto.start_at).toBe('2026-12-15T08:00:00+06:30');
       expect(requestDto.end_at).toBe('2026-12-15T12:00:00+06:30');
       expect(requestDto.application_deadline).toBe('2026-12-10T18:00:00+06:30');
@@ -246,6 +245,53 @@ describe('coordinatorMapper', () => {
       expect(item.groupCode).toBe('GRP-LANG');
       expect(item.status).toBe('confirmed');
       expect(item.assignedAt).toBe('2026-11-14T08:00:00Z'); // Truthful assigned_at, NOT confirmed_at
+    });
+  });
+
+  describe('mapEventUpdateDraftToRequest', () => {
+    it('preserves explicit nulls when clearing optional event fields in PATCH', () => {
+      const payload = mapEventUpdateDraftToRequest({
+        description: null,
+        landmarkText: null,
+        latitude: null,
+        longitude: null,
+        applicationDeadline: null,
+        groupSize: null,
+        maxParticipants: null,
+        compensationNote: null,
+        onboardingText: null,
+      });
+
+      expect(payload).toEqual({
+        description: null,
+        landmark_text: null,
+        latitude: null,
+        longitude: null,
+        application_deadline: null,
+        group_size: null,
+        max_participants: null,
+        compensation_note: null,
+        onboarding_text: null,
+      });
+    });
+
+    it('sends only fields explicitly supplied for an event PATCH', () => {
+      const payload = mapEventUpdateDraftToRequest({
+        title: '  Updated title  ',
+        description: '',
+        geoCheckinOpensBeforeMin: 45,
+        requireCheckinConfirmation: false,
+      });
+
+      expect(payload).toEqual({
+        title: 'Updated title',
+        description: null,
+        geo_checkin_opens_before_min: 45,
+        require_checkin_confirmation: false,
+      });
+      expect(payload).not.toHaveProperty('start_at');
+      expect(payload).not.toHaveProperty('auto_assign_enabled');
+      expect(payload).not.toHaveProperty('compensation_kind');
     });
   });
 

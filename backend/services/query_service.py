@@ -202,6 +202,7 @@ def get_event_posts(event_id: int | str, verified_visible: bool = False) -> list
             "required_skills": list(post.required_skills or []),
             "leader_needed": post.leader_needed,
             "new_volunteers_allowed": post.new_volunteers_allowed,
+            "priority": post.priority,
             "required_headcount": post.required_headcount,
             "assigned_count": int(cap.assigned_count) if cap else 0,
             "remaining": int(cap.remaining) if cap else post.required_headcount,
