@@ -14,17 +14,9 @@ export type CoordinatorEventStatus =
 
 export type EventPurposeType = 'charity_event' | 'help_wanted_event';
 export type AcceptanceMode = 'manual' | 'auto';
-export type LeaderStrategy =
-  | 'none'
-  | 'first_experienced'
-  | 'manual'
-  | 'first_assigned'
-  | 'highest_rated';
-export type CompensationKind =
-  | 'unpaid'
-  | 'arranged_outside_system'
-  | 'stipend'
-  | 'travel_reimbursement';
+export type LeaderStrategy = 'none' | 'first_experienced' | 'manual';
+export type CompensationKind = 'unpaid' | 'arranged_outside_system';
+export type MapProvider = 'openstreetmap' | 'google';
 
 export interface CoordinatorOverviewMetrics {
   totalEventsCount: number;
@@ -74,7 +66,7 @@ export interface CreateEventWizardDraft {
   geoCheckinEnabled: boolean;
   geoCheckinOpensBeforeMin: number;
   requireCheckinConfirmation: boolean;
-  mapProvider: string;
+  mapProvider: MapProvider;
 
   // Step 3: Schedule
   startAt: string;
@@ -108,7 +100,7 @@ export interface CoordinatorEventDetail extends CoordinatorEventSummary {
   geoCheckinEnabled: boolean;
   geoCheckinOpensBeforeMin: number;
   requireCheckinConfirmation: boolean;
-  mapProvider: string;
+  mapProvider: MapProvider;
   applicationDeadline?: string;
   acceptanceMode: AcceptanceMode;
   autoAssignEnabled: boolean;

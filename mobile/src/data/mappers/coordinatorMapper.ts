@@ -36,46 +36,13 @@ import type {
 import type { CharityCategoryCode } from '../../domain/models/event';
 
 /**
- * Maps wizard draft to EventCreateRequestDto matching EventCreateSerializer.
- * Translates mobile domain choices into backend allow-listed serializer choices:
- * - leaderStrategy ('first_assigned' | 'highest_rated' -> 'first_experienced')
- * - compensationKind ('stipend' | 'travel_reimbursement' -> 'arranged_outside_system')
+ * Maps the event wizard draft directly to the current BFF allow-list contract.
+ * Domain choices match EventCreateSerializer, so a selected value is never
+ * silently translated into a different meaning.
  */
 export function mapCreateEventDraftToRequest(
   draft: CreateEventWizardDraft,
 ): EventCreateRequestDto {
-  let leaderStrategy: 'none' | 'first_experienced' | 'manual' = 'none';
-  if (
-    draft.leaderStrategy === 'first_experienced' ||
-    draft.leaderStrategy === 'manual'
-  ) {
-    leaderStrategy = draft.leaderStrategy;
-  } else if (
-    draft.leaderStrategy === 'first_assigned' ||
-    draft.leaderStrategy === 'highest_rated'
-  ) {
-    leaderStrategy = 'first_experienced';
-  }
-
-  let compensationKind: 'unpaid' | 'arranged_outside_system' = 'unpaid';
-  let compensationNote: string | null = draft.compensationNote ?? null;
-
-  if (draft.compensationKind === 'arranged_outside_system') {
-    compensationKind = 'arranged_outside_system';
-  } else if (
-    draft.compensationKind === 'stipend' ||
-    draft.compensationKind === 'travel_reimbursement'
-  ) {
-    compensationKind = 'arranged_outside_system';
-    const kindLabel =
-      draft.compensationKind === 'stipend'
-        ? 'Stipend Support'
-        : 'Travel Reimbursement';
-    compensationNote = draft.compensationNote
-      ? `${kindLabel}: ${draft.compensationNote}`
-      : kindLabel;
-  }
-
   return {
     title: draft.title.trim(),
     description: draft.description ? draft.description.trim() : null,
@@ -88,20 +55,20 @@ export function mapCreateEventDraftToRequest(
     geo_checkin_enabled: Boolean(draft.geoCheckinEnabled),
     geo_checkin_opens_before_min: draft.geoCheckinOpensBeforeMin ?? 30,
     require_checkin_confirmation: Boolean(draft.requireCheckinConfirmation),
-    map_provider: draft.mapProvider === 'google' ? 'google' : 'openstreetmap',
+    map_provider: draft.mapProvider,
     start_at: draft.startAt,
     end_at: draft.endAt,
     application_deadline: draft.applicationDeadline ?? null,
     acceptance_mode: draft.acceptanceMode,
     auto_assign_enabled: Boolean(draft.autoAssignEnabled),
     group_size: draft.groupSize ?? null,
-    leader_strategy: leaderStrategy,
+    leader_strategy: draft.leaderStrategy,
     max_participants: draft.maxParticipants ?? null,
     meals_provided: Boolean(draft.mealsProvided),
     lodging_provided: Boolean(draft.lodgingProvided),
     travel_support_provided: Boolean(draft.travelSupportProvided),
-    compensation_kind: compensationKind,
-    compensation_note: compensationNote,
+    compensation_kind: draft.compensationKind,
+    compensation_note: draft.compensationNote ?? null,
     onboarding_text: draft.onboardingText ? draft.onboardingText.trim() : null,
     require_onboarding_ack: Boolean(draft.requireOnboardingAck),
     qr_registration_enabled: Boolean(draft.qrRegistrationEnabled),

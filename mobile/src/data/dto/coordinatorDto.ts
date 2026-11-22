@@ -97,6 +97,7 @@ export interface EventPostCreateRequestDto {
   required_skills?: string[];
   leader_needed?: boolean;
   new_volunteers_allowed?: boolean;
+  priority?: number;
 }
 
 /**
@@ -110,6 +111,7 @@ export interface EventPostUpdateRequestDto {
   required_skills?: string[];
   leader_needed?: boolean;
   new_volunteers_allowed?: boolean;
+  priority?: number;
   status?: 'open' | 'full' | 'closed';
 }
 
