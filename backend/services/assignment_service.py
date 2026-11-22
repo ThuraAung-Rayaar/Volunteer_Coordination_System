@@ -24,6 +24,7 @@ from apps.events.models import EventApplications, VEventPostCapacity
 from common.db_context import set_db_session_context
 from common.exceptions import DomainError, ResourceMaskedNotFound
 from common.permissions import get_event_for_manager_or_404
+from services.cancellation_policy import is_within_volunteer_cancellation_window
 
 logger = logging.getLogger(__name__)
 
@@ -275,6 +276,22 @@ def cancel_assignment(
 
     if assignment.status == "cancelled":
         return assignment  # Idempotent
+
+    # Volunteer self-cancellation closes 48 hours before the scheduled shift.
+    # Event managers retain the authorized operational override.
+    if (
+        actor.id == assignment.user_id
+        and assignment.status in ("assigned", "confirmed")
+        and is_within_volunteer_cancellation_window(assignment.schedule_start)
+    ):
+        raise DomainError(
+            code="cancellation_window_closed",
+            message=(
+                "Volunteers cannot cancel an accepted shift within 48 hours "
+                "of its scheduled start. Contact the event coordinator for assistance."
+            ),
+            status_code=409,
+        )
 
     set_db_session_context(actor.id)
     assignment.status = "cancelled"
