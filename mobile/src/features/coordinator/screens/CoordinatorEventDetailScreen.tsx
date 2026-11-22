@@ -4,6 +4,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import {
+  Alert,
   Modal,
   Pressable,
   ScrollView,
@@ -17,14 +18,17 @@ import type {
   CoordinatorEventDetail,
   CoordinatorEventStatus,
 } from '../../../domain/models/coordinator';
+import type { EventPost, PhysicalLevel, PostStatus } from '../../../domain/models/event';
 import type { MainDrawerScreenProps } from '../../../navigation/navigationTypes';
 import {
   AppButton,
   AppCard,
   AppHeader,
   AppIcon,
+  AppInput,
   AppText,
   ErrorState,
+  FilterChip,
   LoadingState,
   SectionHeader,
   StatusBadge,
@@ -58,6 +62,20 @@ export function CoordinatorEventDetailScreen({
   const [pendingTargetStatus, setPendingTargetStatus] =
     useState<CoordinatorEventStatus | null>(null);
   const [isTransitioning, setIsTransitioning] = useState(false);
+
+  // Event-post template/editor state. In template mode these changes update the
+  // local mock repository; in HTTP mode the BFF response is reloaded as authority.
+  const [editingPostId, setEditingPostId] = useState<string | null>(null);
+  const [postTitle, setPostTitle] = useState('');
+  const [postDescription, setPostDescription] = useState('');
+  const [postHeadcount, setPostHeadcount] = useState('1');
+  const [postPhysicalLevel, setPostPhysicalLevel] = useState<PhysicalLevel>('light');
+  const [postSkillsText, setPostSkillsText] = useState('');
+  const [postLeaderNeeded, setPostLeaderNeeded] = useState(false);
+  const [postNewVolunteersAllowed, setPostNewVolunteersAllowed] = useState(true);
+  const [postPriority, setPostPriority] = useState('100');
+  const [postStatus, setPostStatus] = useState<PostStatus>('open');
+  const [isSavingPost, setIsSavingPost] = useState(false);
 
   const loadDetail = useCallback(async () => {
     if (!eventId) {
@@ -115,6 +133,105 @@ export function CoordinatorEventDetailScreen({
       setIsTransitioning(false);
       setPendingTargetStatus(null);
     }
+  };
+
+  const resetPostForm = () => {
+    setEditingPostId(null);
+    setPostTitle('');
+    setPostDescription('');
+    setPostHeadcount('1');
+    setPostPhysicalLevel('light');
+    setPostSkillsText('');
+    setPostLeaderNeeded(false);
+    setPostNewVolunteersAllowed(true);
+    setPostPriority('100');
+    setPostStatus('open');
+  };
+
+  const handleEditPost = (post: EventPost) => {
+    setEditingPostId(post.id);
+    setPostTitle(post.title);
+    setPostDescription(post.description ?? '');
+    setPostHeadcount(String(post.requiredHeadcount));
+    setPostPhysicalLevel(post.physicalLevel);
+    setPostSkillsText(post.requiredSkills.join(', '));
+    setPostLeaderNeeded(post.leaderNeeded);
+    setPostNewVolunteersAllowed(post.newVolunteersAllowed);
+    setPostPriority(String(post.priority ?? 100));
+    setPostStatus(post.status);
+  };
+
+  const handleSavePost = async () => {
+    if (!event || isMonitorMode || isFinalState) return;
+    const requiredHeadcount = Number(postHeadcount.trim());
+    const priority = Number(postPriority.trim());
+    if (!postTitle.trim()) {
+      setFeedbackBanner('Post title is required.');
+      return;
+    }
+    if (!Number.isInteger(requiredHeadcount) || requiredHeadcount < 1) {
+      setFeedbackBanner('Required headcount must be a positive whole number.');
+      return;
+    }
+    if (!Number.isInteger(priority)) {
+      setFeedbackBanner('Priority must be a whole number.');
+      return;
+    }
+
+    const postDraft = {
+      title: postTitle.trim(),
+      description: postDescription.trim(),
+      requiredHeadcount,
+      physicalLevel: postPhysicalLevel,
+      requiredSkills: postSkillsText.split(',').map(value => value.trim()).filter(Boolean),
+      leaderNeeded: postLeaderNeeded,
+      newVolunteersAllowed: postNewVolunteersAllowed,
+      priority,
+    };
+
+    setIsSavingPost(true);
+    try {
+      const result = editingPostId
+        ? await repository.updateEventPost(editingPostId, {
+            ...postDraft,
+            status: postStatus,
+          })
+        : await repository.createEventPost(event.id, postDraft);
+
+      if (!result.success) {
+        setFeedbackBanner(result.message);
+        return;
+      }
+
+      setFeedbackBanner(result.message);
+      resetPostForm();
+      await loadDetail();
+    } catch (err) {
+      setFeedbackBanner(err instanceof Error ? err.message : 'Failed to save event post.');
+    } finally {
+      setIsSavingPost(false);
+    }
+  };
+
+  const confirmClosePost = async (postId: string) => {
+    try {
+      const result = await repository.closeEventPost(postId);
+      setFeedbackBanner(result.message);
+      if (result.success) await loadDetail();
+    } catch (err) {
+      setFeedbackBanner(err instanceof Error ? err.message : 'Failed to close event post.');
+    }
+  };
+
+  const handleClosePost = (post: EventPost) => {
+    Alert.alert(
+      'Close event post?',
+      `New applications will no longer be accepted for "${post.title}".`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Close Post', style: 'destructive', onPress: () => { void confirmClosePost(post.id); } },
+      ],
+    );
   };
 
   const handleBack = () => {
@@ -467,6 +584,131 @@ export function CoordinatorEventDetailScreen({
             </View>
           </AppCard>
 
+
+          {/* Event Posts & Role Requirements */}
+          <SectionHeader title={`Event Posts & Role Requirements (${event.posts.length})`} />
+          <AppCard style={styles.cardSpacing}>
+            {event.posts.length === 0 ? (
+              <AppText variant="caption" color={theme.colors.textSecondary}>
+                No role posts have been created for this event yet.
+              </AppText>
+            ) : (
+              event.posts.map(post => (
+                <View
+                  key={post.id}
+                  style={{
+                    paddingVertical: 12,
+                    borderBottomWidth: 1,
+                    borderBottomColor: theme.colors.border,
+                  }}
+                >
+                  <View style={styles.postTitleRow}>
+                    <AppText variant="body" weight="bold" color={theme.colors.textPrimary}>
+                      {post.title}
+                    </AppText>
+                    <StatusBadge status={post.status === 'open' ? 'success' : post.status === 'full' ? 'warning' : 'danger'} />
+                  </View>
+                  {post.description ? (
+                    <AppText variant="caption" color={theme.colors.textSecondary}>
+                      {post.description}
+                    </AppText>
+                  ) : null}
+                  <AppText variant="caption" color={theme.colors.textSecondary}>
+                    Headcount: {post.filledHeadcount}/{post.requiredHeadcount} • Remaining: {post.remainingCapacity}
+                  </AppText>
+                  <AppText variant="caption" color={theme.colors.textSecondary}>
+                    Physical level: {post.physicalLevel} • Priority: {post.priority ?? 100}
+                  </AppText>
+                  <AppText variant="caption" color={theme.colors.textSecondary}>
+                    Skills: {post.requiredSkills.length ? post.requiredSkills.join(', ') : 'No specific skills'}
+                  </AppText>
+                  <AppText variant="caption" color={theme.colors.textSecondary}>
+                    Group leader needed: {post.leaderNeeded ? 'Yes' : 'No'} • New volunteers: {post.newVolunteersAllowed ? 'Allowed' : 'Not allowed'}
+                  </AppText>
+                  {!isMonitorMode && !isFinalState ? (
+                    <View style={[styles.rosterActionButtons, { marginTop: 8 }]}>
+                      <View style={styles.rosterBtnCol}>
+                        <AppButton label="Edit" variant="outline" onPress={() => handleEditPost(post)} />
+                      </View>
+                      <View style={styles.rosterBtnCol}>
+                        <AppButton
+                          label="Close Post"
+                          variant="danger"
+                          disabled={post.status === 'closed'}
+                          onPress={() => handleClosePost(post)}
+                        />
+                      </View>
+                    </View>
+                  ) : null}
+                </View>
+              ))
+            )}
+
+            {isMonitorMode ? (
+              <AppText variant="caption" color={theme.colors.accent} style={{ marginTop: 12 }}>
+                Post management is read-only while another coordinator owns event operations.
+              </AppText>
+            ) : isFinalState ? (
+              <AppText variant="caption" color={theme.colors.textSecondary} style={{ marginTop: 12 }}>
+                Event posts are read-only after the event reaches a final state.
+              </AppText>
+            ) : (
+              <View style={{ marginTop: 14 }}>
+                <AppText variant="body" weight="bold" color={theme.colors.textPrimary}>
+                  {editingPostId ? 'Edit Event Post' : 'Create Event Post'}
+                </AppText>
+                <AppText variant="caption" color={theme.colors.textSecondary} style={{ marginBottom: 10 }}>
+                  These fields match the current event-post BFF contract.
+                </AppText>
+                <AppInput label="Post Title *" value={postTitle} onChangeText={setPostTitle} placeholder="e.g. First Aid Support" style={{ marginBottom: 10 }} />
+                <AppInput label="Description" value={postDescription} onChangeText={setPostDescription} placeholder="Describe the shift duties" multiline numberOfLines={3} style={{ marginBottom: 10 }} />
+                <View style={styles.postFormRow}>
+                  <View style={styles.postFormHalf}>
+                    <AppInput label="Required Headcount *" value={postHeadcount} onChangeText={setPostHeadcount} placeholder="5" />
+                  </View>
+                  <View style={styles.postFormHalf}>
+                    <AppInput label="Priority" value={postPriority} onChangeText={setPostPriority} placeholder="100" />
+                  </View>
+                </View>
+                <AppText variant="caption" weight="semibold" color={theme.colors.textSecondary} style={{ marginTop: 8, marginBottom: 6 }}>
+                  Physical Level
+                </AppText>
+                <View style={styles.chipsRow}>
+                  {(['none', 'light', 'medium', 'heavy'] as PhysicalLevel[]).map(level => (
+                    <FilterChip key={level} label={level} selected={postPhysicalLevel === level} onPress={() => setPostPhysicalLevel(level)} />
+                  ))}
+                </View>
+                <AppInput label="Required Skills (comma-separated)" value={postSkillsText} onChangeText={setPostSkillsText} placeholder="first_aid, logistics" style={{ marginTop: 10 }} />
+                <View style={[styles.chipsRow, { marginTop: 10 }]}>
+                  <FilterChip label="Leader Needed" selected={postLeaderNeeded} onPress={() => setPostLeaderNeeded(!postLeaderNeeded)} />
+                  <FilterChip label="New Volunteers Allowed" selected={postNewVolunteersAllowed} onPress={() => setPostNewVolunteersAllowed(!postNewVolunteersAllowed)} />
+                </View>
+                {editingPostId ? (
+                  <>
+                    <AppText variant="caption" weight="semibold" color={theme.colors.textSecondary} style={{ marginTop: 10, marginBottom: 6 }}>
+                      Post Status
+                    </AppText>
+                    <View style={styles.chipsRow}>
+                      {(['open', 'full', 'closed'] as PostStatus[]).map(status => (
+                        <FilterChip key={status} label={status} selected={postStatus === status} onPress={() => setPostStatus(status)} />
+                      ))}
+                    </View>
+                  </>
+                ) : null}
+                <View style={[styles.rosterActionButtons, { marginTop: 14 }]}>
+                  <View style={styles.rosterBtnCol}>
+                    <AppButton label={isSavingPost ? 'Saving...' : editingPostId ? 'Save Post Changes' : 'Create Post'} variant="primary" loading={isSavingPost} onPress={handleSavePost} />
+                  </View>
+                  {editingPostId ? (
+                    <View style={styles.rosterBtnCol}>
+                      <AppButton label="Cancel Edit" variant="outline" onPress={resetPostForm} />
+                    </View>
+                  ) : null}
+                </View>
+              </View>
+            )}
+          </AppCard>
+
           {/* Location & Rules Summary */}
           <SectionHeader title="Location & Access Configuration" />
           <AppCard style={styles.cardSpacing}>
@@ -691,6 +933,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
     marginBottom: 8,
+  },
+  postTitleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
+  postFormRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 10,
+  },
+  postFormHalf: {
+    flex: 1,
   },
   modalBackdrop: {
     flex: 1,
