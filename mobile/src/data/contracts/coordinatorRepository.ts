@@ -17,7 +17,7 @@ import type {
   GeoAttemptReview,
   VolunteerUuidLookup,
 } from '../../domain/models/coordinator';
-import type { EventPost } from '../../domain/models/event';
+import type { PhysicalLevel, PostStatus } from '../../domain/models/event';
 
 export interface CoordinatorOperationResult<T = void> {
   success: boolean;
@@ -73,13 +73,15 @@ export interface CoordinatorRepository {
     eventId: string,
     post: {
       title: string;
+      description?: string;
       requiredHeadcount: number;
-      physicalLevel?: string;
+      physicalLevel?: PhysicalLevel;
       requiredSkills?: string[];
       leaderNeeded?: boolean;
       newVolunteersAllowed?: boolean;
+      priority?: number;
     },
-  ): Promise<CoordinatorOperationResult<EventPost>>;
+  ): Promise<CoordinatorOperationResult<{ id: string; status: PostStatus }>>;
 
   /**
    * Updates an event post headcount, requirements, or status (C-09).
@@ -87,12 +89,17 @@ export interface CoordinatorRepository {
   updateEventPost(
     postId: string,
     updates: {
+      title?: string;
+      description?: string;
       requiredHeadcount?: number;
-      status?: string;
-      physicalLevel?: string;
+      status?: PostStatus;
+      physicalLevel?: PhysicalLevel;
       requiredSkills?: string[];
+      leaderNeeded?: boolean;
+      newVolunteersAllowed?: boolean;
+      priority?: number;
     },
-  ): Promise<CoordinatorOperationResult<EventPost>>;
+  ): Promise<CoordinatorOperationResult<{ id: string; status: PostStatus }>>;
 
   /**
    * Closes an event post to stop accepting new applications (C-10).

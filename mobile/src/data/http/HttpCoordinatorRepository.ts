@@ -40,7 +40,7 @@ import {
 } from '../mappers/coordinatorMapper';
 import { mapPublicEventPost } from '../mappers/eventMapper';
 import type { PublicEventPostDto } from '../dto/eventDto';
-import type { EventPost } from '../../domain/models/event';
+import type { PostStatus } from '../../domain/models/event';
 import type {
   AttendanceRosterDto,
   CoordinatorApplicationDto,
@@ -383,93 +383,75 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
     eventId: string,
     post: {
       title: string;
+      description?: string;
       requiredHeadcount: number;
-      physicalLevel?: string;
+      physicalLevel?: 'none' | 'light' | 'medium' | 'heavy';
       requiredSkills?: string[];
       leaderNeeded?: boolean;
       newVolunteersAllowed?: boolean;
+      priority?: number;
     },
-  ): Promise<CoordinatorOperationResult<EventPost>> {
+  ): Promise<CoordinatorOperationResult<{ id: string; status: PostStatus }>> {
     const res = await coordinatorApi.createEventPost(
       eventId,
       {
-        title: post.title,
+        title: post.title.trim(),
+        description: post.description?.trim() || null,
         required_headcount: post.requiredHeadcount,
-        physical_level: (post.physicalLevel as any) || 'light',
-        required_skills: post.requiredSkills || [],
+        physical_level: post.physicalLevel ?? 'light',
+        required_skills: post.requiredSkills ?? [],
         leader_needed: post.leaderNeeded ?? false,
         new_volunteers_allowed: post.newVolunteersAllowed ?? true,
+        priority: post.priority ?? 100,
       },
       this.client,
     );
     if (!res.ok) {
-      return {
-        success: false,
-        message: res.error.message,
-      };
+      return { success: false, message: res.error.message };
     }
-    const createdPost: EventPost = {
-      id: String(res.data.id),
-      eventId,
-      title: post.title,
-      requiredHeadcount: post.requiredHeadcount,
-      filledHeadcount: 0,
-      remainingCapacity: post.requiredHeadcount,
-      physicalLevel: (post.physicalLevel as any) || 'light',
-      requiredSkills: post.requiredSkills || [],
-      leaderNeeded: post.leaderNeeded ?? false,
-      newVolunteersAllowed: post.newVolunteersAllowed ?? true,
-      status: 'open',
-    };
     return {
       success: true,
       message: 'Post created successfully',
-      data: createdPost,
+      data: { id: String(res.data.id), status: res.data.status as PostStatus },
     };
   }
 
   public async updateEventPost(
     postId: string,
     updates: {
+      title?: string;
+      description?: string;
       requiredHeadcount?: number;
-      status?: string;
-      physicalLevel?: string;
+      status?: 'open' | 'full' | 'closed';
+      physicalLevel?: 'none' | 'light' | 'medium' | 'heavy';
       requiredSkills?: string[];
+      leaderNeeded?: boolean;
+      newVolunteersAllowed?: boolean;
+      priority?: number;
     },
-  ): Promise<CoordinatorOperationResult<EventPost>> {
+  ): Promise<CoordinatorOperationResult<{ id: string; status: PostStatus }>> {
     const res = await coordinatorApi.updateEventPost(
       postId,
       {
+        title: updates.title?.trim(),
+        description: updates.description?.trim(),
         required_headcount: updates.requiredHeadcount,
-        status: (updates.status as any) || undefined,
-        physical_level: (updates.physicalLevel as any) || undefined,
+        status: updates.status,
+        physical_level: updates.physicalLevel,
         required_skills: updates.requiredSkills,
+        leader_needed: updates.leaderNeeded,
+        new_volunteers_allowed: updates.newVolunteersAllowed,
+        priority: updates.priority,
       },
       this.client,
     );
     if (!res.ok) {
-      return {
-        success: false,
-        message: res.error.message,
-      };
+      return { success: false, message: res.error.message };
     }
-    const updatedPost: EventPost = {
-      id: postId,
-      eventId: '',
-      title: 'Event Post',
-      requiredHeadcount: updates.requiredHeadcount ?? 1,
-      filledHeadcount: 0,
-      remainingCapacity: updates.requiredHeadcount ?? 1,
-      physicalLevel: (updates.physicalLevel as any) || 'light',
-      requiredSkills: updates.requiredSkills || [],
-      leaderNeeded: false,
-      newVolunteersAllowed: true,
-      status: (updates.status as any) || 'open',
-    };
     return {
       success: true,
       message: 'Post updated successfully',
-      data: updatedPost,
+      data: { id: String(res.data.id), status: res.data.status as PostStatus },
     };
   }
 

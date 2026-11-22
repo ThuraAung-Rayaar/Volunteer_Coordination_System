@@ -836,76 +836,88 @@ export class MockCoordinatorRepository implements CoordinatorRepository {
     eventId: string,
     post: {
       title: string;
+      description?: string;
       requiredHeadcount: number;
-      physicalLevel?: string;
+      physicalLevel?: 'none' | 'light' | 'medium' | 'heavy';
       requiredSkills?: string[];
       leaderNeeded?: boolean;
       newVolunteersAllowed?: boolean;
+      priority?: number;
     },
-  ): Promise<CoordinatorOperationResult<EventPost>> {
+  ): Promise<CoordinatorOperationResult<{ id: string; status: 'open' | 'full' | 'closed' }>> {
     const event = this.events.find(e => e.id === eventId);
-    if (!event) {
-      return {
-        success: false,
-        message: 'Event not found',
-      };
+    if (!event) return { success: false, message: 'Event not found' };
+    if (event.isOwnerAsMonitor) {
+      return { success: false, message: 'Post editing is disabled in read-only monitor mode.' };
+    }
+    if (!post.title.trim() || !Number.isInteger(post.requiredHeadcount) || post.requiredHeadcount < 1) {
+      return { success: false, message: 'Post title and a positive whole-number headcount are required.' };
     }
     const newPost: EventPost = {
       id: this.idGenerator('post'),
       eventId,
-      title: post.title,
+      title: post.title.trim(),
+      description: post.description?.trim(),
       requiredHeadcount: post.requiredHeadcount,
       filledHeadcount: 0,
       remainingCapacity: post.requiredHeadcount,
-      physicalLevel: (post.physicalLevel as any) || 'light',
-      requiredSkills: post.requiredSkills || [],
+      physicalLevel: post.physicalLevel ?? 'light',
+      requiredSkills: post.requiredSkills ?? [],
       leaderNeeded: post.leaderNeeded ?? false,
       newVolunteersAllowed: post.newVolunteersAllowed ?? true,
+      priority: post.priority ?? 100,
       status: 'open',
     };
     event.posts.push(newPost);
     return {
       success: true,
       message: 'Demo only — not submitted to server',
-      data: deepClone(newPost),
+      data: { id: newPost.id, status: newPost.status },
     };
   }
 
   public async updateEventPost(
     postId: string,
     updates: {
+      title?: string;
+      description?: string;
       requiredHeadcount?: number;
-      status?: string;
-      physicalLevel?: string;
+      status?: 'open' | 'full' | 'closed';
+      physicalLevel?: 'none' | 'light' | 'medium' | 'heavy';
       requiredSkills?: string[];
+      leaderNeeded?: boolean;
+      newVolunteersAllowed?: boolean;
+      priority?: number;
     },
-  ): Promise<CoordinatorOperationResult<EventPost>> {
+  ): Promise<CoordinatorOperationResult<{ id: string; status: 'open' | 'full' | 'closed' }>> {
     for (const event of this.events) {
       const post = event.posts.find(p => p.id === postId);
-      if (post) {
-        if (updates.requiredHeadcount !== undefined) {
-          post.requiredHeadcount = updates.requiredHeadcount;
-          post.remainingCapacity = Math.max(
-            0,
-            post.requiredHeadcount - post.filledHeadcount,
-          );
-        }
-        if (updates.status !== undefined) post.status = updates.status as any;
-        if (updates.physicalLevel !== undefined)
-          post.physicalLevel = updates.physicalLevel as any;
-        if (updates.requiredSkills !== undefined)
-          post.requiredSkills = updates.requiredSkills;
-        return {
-          success: true,
-          message: 'Demo only — not submitted to server',
-          data: deepClone(post),
-        };
+      if (!post) continue;
+      if (event.isOwnerAsMonitor) {
+        return { success: false, message: 'Post editing is disabled in read-only monitor mode.' };
       }
+      if (updates.title !== undefined) post.title = updates.title.trim();
+      if (updates.description !== undefined) post.description = updates.description.trim();
+      if (updates.requiredHeadcount !== undefined) {
+        if (!Number.isInteger(updates.requiredHeadcount) || updates.requiredHeadcount < post.filledHeadcount) {
+          return { success: false, message: 'Headcount must be a positive whole number and cannot be below assigned capacity.' };
+        }
+        post.requiredHeadcount = updates.requiredHeadcount;
+        post.remainingCapacity = Math.max(0, post.requiredHeadcount - post.filledHeadcount);
+      }
+      if (updates.status !== undefined) post.status = updates.status;
+      if (updates.physicalLevel !== undefined) post.physicalLevel = updates.physicalLevel;
+      if (updates.requiredSkills !== undefined) post.requiredSkills = [...updates.requiredSkills];
+      if (updates.leaderNeeded !== undefined) post.leaderNeeded = updates.leaderNeeded;
+      if (updates.newVolunteersAllowed !== undefined) post.newVolunteersAllowed = updates.newVolunteersAllowed;
+      if (updates.priority !== undefined) post.priority = updates.priority;
+      return {
+        success: true,
+        message: 'Demo only — not submitted to server',
+        data: { id: post.id, status: post.status },
+      };
     }
-    return {
-      success: false,
-      message: 'Post not found',
-    };
+    return { success: false, message: 'Post not found' };
   }
 
   public async closeEventPost(
