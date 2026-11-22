@@ -279,23 +279,27 @@ export function CreateEventWizardScreen({
 
     // Validate Step 2: Location
     if (currentStep === 2) {
-      if (!locationName.trim()) {
-        setErrorMessage('Location name is required.');
+      const hasLatitude = Boolean(latitude.trim());
+      const hasLongitude = Boolean(longitude.trim());
+      if (hasLatitude !== hasLongitude) {
+        setErrorMessage('Enter both latitude and longitude, or leave both blank.');
         return;
       }
 
-      const latNum = parseFloat(latitude.trim());
-      if (isNaN(latNum) || latNum < -90 || latNum > 90) {
-        setErrorMessage('Latitude must be a valid number between -90 and 90.');
-        return;
-      }
+      if (hasLatitude && hasLongitude) {
+        const latNum = parseFloat(latitude.trim());
+        if (isNaN(latNum) || latNum < -90 || latNum > 90) {
+          setErrorMessage('Latitude must be a valid number between -90 and 90.');
+          return;
+        }
 
-      const lngNum = parseFloat(longitude.trim());
-      if (isNaN(lngNum) || lngNum < -180 || lngNum > 180) {
-        setErrorMessage(
-          'Longitude must be a valid number between -180 and 180.',
-        );
-        return;
+        const lngNum = parseFloat(longitude.trim());
+        if (isNaN(lngNum) || lngNum < -180 || lngNum > 180) {
+          setErrorMessage(
+            'Longitude must be a valid number between -180 and 180.',
+          );
+          return;
+        }
       }
 
       const radiusNum = parseInt(geoRadiusM.trim(), 10);
@@ -378,7 +382,7 @@ export function CreateEventWizardScreen({
 
   // Save Draft (Step 7)
   const handleSaveDraft = async () => {
-    if (isLoadingExisting) return;
+    if (isLoadingExisting || (isEditMode && existingEventStatus === null)) return;
     setIsSubmitting(true);
     setErrorMessage(null);
 
@@ -414,8 +418,8 @@ export function CreateEventWizardScreen({
       return;
     }
 
-    const latNum = parseFloat(latitude.trim());
-    const lngNum = parseFloat(longitude.trim());
+    const latNum = latitude.trim() ? parseFloat(latitude.trim()) : null;
+    const lngNum = longitude.trim() ? parseFloat(longitude.trim()) : null;
     const radiusNum = parseInt(geoRadiusM.trim(), 10);
 
     try {
@@ -1330,7 +1334,7 @@ export function CreateEventWizardScreen({
                     : repositories.dataMode === 'mock' ? 'Save Draft (Template)' : 'Create Draft Event'}
                   variant="primary"
                   loading={isSubmitting || isLoadingExisting}
-                  disabled={isLoadingExisting}
+                  disabled={isLoadingExisting || (isEditMode && existingEventStatus === null)}
                   onPress={handleSaveDraft}
                 />
               )}

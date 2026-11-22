@@ -60,8 +60,8 @@ export interface CreateEventWizardDraft {
   // Step 2: Location
   locationName: string;
   landmarkText?: string;
-  latitude: number;
-  longitude: number;
+  latitude: number | null;
+  longitude: number | null;
   geoRadiusM: number;
   geoCheckinEnabled: boolean;
   geoCheckinOpensBeforeMin: number;
