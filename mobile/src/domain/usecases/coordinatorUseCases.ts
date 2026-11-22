@@ -22,6 +22,8 @@ import type {
   EventPost,
   EventPostCapacity,
   GeoAttemptReview,
+  PhysicalLevel,
+  PostStatus,
   VolunteerUuidLookup,
 } from '../models';
 
@@ -263,13 +265,15 @@ export class CoordinatorUseCases {
     eventId: string,
     post: {
       title: string;
+      description?: string;
       requiredHeadcount: number;
-      physicalLevel?: string;
+      physicalLevel?: PhysicalLevel;
       requiredSkills?: string[];
       leaderNeeded?: boolean;
       newVolunteersAllowed?: boolean;
+      priority?: number;
     },
-  ): Promise<CoordinatorOperationResult<EventPost>> {
+  ): Promise<CoordinatorOperationResult<{ id: string; status: PostStatus }>> {
     const result = await this.coordinatorRepo.createEventPost(eventId, post);
     if (result.success) {
       await Promise.allSettled([
@@ -287,12 +291,17 @@ export class CoordinatorUseCases {
     postId: string,
     eventId: string,
     updates: {
+      title?: string;
+      description?: string;
       requiredHeadcount?: number;
-      status?: string;
-      physicalLevel?: string;
+      status?: PostStatus;
+      physicalLevel?: PhysicalLevel;
       requiredSkills?: string[];
+      leaderNeeded?: boolean;
+      newVolunteersAllowed?: boolean;
+      priority?: number;
     },
-  ): Promise<CoordinatorOperationResult<EventPost>> {
+  ): Promise<CoordinatorOperationResult<{ id: string; status: PostStatus }>> {
     const result = await this.coordinatorRepo.updateEventPost(postId, updates);
     if (result.success) {
       await Promise.allSettled([

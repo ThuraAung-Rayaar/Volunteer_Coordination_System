@@ -614,7 +614,10 @@ export function CoordinatorEventDetailScreen({
                     <AppText variant="body" weight="bold" color={theme.colors.textPrimary}>
                       {post.title}
                     </AppText>
-                    <StatusBadge status={post.status === 'open' ? 'success' : post.status === 'full' ? 'warning' : 'danger'} />
+                    <StatusBadge
+                      status={post.status === 'open' ? 'success' : post.status === 'full' ? 'warning' : 'danger'}
+                      label={post.status === 'open' ? 'Open' : post.status === 'full' ? 'Full' : 'Closed'}
+                    />
                   </View>
                   {post.description ? (
                     <AppText variant="caption" color={theme.colors.textSecondary}>
@@ -996,5 +999,10 @@ const styles = StyleSheet.create({
   },
   modalButtonWrap: {
     flex: 1,
+  },
+  chipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
   },
 });

@@ -19,6 +19,7 @@ import type {
   GeoAttemptReview,
   VolunteerUuidLookup,
 } from '../../domain/models/coordinator';
+import type { CharityCategoryCode } from '../../domain/models/event';
 import type {
   CoordinatorOperationResult,
   CoordinatorRepository,
@@ -171,10 +172,10 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
       if (summaryRes.status === 404) return null;
       throw new Error(`Failed to load event summary: ${summaryRes.error.message}`);
     }
-    if (!configurationRes.ok) {
-      if (configurationRes.status === 404) return null;
+    if (!configurationRes || !configurationRes.ok) {
+      if (configurationRes?.status === 404) return null;
       throw new Error(
-        `Failed to load manager event configuration: ${configurationRes.error.message}`,
+        `Failed to load manager event configuration: ${configurationRes?.error?.message ?? 'Unknown error'}`,
       );
     }
 
@@ -218,7 +219,7 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
       applicationDeadline: configuration.application_deadline ?? undefined,
       locationName: configuration.location_name ?? '',
       landmarkText: configuration.landmark_text ?? undefined,
-      charityFields: currentEventItem.charity_fields ?? [],
+      charityFields: (currentEventItem.charity_fields || []) as CharityCategoryCode[],
       ownerId: String(configuration.owner_id),
       currentCoordinatorId: String(configuration.current_coordinator_id),
       coordinatorName: currentEventItem.coordinator_name || this.coordinatorIdentity.displayName,

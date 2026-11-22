@@ -520,7 +520,12 @@ describe('Phase 7: Coordinator Use Cases (C-01 through C-39)', () => {
         leaderNeeded: true,
       });
       expect(createRes.success).toBe(true);
-      expect(createRes.data?.title).toBe('Lead First Aider');
+      expect(createRes.data?.id).toBeDefined();
+      expect(createRes.data?.status).toBe('open');
+
+      const detailAfterCreate = await coordinatorUseCases.getEventDetail(eventId);
+      const createdPost = detailAfterCreate?.posts.find(p => p.id === createRes.data?.id);
+      expect(createdPost?.title).toBe('Lead First Aider');
 
       const postId = createRes.data!.id;
       const updateRes = await coordinatorUseCases.updateEventPost(postId, eventId, {

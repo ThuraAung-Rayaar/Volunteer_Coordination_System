@@ -28,6 +28,25 @@ import {
 } from '../src/features/events/screens/MyAssignmentsScreen';
 import { ThemeProvider } from '../src/theme/ThemeProvider';
 
+const activeRenderers: ReactTestRenderer.ReactTestRenderer[] = [];
+const originalCreate = ReactTestRenderer.create;
+ReactTestRenderer.create = ((...args: Parameters<typeof originalCreate>) => {
+  const r = originalCreate(...args);
+  activeRenderers.push(r);
+  return r;
+}) as any;
+
+afterEach(async () => {
+  while (activeRenderers.length > 0) {
+    const r = activeRenderers.pop();
+    try {
+      await ReactTestRenderer.act(async () => {
+        r?.unmount();
+      });
+    } catch {}
+  }
+});
+
 const initialMetrics = {
   frame: { x: 0, y: 0, width: 390, height: 844 },
   insets: { top: 47, left: 0, right: 0, bottom: 34 },

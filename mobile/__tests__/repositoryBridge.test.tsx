@@ -497,6 +497,44 @@ describe('Http Repositories Non-Invasive & Error Handling Guarantees', () => {
           { status: 200, headers: { 'Content-Type': 'application/json' } },
         );
       }
+      if (input.includes('/coordinator/events/5/configuration/')) {
+        return new Response(
+          JSON.stringify({
+            id: 5,
+            title: 'Sample Event',
+            purpose_type: 'charity_event',
+            status: 'published',
+            start_at: '2026-11-20T08:00:00Z',
+            end_at: '2026-11-20T12:00:00Z',
+            map_provider: 'openstreetmap',
+            acceptance_mode: 'manual',
+            auto_assign_enabled: false,
+            leader_strategy: 'none',
+            compensation_kind: 'unpaid',
+            owner_id: 1,
+            current_coordinator_id: 1,
+            geo_radius_m: 200,
+            geo_checkin_enabled: true,
+            geo_checkin_opens_before_min: 30,
+            require_checkin_confirmation: false,
+            meals_provided: false,
+            lodging_provided: false,
+            travel_support_provided: false,
+            onboarding_version: 1,
+            require_onboarding_ack: false,
+            qr_registration_enabled: false,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      if (input.includes('/coordinator/events/')) {
+        return new Response(
+          JSON.stringify({
+            results: [{ id: 5, title: 'Sample Event', status: 'published', is_read_only_monitor: false }],
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
       return new Response(JSON.stringify({ results: [] }), { status: 200 });
     };
 

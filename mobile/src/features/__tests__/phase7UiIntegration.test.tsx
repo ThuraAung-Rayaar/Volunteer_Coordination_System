@@ -513,6 +513,13 @@ describe('Phase 7: Mobile UI Screen Integration & Verification Suite', () => {
         );
       });
 
+      const noteInput = root!.root.findAllByType(AppInput).find(i => i.props.label?.includes('verification note'));
+      if (noteInput) {
+        await act(async () => {
+          noteInput.props.onChangeText('Manual on-site check-in verified by coordinator');
+        });
+      }
+
       const checkInBtn = root!.root.findAllByType(AppButton).find(b => b.props.label === 'Manual Check-In');
       expect(checkInBtn).toBeDefined();
 

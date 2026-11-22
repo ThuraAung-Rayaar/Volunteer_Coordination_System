@@ -16,6 +16,7 @@ import { useRepositories } from '../../../app/RepositoryProvider';
 import type {
   AcceptanceMode,
   CompensationKind,
+  CreateEventWizardDraft,
   EventPurposeType,
   LeaderStrategy,
 } from '../../../domain/models/coordinator';
@@ -48,7 +49,7 @@ export interface CreateEventWizardScreenProps
   repository?: CoordinatorRepository;
 }
 
-function toMyanmarDateTimeParts(value?: string): { date: string; time: string } {
+function toMyanmarDateTimeParts(value?: string | null): { date: string; time: string } {
   if (!value) return { date: '', time: '' };
   const timestamp = new Date(value).getTime();
   if (!Number.isFinite(timestamp)) return { date: '', time: '' };

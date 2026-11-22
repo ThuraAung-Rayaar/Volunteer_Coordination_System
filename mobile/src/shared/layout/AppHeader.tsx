@@ -10,6 +10,7 @@ import {
   View,
   ViewStyle,
 } from 'react-native';
+import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
 import { useAppTheme } from '../../theme';
 import { AppIcon } from '../components/AppIcon';
 import { AppText } from '../components/AppText';
@@ -42,6 +43,8 @@ export function AppHeader({
   style,
 }: AppHeaderProps): React.JSX.Element {
   const { theme } = useAppTheme();
+  const insets = React.useContext(SafeAreaInsetsContext);
+  const topInset = insets?.top ?? 0;
 
   return (
     <View
@@ -52,7 +55,8 @@ export function AppHeader({
           backgroundColor: theme.colors.surface,
           borderBottomColor: theme.colors.border,
           paddingHorizontal: 16,
-          paddingVertical: 12,
+          paddingTop: topInset > 0 ? topInset + 6 : 12,
+          paddingBottom: 12,
         },
         style,
       ]}
