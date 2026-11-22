@@ -238,12 +238,13 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
           summary.geo_checkin_enabled ??
           false,
       ),
-      geoCheckinOpensBeforeMin: 30,
-      requireCheckinConfirmation: summary.pending_confirmations > 0,
+      geoCheckinOpensBeforeMin: publicDetail?.geo_checkin_opens_before_min ?? 30,
+      requireCheckinConfirmation: publicDetail?.require_checkin_confirmation ?? true,
       mapProvider: publicDetail?.map_provider || summary.map_provider || 'openstreetmap',
       acceptanceMode: (publicDetail?.acceptance_mode as any) || (summary.acceptance_mode as any) || 'manual',
-      autoAssignEnabled: summary.auto_assign_enabled ?? false,
-      leaderStrategy: 'none',
+      autoAssignEnabled: publicDetail?.auto_assign_enabled ?? summary.auto_assign_enabled ?? false,
+      groupSize: publicDetail?.group_size ?? undefined,
+      leaderStrategy: publicDetail?.leader_strategy ?? 'none',
       maxParticipants: publicDetail?.max_participants ?? summary.max_participants ?? 0,
       mealsProvided: Boolean(publicDetail?.meals_provided),
       lodgingProvided: Boolean(publicDetail?.lodging_provided),
@@ -252,8 +253,8 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
       compensationNote: publicDetail?.compensation_note ?? undefined,
       onboardingText: publicDetail?.onboarding_text ?? undefined,
       onboardingVersion: publicDetail?.onboarding_version ?? 1,
-      requireOnboardingAck: false,
-      qrRegistrationEnabled: false,
+      requireOnboardingAck: Boolean(publicDetail?.require_onboarding_ack),
+      qrRegistrationEnabled: Boolean(publicDetail?.qr_registration_enabled),
       posts: rawPosts.map(p => mapPublicEventPost(p, summary.id)),
     };
   }
