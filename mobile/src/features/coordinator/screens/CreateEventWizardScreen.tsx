@@ -48,6 +48,19 @@ export interface CreateEventWizardScreenProps
   repository?: CoordinatorRepository;
 }
 
+function toMyanmarDateTimeParts(value?: string): { date: string; time: string } {
+  if (!value) return { date: '', time: '' };
+  const timestamp = new Date(value).getTime();
+  if (!Number.isFinite(timestamp)) return { date: '', time: '' };
+  // Shift the instant to Myanmar Time (UTC+06:30), independent of device timezone.
+  const mmt = new Date(timestamp + 390 * 60 * 1000);
+  const pad = (part: number) => String(part).padStart(2, '0');
+  return {
+    date: `${mmt.getUTCFullYear()}-${pad(mmt.getUTCMonth() + 1)}-${pad(mmt.getUTCDate())}`,
+    time: `${pad(mmt.getUTCHours())}:${pad(mmt.getUTCMinutes())}`,
+  };
+}
+
 const TOTAL_STEPS = 7;
 const STEP_TITLES = [
   'Basics',
@@ -61,12 +74,15 @@ const STEP_TITLES = [
 
 export function CreateEventWizardScreen({
   navigation,
+  route,
   repository: propRepository,
 }: CreateEventWizardScreenProps): React.JSX.Element {
   const { theme } = useAppTheme();
   const { currentUser } = useCurrentUser();
   const repositories = useRepositories();
   const repository = propRepository ?? repositories.coordinatorRepository ?? defaultCoordinatorRepository;
+  const eventId = route?.params?.eventId;
+  const isEditMode = Boolean(eventId);
 
   useEffect(() => {
     if (
@@ -85,6 +101,8 @@ export function CreateEventWizardScreen({
   const [currentStep, setCurrentStep] = useState(1);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingExisting, setIsLoadingExisting] = useState(Boolean(eventId));
+  const [existingEventStatus, setExistingEventStatus] = useState<string | null>(null);
 
   // Step 1: Basics
   const [title, setTitle] = useState('');
@@ -144,6 +162,86 @@ export function CreateEventWizardScreen({
   );
   const [requireOnboardingAck, setRequireOnboardingAck] = useState(true);
   const [qrRegistrationEnabled, setQrRegistrationEnabled] = useState(true);
+
+  // Reuse the same seven-step form for manager-authorized event editing.
+  useEffect(() => {
+    if (!eventId) {
+      setIsLoadingExisting(false);
+      setExistingEventStatus(null);
+      return;
+    }
+
+    let active = true;
+    setIsLoadingExisting(true);
+    setErrorMessage(null);
+
+    repository.getEventDetail(eventId)
+      .then(existing => {
+        if (!active) return;
+        if (!existing) {
+          setErrorMessage('Event not found or you do not have permission to edit it.');
+          return;
+        }
+        if (existing.isOwnerAsMonitor) {
+          setErrorMessage('This event is read-only while another coordinator manages it.');
+          return;
+        }
+        if (existing.status === 'completed' || existing.status === 'cancelled') {
+          setErrorMessage('Finalized events cannot be edited.');
+          return;
+        }
+
+        const start = toMyanmarDateTimeParts(existing.startAt);
+        const end = toMyanmarDateTimeParts(existing.endAt);
+        const deadline = toMyanmarDateTimeParts(existing.applicationDeadline);
+
+        setExistingEventStatus(existing.status);
+        setTitle(existing.title);
+        setDescription(existing.description ?? '');
+        setPurposeType(existing.purposeType);
+        setCharityFieldCodes((existing.charityFields ?? []) as CharityCategoryCode[]);
+        setLocationName(existing.locationName ?? '');
+        setLandmarkText(existing.landmarkText ?? '');
+        setLatitude(existing.latitude === null || existing.latitude === undefined ? '' : String(existing.latitude));
+        setLongitude(existing.longitude === null || existing.longitude === undefined ? '' : String(existing.longitude));
+        setGeoRadiusM(String(existing.geoRadiusM ?? 200));
+        setGeoCheckinEnabled(existing.geoCheckinEnabled);
+        setGeoOpensBeforeMin(String(existing.geoCheckinOpensBeforeMin));
+        setRequireConfirmation(existing.requireCheckinConfirmation);
+        setMapProvider(existing.mapProvider);
+        setStartDate(start.date);
+        setStartTime(start.time);
+        setEndDate(end.date);
+        setEndTime(end.time);
+        setDeadlineDate(deadline.date);
+        setDeadlineTime(deadline.time);
+        setAcceptanceMode(existing.acceptanceMode);
+        setAutoAssignEnabled(existing.autoAssignEnabled);
+        setGroupSize(existing.groupSize === undefined ? '' : String(existing.groupSize));
+        setLeaderStrategy(existing.leaderStrategy);
+        setMaxParticipants(existing.maxParticipants === undefined ? '' : String(existing.maxParticipants));
+        setMealsProvided(existing.mealsProvided);
+        setLodgingProvided(existing.lodgingProvided);
+        setTravelSupportProvided(existing.travelSupportProvided);
+        setCompensationKind(existing.compensationKind);
+        setCompensationNote(existing.compensationNote ?? '');
+        setOnboardingText(existing.onboardingText ?? '');
+        setRequireOnboardingAck(existing.requireOnboardingAck);
+        setQrRegistrationEnabled(existing.qrRegistrationEnabled);
+      })
+      .catch(err => {
+        if (active) {
+          setErrorMessage(err instanceof Error ? err.message : 'Failed to load event for editing.');
+        }
+      })
+      .finally(() => {
+        if (active) setIsLoadingExisting(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [eventId, repository]);
 
   // Charity Category Selection (Limit 1 to 3)
   const toggleCharityCategory = (code: CharityCategoryCode) => {
@@ -280,6 +378,7 @@ export function CreateEventWizardScreen({
 
   // Save Draft (Step 7)
   const handleSaveDraft = async () => {
+    if (isLoadingExisting) return;
     setIsSubmitting(true);
     setErrorMessage(null);
 
@@ -320,7 +419,7 @@ export function CreateEventWizardScreen({
     const radiusNum = parseInt(geoRadiusM.trim(), 10);
 
     try {
-      const result = await repository.createDraftEvent({
+      const draft: CreateEventWizardDraft = {
         title,
         description: description || undefined,
         purposeType,
@@ -352,16 +451,27 @@ export function CreateEventWizardScreen({
         onboardingText: onboardingText || undefined,
         requireOnboardingAck,
         qrRegistrationEnabled,
-      });
+      };
+      const result = eventId
+        ? await repository.updateEvent(eventId, draft)
+        : await repository.createDraftEvent(draft);
 
       if (result.success && result.data) {
-        navigation?.navigate?.('CoordinatorEvents');
+        if (eventId) {
+          navigation?.navigate?.('CoordinatorEventDetail', { eventId });
+        } else {
+          navigation?.navigate?.('CoordinatorEvents');
+        }
       } else {
         setErrorMessage(result.message);
       }
     } catch (err) {
       setErrorMessage(
-        err instanceof Error ? err.message : 'Failed to create draft event',
+        err instanceof Error
+          ? err.message
+          : isEditMode
+            ? 'Failed to update event'
+            : 'Failed to create draft event',
       );
     } finally {
       setIsSubmitting(false);
@@ -422,7 +532,7 @@ export function CreateEventWizardScreen({
     <CoordinatorGuard navigation={navigation}>
       <View style={[styles.root, { backgroundColor: theme.colors.background }]}>
         <AppHeader
-          title="Create Event Wizard"
+          title={isEditMode ? 'Edit Event' : 'Create Event Wizard'}
           subtitle={`Step ${currentStep} of ${TOTAL_STEPS}: ${STEP_TITLES[currentStep - 1]}`}
           onBackPress={handleCancel}
         />
@@ -1092,7 +1202,7 @@ export function CreateEventWizardScreen({
           {currentStep === 7 && (
             <AppCard style={styles.cardSpacing}>
               <AppText variant="title" weight="bold" color={theme.colors.textPrimary}>
-                Review Event Configuration
+                {isEditMode ? 'Review Event Changes' : 'Review Event Configuration'}
               </AppText>
 
               {/* Demo-only banner */}
@@ -1180,7 +1290,9 @@ export function CreateEventWizardScreen({
                   IMMUTABLE SYSTEM ATTRIBUTES (ENFORCED BY SERVICE)
                 </AppText>
                 <AppText variant="caption" color={theme.colors.textSecondary}>
-                  {`Status: Draft • Onboarding Version: 1 • Coordinator: ${
+                  {`${isEditMode
+                    ? `Existing status: ${existingEventStatus ?? 'unchanged'} • Status is unchanged by this form • Onboarding version is server-managed • Coordinator: `
+                    : 'Status: Draft • Onboarding Version: 1 • Coordinator: '}${
                     currentUser?.displayName ??
                     ('getCoordinatorIdentity' in repository &&
                     typeof (repository as any).getCoordinatorIdentity === 'function'
@@ -1213,9 +1325,12 @@ export function CreateEventWizardScreen({
                 />
               ) : (
                 <AppButton
-                  label="Save Draft (Demo)"
+                  label={isEditMode
+                    ? repositories.dataMode === 'mock' ? 'Save Changes (Template)' : 'Save Event Changes'
+                    : repositories.dataMode === 'mock' ? 'Save Draft (Template)' : 'Create Draft Event'}
                   variant="primary"
-                  loading={isSubmitting}
+                  loading={isSubmitting || isLoadingExisting}
+                  disabled={isLoadingExisting}
                   onPress={handleSaveDraft}
                 />
               )}

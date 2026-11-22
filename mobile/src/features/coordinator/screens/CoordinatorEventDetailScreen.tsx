@@ -387,6 +387,15 @@ export function CoordinatorEventDetailScreen({
               {event.description}
             </AppText>
 
+            {!isMonitorMode && !isFinalState ? (
+              <AppButton
+                label="Edit Event Configuration"
+                variant="outline"
+                onPress={() => navigation?.navigate?.('CreateEventWizard', { eventId: event.id })}
+                style={{ marginTop: 12 }}
+              />
+            ) : null}
+
             <View style={styles.categoriesRow}>
               {event.charityFields.map(code => (
                 <View
