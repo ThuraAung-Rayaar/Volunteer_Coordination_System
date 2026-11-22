@@ -1110,11 +1110,14 @@ export function CreateEventWizardScreen({
                   weight="bold"
                   color={theme.colors.warning}
                 >
-                  ⚠️ Demo only — not submitted to server
+                  {repositories.dataMode === 'mock'
+                    ? 'Template Preview — not submitted to server'
+                    : 'HTTP Mode — event draft will be submitted to the BFF'}
                 </AppText>
                 <AppText variant="caption" color={theme.colors.textSecondary}>
-                  Saving will create an in-memory draft event fixture for this
-                  session.
+                  {repositories.dataMode === 'mock'
+                    ? 'Saving updates a local in-memory event fixture for this session.'
+                    : 'Saving sends the event draft to the configured Django BFF.'}
                 </AppText>
               </View>
 

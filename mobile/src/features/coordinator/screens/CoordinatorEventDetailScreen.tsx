@@ -799,11 +799,14 @@ export function CoordinatorEventDetailScreen({
                   weight="bold"
                   color={theme.colors.warning}
                 >
-                  ⚠️ Demo Preview — not submitted to server
+                  {repositories.dataMode === 'mock'
+                    ? 'Template Preview — local state only'
+                    : 'HTTP Mode — the BFF will process this transition'}
                 </AppText>
                 <AppText variant="caption" color={theme.colors.textSecondary}>
-                  This transition will update local mock state for this preview
-                  session.
+                  {repositories.dataMode === 'mock'
+                    ? 'This transition updates local mock state for this preview session.'
+                    : 'This request will be sent to the backend and may change the event status in PostgreSQL.'}
                 </AppText>
               </View>
 
@@ -829,7 +832,7 @@ export function CoordinatorEventDetailScreen({
                 </View>
                 <View style={styles.modalButtonWrap}>
                   <AppButton
-                    label="Confirm (Demo)"
+                    label={repositories.dataMode === 'mock' ? 'Confirm (Template)' : 'Confirm Transition'}
                     variant={
                       pendingTargetStatus === 'cancelled'
                         ? 'danger'
