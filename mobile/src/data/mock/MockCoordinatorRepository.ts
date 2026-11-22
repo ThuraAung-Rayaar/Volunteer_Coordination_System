@@ -310,15 +310,51 @@ export class MockCoordinatorRepository implements CoordinatorRepository {
         message: 'Event not found',
       };
     }
+    if (event.isOwnerAsMonitor) {
+      return {
+        success: false,
+        message: 'Event editing is disabled in read-only monitor mode.',
+      };
+    }
+    if (event.status === 'completed' || event.status === 'cancelled') {
+      return {
+        success: false,
+        message: 'Finalized events cannot be edited.',
+      };
+    }
+
     if (data.title !== undefined) event.title = data.title.trim();
-    if (data.description !== undefined)
-      event.description = data.description.trim();
-    if (data.locationName !== undefined)
-      event.locationName = data.locationName.trim();
-    if (data.onboardingText !== undefined) {
+    if (data.description !== undefined) event.description = data.description.trim();
+    if (data.purposeType !== undefined) event.purposeType = data.purposeType;
+    if (data.charityFieldCodes !== undefined) event.charityFields = [...data.charityFieldCodes];
+    if (data.locationName !== undefined) event.locationName = data.locationName.trim();
+    if (data.landmarkText !== undefined) event.landmarkText = data.landmarkText.trim();
+    if (data.latitude !== undefined) event.latitude = data.latitude;
+    if (data.longitude !== undefined) event.longitude = data.longitude;
+    if (data.geoRadiusM !== undefined) event.geoRadiusM = data.geoRadiusM;
+    if (data.geoCheckinEnabled !== undefined) event.geoCheckinEnabled = data.geoCheckinEnabled;
+    if (data.geoCheckinOpensBeforeMin !== undefined) event.geoCheckinOpensBeforeMin = data.geoCheckinOpensBeforeMin;
+    if (data.requireCheckinConfirmation !== undefined) event.requireCheckinConfirmation = data.requireCheckinConfirmation;
+    if (data.mapProvider !== undefined) event.mapProvider = data.mapProvider;
+    if (data.startAt !== undefined) event.startAt = data.startAt;
+    if (data.endAt !== undefined) event.endAt = data.endAt;
+    if (data.applicationDeadline !== undefined) event.applicationDeadline = data.applicationDeadline;
+    if (data.acceptanceMode !== undefined) event.acceptanceMode = data.acceptanceMode;
+    if (data.autoAssignEnabled !== undefined) event.autoAssignEnabled = data.autoAssignEnabled;
+    if (data.groupSize !== undefined) event.groupSize = data.groupSize;
+    if (data.leaderStrategy !== undefined) event.leaderStrategy = data.leaderStrategy;
+    if (data.maxParticipants !== undefined) event.maxParticipants = data.maxParticipants;
+    if (data.mealsProvided !== undefined) event.mealsProvided = data.mealsProvided;
+    if (data.lodgingProvided !== undefined) event.lodgingProvided = data.lodgingProvided;
+    if (data.travelSupportProvided !== undefined) event.travelSupportProvided = data.travelSupportProvided;
+    if (data.compensationKind !== undefined) event.compensationKind = data.compensationKind;
+    if (data.compensationNote !== undefined) event.compensationNote = data.compensationNote.trim();
+    if (data.onboardingText !== undefined && data.onboardingText.trim() !== event.onboardingText) {
       event.onboardingText = data.onboardingText.trim();
       event.onboardingVersion = (event.onboardingVersion || 1) + 1;
     }
+    if (data.requireOnboardingAck !== undefined) event.requireOnboardingAck = data.requireOnboardingAck;
+    if (data.qrRegistrationEnabled !== undefined) event.qrRegistrationEnabled = data.qrRegistrationEnabled;
     return {
       success: true,
       message: 'Demo only — not submitted to server',

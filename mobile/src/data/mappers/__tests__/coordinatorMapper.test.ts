@@ -8,6 +8,7 @@ import {
   mapCoordinatorAssignment,
   mapCoordinatorEventSummary,
   mapCreateEventDraftToRequest,
+  mapEventUpdateDraftToRequest,
 } from '../coordinatorMapper';
 import type {
   AttendanceRosterDto,
@@ -244,6 +245,27 @@ describe('coordinatorMapper', () => {
       expect(item.groupCode).toBe('GRP-LANG');
       expect(item.status).toBe('confirmed');
       expect(item.assignedAt).toBe('2026-11-14T08:00:00Z'); // Truthful assigned_at, NOT confirmed_at
+    });
+  });
+
+  describe('mapEventUpdateDraftToRequest', () => {
+    it('sends only fields explicitly supplied for an event PATCH', () => {
+      const payload = mapEventUpdateDraftToRequest({
+        title: '  Updated title  ',
+        description: '',
+        geoCheckinOpensBeforeMin: 45,
+        requireCheckinConfirmation: false,
+      });
+
+      expect(payload).toEqual({
+        title: 'Updated title',
+        description: null,
+        geo_checkin_opens_before_min: 45,
+        require_checkin_confirmation: false,
+      });
+      expect(payload).not.toHaveProperty('start_at');
+      expect(payload).not.toHaveProperty('auto_assign_enabled');
+      expect(payload).not.toHaveProperty('compensation_kind');
     });
   });
 

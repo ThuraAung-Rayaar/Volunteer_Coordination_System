@@ -34,6 +34,7 @@ import {
   mapCoordinatorEventSummary,
   mapCoordinatorHistoryItem,
   mapCreateEventDraftToRequest,
+  mapEventUpdateDraftToRequest,
   mapEventPostCapacity,
   mapGeoAttemptReview,
   mapVolunteerUuidLookup,
@@ -161,8 +162,8 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
   ): Promise<CoordinatorEventDetail | null> {
     const [summaryRes, postsRes, eventsRes, configurationRes] = await Promise.all([
       coordinatorApi.getEventSummary(eventId, this.client),
-      coordinatorApi.getEventPosts(eventId, this.client).catch(() => null),
-      coordinatorApi.getMyEvents(this.client).catch(() => null),
+      coordinatorApi.getEventPosts(eventId, this.client),
+      coordinatorApi.getMyEvents(this.client),
       coordinatorApi.getEventConfiguration(eventId, this.client),
     ]);
 
@@ -177,18 +178,28 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
       );
     }
 
+    if (!eventsRes.ok) {
+      throw new Error(
+        `Failed to verify coordinator event permissions: ${eventsRes.error.message}`,
+      );
+    }
+    if (!postsRes.ok) {
+      throw new Error(
+        `Failed to load event posts: ${postsRes.error.message}`,
+      );
+    }
+
     const summary = summaryRes.data;
     const configuration = configurationRes.data;
-    const events: CoordinatorEventListItemDto[] =
-      eventsRes && eventsRes.ok && eventsRes.data?.results ? eventsRes.data.results : [];
+    const events: CoordinatorEventListItemDto[] = eventsRes.data?.results ?? [];
     const currentEventItem = events.find(e => String(e.id) === String(eventId));
+    if (!currentEventItem) {
+      throw new Error('Cannot verify event manager/monitor permissions for this event.');
+    }
 
-    const rawPosts: PublicEventPostDto[] =
-      postsRes && postsRes.ok
-        ? Array.isArray(postsRes.data)
-          ? postsRes.data
-          : postsRes.data?.results || []
-        : [];
+    const rawPosts: PublicEventPostDto[] = Array.isArray(postsRes.data)
+      ? postsRes.data
+      : postsRes.data?.results || [];
 
     const toCoordinate = (value: string | number | null | undefined): number | null => {
       if (value === null || value === undefined || value === '') return null;
@@ -207,11 +218,11 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
       applicationDeadline: configuration.application_deadline ?? undefined,
       locationName: configuration.location_name ?? '',
       landmarkText: configuration.landmark_text ?? undefined,
-      charityFields: currentEventItem?.charity_fields ?? [],
+      charityFields: currentEventItem.charity_fields ?? [],
       ownerId: String(configuration.owner_id),
       currentCoordinatorId: String(configuration.current_coordinator_id),
-      coordinatorName: currentEventItem?.coordinator_name || this.coordinatorIdentity.displayName,
-      isOwnerAsMonitor: currentEventItem?.is_read_only_monitor ?? false,
+      coordinatorName: currentEventItem.coordinator_name || this.coordinatorIdentity.displayName,
+      isOwnerAsMonitor: currentEventItem.is_read_only_monitor,
       pendingApplicationCount: summary.pending_count || 0,
       acceptedApplicantCount: summary.accepted_count || 0,
       assignedCount: summary.assignment_count || 0,
@@ -266,7 +277,7 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
     eventId: string,
     data: Partial<CreateEventWizardDraft>,
   ): Promise<CoordinatorOperationResult<CoordinatorEventDetail>> {
-    const payload = mapCreateEventDraftToRequest(data as CreateEventWizardDraft);
+    const payload = mapEventUpdateDraftToRequest(data);
     const res = await coordinatorApi.updateEvent(eventId, payload, this.client);
     if (!res.ok) {
       return {
