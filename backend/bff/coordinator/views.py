@@ -19,6 +19,7 @@ from .serializers import (
     AutoAssignResultSerializer,
     CancelEventSerializer,
     CoordinatorInviteSerializer,
+    CoordinatorEventConfigurationSerializer,
     EventCreateSerializer,
     EventListSerializer,
     EventPostCreateSerializer,
@@ -64,8 +65,16 @@ class CoordinatorEventListCreateView(APIView):
 
 
 class CoordinatorEventDetailView(APIView):
-    """PATCH /api/v1/coordinator/events/{event_id}/."""
+    """GET/PATCH /api/v1/coordinator/events/{event_id}/; both are manager-scoped."""
     permission_classes = [IsAuthenticated]
+
+    def get(self, request, event_id):
+        event = get_event_for_manager_or_404(
+            request.user,
+            event_id,
+            require_write=False,
+        )
+        return Response(CoordinatorEventConfigurationSerializer(event).data)
 
     def patch(self, request, event_id):
         serializer = EventUpdateSerializer(data=request.data)
