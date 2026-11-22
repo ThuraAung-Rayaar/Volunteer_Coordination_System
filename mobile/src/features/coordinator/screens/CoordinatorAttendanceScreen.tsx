@@ -326,7 +326,11 @@ export function CoordinatorAttendanceScreen({
           {createdQrToken ? (
             <View style={[styles.qrTokenPreview, { borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceRaised }]}>
               <AppText variant="caption" weight="bold" color={theme.colors.textPrimary}>Created Token #{createdQrToken.id}</AppText>
-              <AppText variant="caption" color={theme.colors.textSecondary}>Token value (template preview):</AppText>
+              <AppText variant="caption" color={theme.colors.textSecondary}>
+                {repositories.dataMode === 'mock'
+                  ? 'Local template token only — it is not saved on the server.'
+                  : 'Server-issued token value — handle securely.'}
+              </AppText>
               <AppText variant="body" weight="semibold" color={theme.colors.primary}>{createdQrToken.rawToken}</AppText>
               <AppText variant="caption" color={theme.colors.textSecondary}>Expires: {createdQrToken.expiresAt}</AppText>
             </View>

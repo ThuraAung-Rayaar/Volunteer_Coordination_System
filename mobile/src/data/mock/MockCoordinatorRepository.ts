@@ -53,6 +53,8 @@ export class MockCoordinatorRepository implements CoordinatorRepository {
   private applications: CoordinatorApplicationItem[];
   private assignments: CoordinatorAssignmentItem[];
   private attendance: CoordinatorAttendanceItem[];
+  private qrTokens: Map<number, { eventId: string; rawToken: string; expiresAt: string }>;
+  private nextQrTokenId: number;
   private coordinatorIdentity: MockCoordinatorIdentity;
   private idGenerator: IdGenerator;
   private clock: Clock;
@@ -70,6 +72,8 @@ export class MockCoordinatorRepository implements CoordinatorRepository {
     this.applications = deepClone(initialApplications);
     this.assignments = deepClone(initialAssignments);
     this.attendance = deepClone(initialAttendance);
+    this.qrTokens = new Map();
+    this.nextQrTokenId = 1001;
     this.coordinatorIdentity = options?.coordinatorIdentity
       ? { ...options.coordinatorIdentity }
       : {
@@ -100,6 +104,8 @@ export class MockCoordinatorRepository implements CoordinatorRepository {
     this.attendance = deepClone(
       attendance ?? createCoordinatorAttendanceFixture(),
     );
+    this.qrTokens.clear();
+    this.nextQrTokenId = 1001;
     if (options?.coordinatorIdentity) {
       this.coordinatorIdentity = { ...options.coordinatorIdentity };
     }
@@ -809,26 +815,47 @@ export class MockCoordinatorRepository implements CoordinatorRepository {
       expiresAt: string;
     }>
   > {
+    const event = this.events.find(item => item.id === eventId);
+    if (!event) return { success: false, message: 'Event not found.' };
+    if (event.isOwnerAsMonitor) {
+      return { success: false, message: 'QR token management is disabled in read-only monitor mode.' };
+    }
+    if (!Number.isInteger(ttlMinutes) || ttlMinutes < 1 || ttlMinutes > 10080) {
+      return { success: false, message: 'Token lifetime must be between 1 and 10080 minutes.' };
+    }
+    if (maxUses !== undefined && maxUses !== null && (!Number.isInteger(maxUses) || maxUses < 1)) {
+      return { success: false, message: 'Maximum uses must be a positive whole number.' };
+    }
+
+    const id = this.nextQrTokenId++;
     const expiresAt = new Date(
       this.clock().getTime() + ttlMinutes * 60 * 1000,
     ).toISOString();
+    const rawToken = `template-qr-${id}-${eventId}-${purpose}-${this.clock().getTime()}`;
+    this.qrTokens.set(id, { eventId, rawToken, expiresAt });
     return {
       success: true,
-      message: 'QR token created successfully (Demo only)',
-      data: {
-        id: 1001,
-        rawToken: `mock-qr-${eventId}-${purpose}-${Date.now()}`,
-        expiresAt,
-      },
+      message: 'Local template QR token created — not submitted to the server.',
+      data: { id, rawToken, expiresAt },
     };
   }
 
   public async revokeQrToken(
-    _qrId: string,
+    qrId: string,
   ): Promise<CoordinatorOperationResult> {
+    const id = Number(qrId);
+    const token = this.qrTokens.get(id);
+    if (!Number.isInteger(id) || !token) {
+      return { success: false, message: 'Template QR token not found.' };
+    }
+    const event = this.events.find(item => item.id === token.eventId);
+    if (event?.isOwnerAsMonitor) {
+      return { success: false, message: 'QR token management is disabled in read-only monitor mode.' };
+    }
+    this.qrTokens.delete(id);
     return {
       success: true,
-      message: 'QR token revoked successfully (Demo only)',
+      message: 'Local template QR token revoked.',
     };
   }
 

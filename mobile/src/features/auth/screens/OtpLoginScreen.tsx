@@ -5,6 +5,7 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useCurrentUser } from '../../../app/UserContext';
+import { getDataMode } from '../../../app/configuration/dataMode';
 import type { RequestOtpResult, VerifyOtpResult } from '../../../app/UserContext';
 import type { OtpDeliveryDto, TokenizedOtpDeliveryDto } from '../../../data/dto/authDto';
 import {
@@ -31,6 +32,9 @@ export function getDeliveryStatusDescription(
   status?: string,
 ): string {
   if (!delivery) return '';
+  if (status === 'template_simulated') {
+    return 'Template Mode: local demo code generated — no SMS or network request.';
+  }
   const channel = delivery.channel || 'SMS';
   if (delivery.delivered) {
     return `Delivery channel: ${channel} (delivered)`;
@@ -94,7 +98,12 @@ export function OtpLoginScreen({
     challenge.delivery.configured === true &&
     challenge.delivery.provider !== 'console'
   );
-  const effectiveDevCode = isDevBuild && !isRealProvider ? (challenge?.devCode ?? devCode) : null;
+  const effectiveDevCode =
+    challenge?.status === 'template_simulated'
+      ? challenge.devCode ?? '123456'
+      : isDevBuild && !isRealProvider
+        ? challenge?.devCode ?? devCode
+        : null;
 
   const executeSendOtp = async (explicitRequestId?: string) => {
     if (isLoading) return; // Prevent double-submit while in flight
@@ -265,7 +274,9 @@ export function OtpLoginScreen({
         subtitle={
           step === 'phone'
             ? 'Access your volunteer shifts & coordinator workspace'
-            : `Code sent to ${phone}`
+            : challenge?.status === 'template_simulated'
+              ? `Local template demo for ${phone}`
+              : `Code sent to ${phone}`
         }
         showNotificationBell={false}
         onBackPress={step === 'otp' ? handleBackToPhone : undefined}
@@ -283,8 +294,9 @@ export function OtpLoginScreen({
                 color={theme.colors.textSecondary}
                 style={styles.subtext}
               >
-                Enter your mobile phone number to receive a secure SMS one-time
-                passcode.
+                {getDataMode() === 'mock'
+                  ? 'Template Mode: enter any demo mobile number. No SMS or network request will be made.'
+                  : 'Enter your mobile phone number to receive a secure SMS one-time passcode.'}
               </AppText>
             </View>
 
@@ -299,7 +311,9 @@ export function OtpLoginScreen({
               keyboardType="phone-pad"
               autoComplete="tel"
               error={fieldError ?? undefined}
-              helperText="E.g. +959 followed by your 8-9 digit phone number"
+              helperText={getDataMode() === 'mock'
+                ? 'Template Mode: any demo number is accepted locally.'
+                : 'E.g. +959 followed by your 8-9 digit phone number'}
             />
 
             <View style={styles.fieldSpacer} />
