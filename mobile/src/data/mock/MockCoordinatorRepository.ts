@@ -947,22 +947,24 @@ export class MockCoordinatorRepository implements CoordinatorRepository {
 
   public async inviteVolunteer(
     eventId: string,
-    volunteerUserId: string | number,
+    volunteerUserId?: string | number,
     postId?: string | number,
     note?: string,
+    volunteerUuid?: string,
   ): Promise<CoordinatorOperationResult<CoordinatorApplicationItem>> {
     const event = this.events.find(e => e.id === eventId);
-    if (!event) {
-      return {
-        success: false,
-        message: 'Event not found',
-      };
+    if (!event) return { success: false, message: 'Event not found' };
+    if (event.isOwnerAsMonitor) {
+      return { success: false, message: 'Invitations are disabled in read-only monitor mode.' };
+    }
+    if (!volunteerUserId && !volunteerUuid?.trim()) {
+      return { success: false, message: 'Provide either a volunteer user ID or UUID.' };
     }
     const appItem: CoordinatorApplicationItem = {
       id: this.idGenerator('app-inv'),
       eventId,
       eventTitle: event.title,
-      userId: String(volunteerUserId),
+      userId: String(volunteerUuid?.trim() || volunteerUserId),
       applicantName: 'Invited Volunteer',
       source: 'invite',
       postId: postId ? String(postId) : undefined,

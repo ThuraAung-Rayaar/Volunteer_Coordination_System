@@ -585,14 +585,25 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
 
   public async inviteVolunteer(
     eventId: string,
-    volunteerUserId: string | number,
+    volunteerUserId?: string | number,
     postId?: string | number,
     note?: string,
+    volunteerUuid?: string,
   ): Promise<CoordinatorOperationResult<CoordinatorApplicationItem>> {
+    const normalizedUserId = volunteerUserId !== undefined && String(volunteerUserId).trim()
+      ? Number(volunteerUserId)
+      : undefined;
+    if (normalizedUserId !== undefined && !Number.isInteger(normalizedUserId)) {
+      return { success: false, message: 'Volunteer user ID must be a whole number.' };
+    }
+    if (!normalizedUserId && !volunteerUuid?.trim()) {
+      return { success: false, message: 'Provide either a volunteer user ID or UUID.' };
+    }
     const res = await coordinatorApi.inviteVolunteer(
       eventId,
       {
-        volunteer_user_id: Number(volunteerUserId),
+        volunteer_user_id: normalizedUserId,
+        volunteer_uuid: volunteerUuid?.trim() || undefined,
         post_id: postId ? Number(postId) : null,
         note: note || null,
       },

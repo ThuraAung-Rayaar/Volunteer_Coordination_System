@@ -149,9 +149,10 @@ export interface CoordinatorRepository {
    */
   inviteVolunteer(
     eventId: string,
-    volunteerUserId: string | number,
+    volunteerUserId?: string | number,
     postId?: string | number,
     note?: string,
+    volunteerUuid?: string,
   ): Promise<CoordinatorOperationResult<CoordinatorApplicationItem>>;
 
   /**
