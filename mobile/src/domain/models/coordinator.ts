@@ -53,13 +53,13 @@ export interface CoordinatorEventSummary {
 export interface CreateEventWizardDraft {
   // Step 1: Basics
   title: string;
-  description?: string;
+  description?: string | null;
   purposeType: EventPurposeType;
   charityFieldCodes: CharityCategoryCode[];
 
   // Step 2: Location
   locationName: string;
-  landmarkText?: string;
+  landmarkText?: string | null;
   latitude: number | null;
   longitude: number | null;
   geoRadiusM: number;
@@ -71,24 +71,24 @@ export interface CreateEventWizardDraft {
   // Step 3: Schedule
   startAt: string;
   endAt: string;
-  applicationDeadline?: string;
+  applicationDeadline?: string | null;
 
   // Step 4: Capacity & Acceptance
   acceptanceMode: AcceptanceMode;
   autoAssignEnabled: boolean;
-  groupSize?: number;
+  groupSize?: number | null;
   leaderStrategy: LeaderStrategy;
-  maxParticipants?: number;
+  maxParticipants?: number | null;
 
   // Step 5: Support
   mealsProvided: boolean;
   lodgingProvided: boolean;
   travelSupportProvided: boolean;
   compensationKind: CompensationKind;
-  compensationNote?: string;
+  compensationNote?: string | null;
 
   // Step 6: Onboarding & QR
-  onboardingText?: string;
+  onboardingText?: string | null;
   requireOnboardingAck: boolean;
   qrRegistrationEnabled: boolean;
 }

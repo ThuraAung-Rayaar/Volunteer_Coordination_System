@@ -86,11 +86,11 @@ export function mapEventUpdateDraftToRequest(
   const payload: Partial<EventCreateRequestDto> = {};
 
   if (draft.title !== undefined) payload.title = draft.title.trim();
-  if (draft.description !== undefined) payload.description = draft.description.trim() || null;
+  if (draft.description !== undefined) payload.description = draft.description?.trim() || null;
   if (draft.purposeType !== undefined) payload.purpose_type = draft.purposeType;
   if (draft.charityFieldCodes !== undefined) payload.charity_field_codes = [...draft.charityFieldCodes];
   if (draft.locationName !== undefined) payload.location_name = draft.locationName.trim() || null;
-  if (draft.landmarkText !== undefined) payload.landmark_text = draft.landmarkText.trim() || null;
+  if (draft.landmarkText !== undefined) payload.landmark_text = draft.landmarkText?.trim() || null;
   if (draft.latitude !== undefined) payload.latitude = draft.latitude;
   if (draft.longitude !== undefined) payload.longitude = draft.longitude;
   if (draft.geoRadiusM !== undefined) payload.geo_radius_m = draft.geoRadiusM;
@@ -110,8 +110,8 @@ export function mapEventUpdateDraftToRequest(
   if (draft.lodgingProvided !== undefined) payload.lodging_provided = draft.lodgingProvided;
   if (draft.travelSupportProvided !== undefined) payload.travel_support_provided = draft.travelSupportProvided;
   if (draft.compensationKind !== undefined) payload.compensation_kind = draft.compensationKind;
-  if (draft.compensationNote !== undefined) payload.compensation_note = draft.compensationNote.trim() || null;
-  if (draft.onboardingText !== undefined) payload.onboarding_text = draft.onboardingText.trim() || null;
+  if (draft.compensationNote !== undefined) payload.compensation_note = draft.compensationNote?.trim() || null;
+  if (draft.onboardingText !== undefined) payload.onboarding_text = draft.onboardingText?.trim() || null;
   if (draft.requireOnboardingAck !== undefined) payload.require_onboarding_ack = draft.requireOnboardingAck;
   if (draft.qrRegistrationEnabled !== undefined) payload.qr_registration_enabled = draft.qrRegistrationEnabled;
 
