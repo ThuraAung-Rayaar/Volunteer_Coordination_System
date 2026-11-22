@@ -44,6 +44,7 @@ export function mapDashboardSummary(
   assignments: VolunteerAssignmentDto[] = [],
   attendanceRecords: AttendanceHistoryItemDto[] = [],
   feedbackSummary?: FeedbackSummaryResponseDto | null,
+  now: Date = new Date(),
 ): DashboardSummary {
   // Build lookup index for joining attendance with assignments
   const assignmentById = new Map<number, VolunteerAssignmentDto>();
@@ -57,9 +58,14 @@ export function mapDashboardSummary(
     }
   });
 
-  // Filter active upcoming shifts: 'assigned' or 'confirmed'
+  // Upcoming means assigned/confirmed and not already past the scheduled end.
+  // Invalid timestamps are excluded rather than displayed with fabricated dates.
   const upcomingCommitments: UpcomingCommitment[] = assignments
-    .filter(a => a.status === 'assigned' || a.status === 'confirmed')
+    .filter(a => {
+      if (a.status !== 'assigned' && a.status !== 'confirmed') return false;
+      const endAtMs = Date.parse(a.schedule_end);
+      return Number.isFinite(endAtMs) && endAtMs >= now.getTime();
+    })
     .map(a => ({
       id: String(a.id),
       eventId: String(a.event_id),
@@ -69,7 +75,8 @@ export function mapDashboardSummary(
       endAt: a.schedule_end,
       location: a.location_name || 'Event Location',
       status: a.status === 'confirmed' ? 'confirmed' : 'assigned',
-    }));
+    }))
+    .sort((left, right) => Date.parse(left.startAt) - Date.parse(right.startAt));
 
   // Filter completed activities: strictly status === 'completed'
   const completedAttendance = attendanceRecords.filter(
