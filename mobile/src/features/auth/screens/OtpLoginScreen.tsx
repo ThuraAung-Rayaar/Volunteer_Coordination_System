@@ -363,11 +363,15 @@ export function OtpLoginScreen({
                 color={theme.colors.textSecondary}
                 style={styles.subtext}
               >
-                We have sent an authentication code to{' '}
+                {challenge?.status === 'template_simulated'
+                  ? 'A local demo code is ready for '
+                  : 'An authentication code was requested for '}
                 <AppText weight="bold" color={theme.colors.textPrimary}>
                   {phone}
                 </AppText>
-                .
+                {challenge?.status === 'template_simulated'
+                  ? '. No SMS was sent.'
+                  : '.'}
               </AppText>
 
               {/* Truthful delivery status metadata */}
@@ -394,7 +398,8 @@ export function OtpLoginScreen({
                   <StatusBadge status="info" label="DEV TEST OTP" />
                 </View>
                 <AppText variant="caption" color={theme.colors.primary}>
-                  Development Code: <AppText weight="bold">{effectiveDevCode}</AppText>
+                  {challenge?.status === 'template_simulated' ? 'Template Demo Code: ' : 'Development Code: '}
+                  <AppText weight="bold">{effectiveDevCode}</AppText>
                 </AppText>
               </View>
             ) : null}
@@ -410,7 +415,9 @@ export function OtpLoginScreen({
               keyboardType="number-pad"
               maxLength={codeLength}
               error={fieldError ?? undefined}
-              helperText={`Enter the ${codeLength}-digit code received via SMS`}
+              helperText={challenge?.status === 'template_simulated'
+                ? `Enter the local ${codeLength}-digit demo code`
+                : `Enter the ${codeLength}-digit code received via SMS`}
             />
 
             {errorMessage ? (
