@@ -131,9 +131,16 @@ class PublicEventDetailView(APIView):
 
         posts = query_service.get_event_posts(event.id, verified_visible=True)
         data = dict(base_data)
-        data["posts"] = posts
-        data["require_onboarding_ack"] = event.require_onboarding_ack
-        data["qr_registration_enabled"] = event.qr_registration_enabled
+        data.update({
+            "geo_checkin_opens_before_min": event.geo_checkin_opens_before_min,
+            "require_checkin_confirmation": event.require_checkin_confirmation,
+            "auto_assign_enabled": event.auto_assign_enabled,
+            "group_size": event.group_size,
+            "leader_strategy": event.leader_strategy,
+            "posts": posts,
+            "require_onboarding_ack": event.require_onboarding_ack,
+            "qr_registration_enabled": event.qr_registration_enabled,
+        })
         has_t2 = can_access_event_t2(request.user, event)
         if has_t2:
             data["onboarding_text"] = event.onboarding_text

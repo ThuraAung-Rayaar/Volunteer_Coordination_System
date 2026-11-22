@@ -73,6 +73,11 @@ export interface PublicEventDetailDto extends PublicEventDto {
   compensation_note?: string | null;
   require_onboarding_ack?: boolean;
   qr_registration_enabled?: boolean;
+  geo_checkin_opens_before_min?: number;
+  require_checkin_confirmation?: boolean;
+  auto_assign_enabled?: boolean;
+  group_size?: number | null;
+  leader_strategy?: 'none' | 'first_experienced' | 'manual';
 }
 
 /**
