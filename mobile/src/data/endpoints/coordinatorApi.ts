@@ -11,6 +11,7 @@ import type {
   CoordinatorApplicationDto,
   CoordinatorAssignmentDto,
   CoordinatorEventListItemDto,
+  CoordinatorEventConfigurationDto,
   CoordinatorHistoryItemDto,
   CoordinatorInviteRequestDto,
   EventCreateRequestDto,
@@ -40,6 +41,15 @@ export const coordinatorApi = {
    * Fetches coordinator-level summary metrics for an event.
    * Authenticated endpoint.
    */
+  getEventConfiguration(
+    eventId: number | string,
+    client: ApiClient = defaultApiClient,
+  ): Promise<ApiResult<CoordinatorEventConfigurationDto>> {
+    return client.get<CoordinatorEventConfigurationDto>(
+      `coordinator/events/${eventId}/`,
+    );
+  },
+
   getEventSummary(
     eventId: number | string,
     client: ApiClient = defaultApiClient,
