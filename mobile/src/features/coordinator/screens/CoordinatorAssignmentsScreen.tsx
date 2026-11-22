@@ -24,6 +24,7 @@ import {
   AppCard,
   AppHeader,
   AppIcon,
+  AppInput,
   AppText,
   EmptyState,
   FilterChip,
@@ -68,6 +69,9 @@ export function CoordinatorAssignmentsScreen({
   const [activeTab, setActiveTab] = useState<TabFilter>('all');
   const [feedbackBanner, setFeedbackBanner] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [manualTargetPostId, setManualTargetPostId] = useState('');
+  const [manualGroupCode, setManualGroupCode] = useState('');
+  const [manualIsGroupLeader, setManualIsGroupLeader] = useState(false);
 
   const loadData = useCallback(
     async (targetId?: string) => {
@@ -138,14 +142,14 @@ export function CoordinatorAssignmentsScreen({
     setIsProcessing(true);
     try {
       const app = unassignedApps.find(a => a.id === applicationId);
-      const postIdToAssign = app?.postId ?? '';
-      const result =
-        await repo.assignVolunteerManually(
-          applicationId,
-          postIdToAssign,
-          'GRP-C',
-          false,
-        );
+      const postIdToAssign = manualTargetPostId.trim() || app?.postId || '';
+      const result = await repo.assignVolunteerManually(
+        applicationId,
+        postIdToAssign,
+        manualGroupCode.trim() || undefined,
+        manualIsGroupLeader,
+        selectedEventId,
+      );
       setFeedbackBanner(result.message);
       if (result.success) {
         await loadData();
@@ -280,6 +284,47 @@ export function CoordinatorAssignmentsScreen({
         />
       </ScrollView>
 
+      {/* Manual Assignment Parameters — exact optional BFF inputs */}
+      {activeTab !== 'assigned' && unassignedApps.length > 0 ? (
+        <View style={styles.sectionWrapper}>
+          <SectionHeader title="Manual Assignment Parameters" />
+          <AppCard style={styles.assignmentOptionsCard}>
+            <AppText variant="caption" color={theme.colors.textSecondary}>
+              Choose the target post and optional group settings before assigning an accepted application. If the post ID is blank, the application's requested post is used when available.
+            </AppText>
+            <AppInput
+              label="Target Post ID (optional)"
+              value={manualTargetPostId}
+              onChangeText={setManualTargetPostId}
+              placeholder="Use application's preferred post"
+              style={styles.manualField}
+            />
+            <AppInput
+              label="Group Code (optional)"
+              value={manualGroupCode}
+              onChangeText={setManualGroupCode}
+              placeholder="e.g. TEAM-YGN-01"
+              style={styles.manualField}
+            />
+            <View style={styles.chipRow}>
+              <FilterChip
+                label="Regular Member"
+                selected={!manualIsGroupLeader}
+                onPress={() => setManualIsGroupLeader(false)}
+              />
+              <FilterChip
+                label="Assign as Group Leader"
+                selected={manualIsGroupLeader}
+                onPress={() => setManualIsGroupLeader(true)}
+              />
+            </View>
+            <AppText variant="caption" color={theme.colors.textSecondary}>
+              The selected application ID is taken from the accepted application card. The BFF remains authoritative for post/event ownership and assignment rules.
+            </AppText>
+          </AppCard>
+        </View>
+      ) : null}
+
       {/* Section 1: Unassigned Accepted Volunteers */}
       {activeTab !== 'assigned' ? (
         <View style={styles.sectionWrapper}>
@@ -408,6 +453,18 @@ const styles = StyleSheet.create({
   },
   sectionWrapper: {
     marginBottom: 8,
+  },
+  assignmentOptionsCard: {
+    padding: 14,
+    gap: 8,
+  },
+  manualField: {
+    marginTop: 4,
+  },
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
   },
   emptyInlineText: {
     fontStyle: 'italic',
