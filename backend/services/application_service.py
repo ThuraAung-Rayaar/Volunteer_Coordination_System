@@ -29,6 +29,7 @@ from django.db import (
 from django.utils import timezone
 
 from apps.accounts.models import Users
+from apps.coordination.models import Assignments
 from apps.events.models import EventApplications, Events
 from common.db_context import get_db_session_context, set_db_session_context
 from common.exceptions import (
@@ -37,6 +38,7 @@ from common.exceptions import (
     translate_db_exception,
 )
 from common.permissions import get_event_for_manager_or_404, get_visible_event_or_404
+from services.cancellation_policy import is_within_volunteer_cancellation_window
 
 logger = logging.getLogger(__name__)
 
@@ -379,9 +381,35 @@ def withdraw_application(user, application_id: int) -> EventApplications:
     except EventApplications.DoesNotExist:
         raise ResourceMaskedNotFound(message="Application not found.")
 
-    # Only the applicant or an event manager can withdraw
-    if user.id != app.user_id:
+    # Only the applicant or an event manager can withdraw.
+    is_applicant_withdrawing = user.id == app.user_id
+    if not is_applicant_withdrawing:
         get_event_for_manager_or_404(user, app.event_id, require_write=True)
+
+    # Accepted-application withdrawal cascades to assignments in PostgreSQL.
+    # Enforce the same cutoff here to prevent bypass through the cascade.
+    # Authorized event managers retain their existing override.
+    if app.status == "accepted" and is_applicant_withdrawing:
+        active_assignment = (
+            Assignments.objects.filter(
+                application_id=app.id,
+                status__in=("assigned", "confirmed"),
+            )
+            .order_by("schedule_start")
+            .first()
+        )
+        if (
+            active_assignment is not None
+            and is_within_volunteer_cancellation_window(active_assignment.schedule_start)
+        ):
+            raise DomainError(
+                code="cancellation_window_closed",
+                message=(
+                    "You cannot withdraw an accepted application within 48 hours "
+                    "of the assigned shift. Contact the event coordinator for assistance."
+                ),
+                status_code=409,
+            )
 
     if app.status not in ("pending", "waitlisted", "accepted"):
         raise DomainError(
