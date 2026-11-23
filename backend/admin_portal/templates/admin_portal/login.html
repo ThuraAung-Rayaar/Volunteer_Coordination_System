@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" class="h-full bg-slate-950">
+<html lang="en" class="h-full bg-slate-950 admin-login">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -13,14 +13,49 @@
                 extend: {
                     colors: {
                         slate: {
-                            850: '#151f33',
-                            950: '#070b14',
+                            50: '#FAF4E8',
+                            100: '#FFFDF8',
+                            200: '#0E1A33',
+                            300: '#56607A',
+                            400: '#56607A',
+                            500: '#8E92A0',
+                            600: '#56607A',
+                            700: '#E7DCC4',
+                            800: '#E7DCC4',
+                            850: '#F3EAD8',
+                            900: '#FFFDF8',
+                            950: '#FAF4E8',
                         }
                     }
                 }
             }
         }
     </script>
+
+    <style>
+        :root { color-scheme: light; }
+        html.admin-login, body.admin-login {
+            background: #FAF4E8 !important;
+            color: #0E1A33 !important;
+        }
+        .admin-login .text-white { color: #0E1A33 !important; }
+        .admin-login .bg-gradient-to-tr .text-white,
+        .admin-login button.bg-blue-600.text-white { color: #fff !important; }
+        .admin-login input {
+            background: #FFFDF8 !important;
+            color: #0E1A33 !important;
+            border-color: #E7DCC4 !important;
+        }
+        .admin-login input::placeholder { color: #8E92A0 !important; }
+        .admin-login input:focus {
+            border-color: #2563EB !important;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+        }
+        .admin-login .bg-slate-900,
+        .admin-login .bg-slate-950 { background-color: #FFFDF8 !important; }
+        .admin-login .border-slate-700 { border-color: #E7DCC4 !important; }
+    </style>
+
 </head>
 <body class="min-h-full bg-slate-950 text-slate-100 flex flex-col justify-center items-center p-4 font-sans antialiased selection:bg-blue-600 selection:text-white">
 
