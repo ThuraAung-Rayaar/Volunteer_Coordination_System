@@ -139,7 +139,13 @@ describe('Phase 8: Onboarding, QR, Attendance & Feedback Integration', () => {
         .spyOn(checkinApi, 'submitGeoCheckIn')
         .mockResolvedValue({ ok: true, status: 200, data: mockResponse });
 
-      const result = await eventRepo.submitGeoCheckIn!('101', 16.805, 96.155, 10);
+      const result = await eventRepo.submitGeoCheckIn!('101', {
+        latitude: 16.805,
+        longitude: 96.155,
+        accuracyM: 10,
+        capturedAt: '2026-11-23T05:30:00.000Z',
+        isMocked: false,
+      });
 
       expect(result.success).toBe(true);
       expect(result.result).toBe('accepted');
@@ -151,6 +157,8 @@ describe('Phase 8: Onboarding, QR, Attendance & Feedback Integration', () => {
           latitude: 16.805,
           longitude: 96.155,
           accuracy_m: 10,
+          captured_at: '2026-11-23T05:30:00.000Z',
+          is_mocked: false,
         },
         mockClient,
       );

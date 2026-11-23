@@ -17,6 +17,7 @@ import type {
   EventApplyResult,
   EventFeedbackItem,
   EventRepository,
+  GeoCheckInLocationFix,
   GeoCheckInResult,
   OnboardingStatusResult,
   PaginatedEventsResult,
@@ -440,9 +441,7 @@ export class HttpEventRepository implements EventRepository {
 
   public async submitGeoCheckIn(
     eventId: string,
-    latitude: number,
-    longitude: number,
-    accuracyM?: number,
+    fix: GeoCheckInLocationFix,
   ): Promise<{
     success: boolean;
     message: string;
@@ -454,9 +453,11 @@ export class HttpEventRepository implements EventRepository {
     const res = await checkinApi.submitGeoCheckIn(
       {
         event_id: Number(eventId),
-        latitude,
-        longitude,
-        accuracy_m: accuracyM ?? null,
+        latitude: fix.latitude,
+        longitude: fix.longitude,
+        accuracy_m: fix.accuracyM,
+        captured_at: fix.capturedAt,
+        is_mocked: fix.isMocked,
       },
       this.client,
     );

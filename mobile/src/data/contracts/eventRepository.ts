@@ -49,6 +49,14 @@ export interface QrRedeemResult {
   applicationId?: string;
 }
 
+export interface GeoCheckInLocationFix {
+  latitude: number;
+  longitude: number;
+  accuracyM: number | null;
+  capturedAt: string;
+  isMocked: boolean;
+}
+
 export interface GeoCheckInResult {
   success: boolean;
   message: string;
@@ -181,9 +189,7 @@ export interface EventRepository {
    */
   submitGeoCheckIn(
     eventId: string,
-    latitude: number,
-    longitude: number,
-    accuracyM?: number,
+    fix: GeoCheckInLocationFix,
   ): Promise<GeoCheckInResult>;
 
   /**

@@ -342,9 +342,7 @@ export function MyAssignmentsScreen({
       const fix = await defaultLocationProvider.getCurrentPosition();
       const res = await repository.submitGeoCheckIn(
         checkInItem.eventId,
-        fix.latitude,
-        fix.longitude,
-        fix.accuracyM ?? undefined,
+        fix,
       );
       setFeedbackBanner(res.message);
       if (res.success) {
@@ -361,12 +359,12 @@ export function MyAssignmentsScreen({
   };
 
   const handleRedeemQrCheckIn = async () => {
-    if (!checkInItem || !repository.redeemQrToken || !qrTokenInput.trim()) {
+    if (!checkInItem || !repository.qrCheckIn || !qrTokenInput.trim()) {
       return;
     }
     setIsCheckingIn(true);
     try {
-      const res = await repository.redeemQrToken(qrTokenInput.trim());
+      const res = await repository.qrCheckIn(qrTokenInput.trim());
       setFeedbackBanner(res.message);
       if (res.success) {
         setCheckInItem(null);

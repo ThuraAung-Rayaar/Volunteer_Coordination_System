@@ -484,9 +484,13 @@ export class MockEventRepository implements EventRepository {
 
   public async submitGeoCheckIn(
     eventId: string,
-    _latitude: number,
-    _longitude: number,
-    _accuracyM?: number,
+    _fix: {
+      latitude: number;
+      longitude: number;
+      accuracyM: number | null;
+      capturedAt: string;
+      isMocked: boolean;
+    },
   ): Promise<{
     success: boolean;
     message: string;
