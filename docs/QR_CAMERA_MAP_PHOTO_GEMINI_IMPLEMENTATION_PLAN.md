@@ -4,8 +4,8 @@
 **Target branch:** `mobile/ui_sync`  
 **Base branch:** `main`  
 **Main HEAD at handoff:** `695d4930bcc12855604fbc4e409fb887c98217dc`  
-**Target branch HEAD at handoff:** `60053fca884d73440c95bce3726dd94e93c47891`  
-**Branch state:** 4 commits ahead of `main`, 0 behind (verify again before work)  
+**Source-code HEAD at handoff review:** `621126c9fc06cfa0d40ef3c5ff759e2e3b392ebf`  
+**Branch state:** expected to be ahead of `main` and not behind; always re-check the live comparison before editing.  
 **Mobile stack:** React Native 0.88.1, React 19.3.0, TypeScript 6.0.3, New Architecture enabled  
 **Backend:** Django REST Framework BFF, PostgreSQL/database-first  
 **Document purpose:** Continue implementation locally after the GPT-owned cross-layer fixes. This is an implementation task, not a fresh architecture proposal.
@@ -64,6 +64,10 @@ The branch includes the following four GPT-owned commits after the merged `main`
 2. `0510957f72e5f2a33693f4be01d3f3c06cbc329e` — generate region-filtered MBTiles exports from real raster cache entries.
 3. `37fb28681b8b797e25a5a04ac27b3eeeb7e29141` — expose a MapLibre raster style and use the region-specific archive endpoint.
 4. `60053fca884d73440c95bce3726dd94e93c47891` — expose per-region real raster/placeholder coverage in the map catalog.
+
+Two small follow-up consistency fixes were committed after the initial handoff draft:
+- `07cf036749b1f3a5a8dba0a618eb700dfcfc276b` — preserve literal MapLibre tile URL placeholders in the style URL and keep map preview behavior explicit.
+- `621126c9fc06cfa0d40ef3c5ff759e2e3b392ebf` — correct the PNG byte fixture in the SQLite-only map export test.
 
 ### 3.1 Mobile GPS contract is corrected
 
