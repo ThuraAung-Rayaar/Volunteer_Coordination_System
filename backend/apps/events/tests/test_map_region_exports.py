@@ -15,7 +15,7 @@ class RegionMbtilesExportTests(SimpleTestCase):
         self.root = Path(self.temp_dir.name)
         self.source = self.root / "source.mbtiles"
         self.output = self.root / "packs"
-        png = b"\\x89PNG\\r\\n\\x1a\\n" + b"raster"
+        png = b"\x89PNG\r\n\x1a\n" + b"raster"
         svg = b"<svg xmlns='http://www.w3.org/2000/svg'></svg>"
         with sqlite3.connect(self.source) as conn:
             conn.execute("CREATE TABLE metadata (name TEXT PRIMARY KEY, value TEXT)")
@@ -53,7 +53,7 @@ class RegionMbtilesExportTests(SimpleTestCase):
             metadata = dict(conn.execute("SELECT name, value FROM metadata").fetchall())
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0][:3], (10, 830, (1 << 10) - 1 - 470))
-        self.assertTrue(rows[0][3].startswith(b"\\x89PNG"))
+        self.assertTrue(rows[0][3].startswith(b"\x89PNG"))
         self.assertEqual(metadata["format"], "png")
         self.assertEqual(metadata["attribution"], "Test attribution")
 
