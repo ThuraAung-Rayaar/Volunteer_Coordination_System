@@ -9,6 +9,7 @@ import json
 import math
 import os
 import sqlite3
+import tempfile
 import urllib.request
 from pathlib import Path
 from typing import Any
@@ -368,50 +369,45 @@ def get_or_fetch_tile(z: int, x: int, y: int, allow_remote: bool = True) -> tupl
             if row and row[0]:
                 tile_bytes = row[0]
                 is_svg = tile_bytes.startswith(b"<svg") or tile_bytes.startswith(b"<?xml")
-                # If already a real raster tile, or offline mode, return local immediately
-                if not is_svg or not allow_remote:
-                    if is_svg:
-                        content_type = "image/svg+xml"
-                    elif tile_bytes.startswith(b"\xff\xd8\xff"):
-                        content_type = "image/jpeg"
-                    else:
-                        content_type = "image/png"
+                # SVG grid tiles are previews only, not genuine offline map tiles.
+                if is_svg and not allow_remote:
+                    return b"", "application/octet-stream", "offline_tile_unavailable"
+                if not is_svg:
+                    content_type = (
+                        "image/jpeg" if tile_bytes.startswith(b"\xff\xd8\xff")
+                        else "image/png"
+                    )
                     return tile_bytes, content_type, "local_mbtiles"
+
         finally:
             conn.close()
     except Exception:
         pass
 
-    # Step 2: Fetch from remote mirrors if allowed
+    # Step 2: Fetch only from an explicitly configured tile provider.
+    # Do not bulk-download public OSM/ArcGIS endpoints.
     if allow_remote:
-        carto_key = getattr(settings, "CARTO_API_KEY", "") or os.getenv("CARTO_API_KEY", "")
-        remote_urls = []
-        if carto_key:
-            remote_urls.append(f"https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key={carto_key}")
-            remote_urls.append(f"https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key={carto_key}")
-        # Primary keyless compliant mirror: OpenStreetMap with compliant server User-Agent
-        remote_urls.append(f"https://tile.openstreetmap.org/{z}/{x}/{y}.png")
-        # Secondary fallback mirror: ArcGIS World Topo
-        remote_urls.append(f"https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}")
-
-        for url in remote_urls:
-            req = urllib.request.Request(
-                url,
-                headers={
-                    "User-Agent": USER_AGENT_HEADER,
-                    "Accept": "image/png,image/*;q=0.8",
-                },
-            )
+        provider_template = (
+            getattr(settings, "MAP_TILE_URL_TEMPLATE", "")
+            or os.getenv("MAP_TILE_URL_TEMPLATE", "")
+        )
+        if provider_template:
             try:
-                with urllib.request.urlopen(req, timeout=2.5) as resp:
+                url = provider_template.format(z=z, x=x, y=y)
+                req = urllib.request.Request(
+                    url,
+                    headers={
+                        "User-Agent": USER_AGENT_HEADER,
+                        "Accept": "image/png,image/jpeg",
+                    },
+                )
+                with urllib.request.urlopen(req, timeout=5.0) as resp:
                     if resp.status == 200:
-                        png_bytes = resp.read()
-                        # Reject Carto's 2049-byte "API KEY REQUIRED" watermark image
-                        if len(png_bytes) == 2049 or (len(png_bytes) < 3000 and b"carto" in png_bytes.lower()):
-                            continue
-
-                        if png_bytes.startswith(b"\x89PNG") or png_bytes.startswith(b"\xff\xd8\xff"):
-                            content_type = "image/png" if png_bytes.startswith(b"\x89PNG") else "image/jpeg"
+                        tile_bytes = resp.read()
+                        is_png = tile_bytes.startswith(b"\x89PNG\r\n\x1a\n")
+                        is_jpeg = tile_bytes.startswith(b"\xff\xd8\xff")
+                        if is_png or is_jpeg:
+                            content_type = "image/png" if is_png else "image/jpeg"
                             region_code = _match_region_code(z, x, y)
                             now_iso = timezone.now().isoformat()
                             try:
@@ -423,16 +419,17 @@ def get_or_fetch_tile(z: int, x: int, y: int, allow_remote: bool = True) -> tupl
                                         (zoom_level, tile_column, tile_row, tile_data, region_code, updated_at)
                                         VALUES (?, ?, ?, ?, ?, ?)
                                         """,
-                                        (z, x, y, png_bytes, region_code, now_iso),
+                                        (z, x, y, tile_bytes, region_code, now_iso),
                                     )
                                     conn.commit()
                                 finally:
                                     conn.close()
                             except Exception:
                                 pass
-                            return png_bytes, content_type, "remote_cached"
+                            return tile_bytes, content_type, "remote_cached"
             except Exception:
-                continue
+                # Missing provider or provider failure means tile unavailable.
+                pass
 
     # Step 3: Offline SVG fallback
     svg_bytes = generate_offline_svg_tile(z, x, y)
@@ -568,6 +565,155 @@ def seed_region_tiles(
     }
 
 
+def build_region_mbtiles(
+    region_code: str,
+    *,
+    source_path: Path | None = None,
+    output_dir: Path | None = None,
+) -> Path:
+    """Create a region-filtered MBTiles archive from genuine raster cache entries.
+
+    The offline-distribution flag is an explicit provider licensing gate.
+    Central cache rows use XYZ; exported MBTiles uses TMS tile_row values.
+    SVG placeholder tiles are never included.
+    """
+    if not bool(getattr(settings, "MAP_TILE_OFFLINE_ALLOWED", False)):
+        raise PermissionError(
+            "Offline map distribution is disabled. Configure a tile provider that "
+            "explicitly permits offline caching/redistribution before enabling it."
+        )
+    config = (
+        ASEAN_MACRO_CONFIG
+        if region_code == ASEAN_MACRO_CONFIG["code"]
+        else MYANMAR_MICRO_REGIONS.get(region_code)
+    )
+    if config is None:
+        raise ValueError(f"Unknown map region: {region_code}")
+
+    database_path = Path(source_path or MBTILES_PATH)
+    if not database_path.exists() or database_path.stat().st_size == 0:
+        raise ValueError(f"No map tile store exists for region: {region_code}")
+
+    with sqlite3.connect(str(database_path), timeout=30.0) as source:
+        rows = source.execute(
+            """
+            SELECT zoom_level, tile_column, tile_row, tile_data, updated_at
+            FROM tiles WHERE region_code = ?
+            ORDER BY zoom_level, tile_column, tile_row
+            """,
+            (region_code,),
+        ).fetchall()
+        try:
+            refresh_row = source.execute(
+                "SELECT value FROM metadata WHERE name = 'last_refreshed_at'"
+            ).fetchone()
+        except sqlite3.DatabaseError:
+            refresh_row = None
+
+    raster_rows = []
+    formats = set()
+    for zoom, column, xyz_row, tile_data, updated_at in rows:
+        if not isinstance(tile_data, (bytes, bytearray)):
+            continue
+        data = bytes(tile_data)
+        if data.startswith(b"\x89PNG\r\n\x1a\n"):
+            formats.add("png")
+        elif data.startswith(b"\xff\xd8\xff"):
+            formats.add("jpg")
+        else:
+            continue
+        raster_rows.append((int(zoom), int(column), int(xyz_row), data, updated_at))
+
+    if not raster_rows:
+        raise ValueError(
+            f"No real raster tiles are available for '{region_code}'. "
+            "The region has no publishable offline map data."
+        )
+    if len(formats) != 1:
+        raise ValueError(f"Region '{region_code}' contains mixed raster formats.")
+
+    latest_update = max((str(row[4] or "") for row in raster_rows), default="")
+    revision = (
+        f"{database_path.stat().st_mtime_ns}:"
+        f"{refresh_row[0] if refresh_row else ''}:{latest_update}:{len(raster_rows)}"
+    )
+    pack_dir = Path(output_dir or (MBTILES_DIR / "region-packs"))
+    pack_dir.mkdir(parents=True, exist_ok=True)
+    pack_path = pack_dir / f"{region_code}.mbtiles"
+
+    if pack_path.exists():
+        try:
+            with sqlite3.connect(str(pack_path)) as cached:
+                cached_revision = cached.execute(
+                    "SELECT value FROM metadata WHERE name = 'source_revision'"
+                ).fetchone()
+            if cached_revision and cached_revision[0] == revision:
+                return pack_path
+        except sqlite3.DatabaseError:
+            pass
+
+    fd, temp_name = tempfile.mkstemp(
+        prefix=f".{region_code}-", suffix=".tmp", dir=str(pack_dir)
+    )
+    os.close(fd)
+    temp_path = Path(temp_name)
+    try:
+        min_zoom = min(row[0] for row in raster_rows)
+        max_zoom = max(row[0] for row in raster_rows)
+        sw, ne = config["bounds"]
+        south, west = sw
+        north, east = ne
+        center_lat, center_lon = config["center"]
+        metadata = {
+            "name": str(config["name"]),
+            "type": "baselayer",
+            "version": "1.0",
+            "description": f"Region-specific offline raster tiles for {region_code}",
+            "format": next(iter(formats)),
+            "minzoom": str(min_zoom),
+            "maxzoom": str(max_zoom),
+            "bounds": f"{west},{south},{east},{north}",
+            "center": f"{center_lon},{center_lat},{int(config.get('default_zoom', 4))}",
+            "attribution": str(getattr(settings, "MAP_TILE_ATTRIBUTION", "") or ""),
+            "source_revision": revision,
+        }
+        with sqlite3.connect(str(temp_path), timeout=30.0) as output:
+            output.execute("CREATE TABLE metadata (name TEXT PRIMARY KEY, value TEXT NOT NULL)")
+            output.execute(
+                """
+                CREATE TABLE tiles (
+                    zoom_level INTEGER NOT NULL,
+                    tile_column INTEGER NOT NULL,
+                    tile_row INTEGER NOT NULL,
+                    tile_data BLOB NOT NULL,
+                    PRIMARY KEY (zoom_level, tile_column, tile_row)
+                )
+                """
+            )
+            output.executemany(
+                "INSERT INTO metadata (name, value) VALUES (?, ?)", list(metadata.items())
+            )
+            output.executemany(
+                """
+                INSERT INTO tiles (zoom_level, tile_column, tile_row, tile_data)
+                VALUES (?, ?, ?, ?)
+                """,
+                [
+                    (z, x, (1 << z) - 1 - xyz_y, data)
+                    for z, x, xyz_y, data, _updated_at in raster_rows
+                ],
+            )
+            output.commit()
+        os.replace(temp_path, pack_path)
+    except Exception:
+        try:
+            temp_path.unlink(missing_ok=True)
+        except OSError:
+            pass
+        raise
+    return pack_path
+
+
 # ==============================================================================
 # CATALOG STATUS DISCOVERY
 # ==============================================================================
@@ -619,4 +765,12 @@ def get_map_catalog_status() -> dict[str, Any]:
         "regions": MYANMAR_MICRO_REGIONS,
         "zoom_distribution": zoom_distribution,
         "region_distribution": region_distribution,
+        "tile_provider_configured": bool(
+            getattr(settings, "MAP_TILE_URL_TEMPLATE", "")
+            or os.getenv("MAP_TILE_URL_TEMPLATE", "")
+        ),
+        "tile_attribution": str(getattr(settings, "MAP_TILE_ATTRIBUTION", "") or ""),
+        "offline_downloads_enabled": bool(
+            getattr(settings, "MAP_TILE_OFFLINE_ALLOWED", False)
+        ),
     }
