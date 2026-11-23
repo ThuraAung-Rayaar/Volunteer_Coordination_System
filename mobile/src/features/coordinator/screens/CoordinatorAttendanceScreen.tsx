@@ -10,6 +10,7 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
+import QRCode from 'react-native-qrcode-svg';
 import { CoordinatorRepository } from '../../../data/contracts/coordinatorRepository';
 import { defaultCoordinatorRepository } from '../../../data/mock/MockCoordinatorRepository';
 import { useRepositories } from '../../../app/RepositoryProvider';
@@ -78,6 +79,19 @@ export function CoordinatorAttendanceScreen({
   const [isCreatingQr, setIsCreatingQr] = useState(false);
   const [createdQrToken, setCreatedQrToken] = useState<{ id: number; rawToken: string; expiresAt: string } | null>(null);
   const [revokeQrId, setRevokeQrId] = useState('');
+
+  // Clear QR state on component unmount
+  useEffect(() => {
+    return () => {
+      setCreatedQrToken(null);
+    };
+  }, []);
+
+  const isQrExpired = useMemo(() => {
+    if (!createdQrToken?.expiresAt) return false;
+    const expiryTime = new Date(createdQrToken.expiresAt).getTime();
+    return !Number.isNaN(expiryTime) && expiryTime < Date.now();
+  }, [createdQrToken]);
 
   const loadData = useCallback(
     async (targetId?: string) => {
@@ -257,6 +271,8 @@ export function CoordinatorAttendanceScreen({
         onSelectEvent={id => {
           setSelectedEventId(id);
           selectedEventIdRef.current = id;
+          setCreatedQrToken(null);
+          setRevokeQrId('');
           loadData(id);
         }}
       />
@@ -336,8 +352,36 @@ export function CoordinatorAttendanceScreen({
                   ? 'Local template token only — it is not saved on the server.'
                   : 'Server-issued token value — handle securely.'}
               </AppText>
-              <AppText variant="body" weight="semibold" color={theme.colors.primary}>{createdQrToken.rawToken}</AppText>
-              <AppText variant="caption" color={theme.colors.textSecondary}>Expires: {createdQrToken.expiresAt}</AppText>
+              {isQrExpired ? (
+                <View style={[styles.qrExpiredBadge, { backgroundColor: theme.colors.surface, borderColor: theme.colors.danger }]}>
+                  <AppIcon name="alert" size={16} color={theme.colors.danger} />
+                  <AppText variant="caption" weight="bold" color={theme.colors.danger}>
+                    TOKEN EXPIRED — Generate a new token for check-in
+                  </AppText>
+                </View>
+              ) : (
+                <View style={styles.qrCodeWrapper} testID="coordinator-qr-container">
+                  <View style={styles.qrCodeInner}>
+                    <QRCode
+                      value={createdQrToken.rawToken}
+                      size={180}
+                      backgroundColor="#FFFFFF"
+                      color="#000000"
+                    />
+                  </View>
+                  <AppText variant="caption" weight="semibold" color={theme.colors.primary} style={{ marginTop: 8 }}>
+                    Raw: {createdQrToken.rawToken}
+                  </AppText>
+                </View>
+              )}
+              <View style={styles.qrMetadataRow}>
+                <AppText variant="caption" color={theme.colors.textSecondary}>
+                  Event: {selectedEvent?.title ?? 'Selected Event'} • Purpose: {qrPurpose}
+                </AppText>
+                <AppText variant="caption" color={theme.colors.textSecondary}>
+                  Expires: {createdQrToken.expiresAt}
+                </AppText>
+              </View>
             </View>
           ) : null}
           <AppInput label="QR Token ID to Revoke" value={revokeQrId} onChangeText={setRevokeQrId} placeholder="Enter the token ID" keyboardType="number-pad" editable={!isMonitorMode} />
@@ -543,5 +587,29 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 8,
     gap: 4,
+  },
+  qrCodeWrapper: {
+    alignItems: 'center',
+    marginVertical: 10,
+  },
+  qrCodeInner: {
+    padding: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  qrExpiredBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 10,
+    borderWidth: 1,
+    borderRadius: 6,
+    marginVertical: 8,
+  },
+  qrMetadataRow: {
+    marginTop: 4,
+    gap: 2,
   },
 });

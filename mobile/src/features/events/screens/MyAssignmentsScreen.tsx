@@ -27,6 +27,7 @@ import {
   VolunteerAssignmentStatus,
 } from '../../../domain/models/event';
 import type { MainDrawerScreenProps } from '../../../navigation/navigationTypes';
+import { QrCameraScannerModal } from '../components/QrCameraScannerModal';
 import {
   AppButton,
   AppCard,
@@ -163,6 +164,7 @@ export function MyAssignmentsScreen({
     useState<VolunteerAssignmentItem | null>(null);
   const [qrTokenInput, setQrTokenInput] = useState('');
   const [isCheckingIn, setIsCheckingIn] = useState(false);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
 
   // Feedback modal state
   const [feedbackItem, setFeedbackItem] =
@@ -352,6 +354,49 @@ export function MyAssignmentsScreen({
     } catch (err) {
       setFeedbackBanner(
         err instanceof Error ? err.message : 'Geo check-in request failed.',
+      );
+    } finally {
+      setIsCheckingIn(false);
+    }
+  };
+
+  const handleCameraScan = async (scannedToken: string) => {
+    if (!checkInItem || !repository.qrCheckIn) {
+      return;
+    }
+    const token = scannedToken.trim();
+    if (!token) {
+      setFeedbackBanner('Invalid empty QR code scanned.');
+      return;
+    }
+    setIsCheckingIn(true);
+    try {
+      if (repository.resolveQrToken) {
+        try {
+          const preview = await repository.resolveQrToken(token);
+          if (!preview.isValid) {
+            setFeedbackBanner(`Cannot check in: ${preview.reason || 'QR code is not valid.'}`);
+            return;
+          }
+          if (preview.purpose && preview.purpose !== 'checkin') {
+            setFeedbackBanner(`QR code purpose "${preview.purpose}" cannot be used for attendance check-in.`);
+            return;
+          }
+        } catch {
+          // Fall through to direct checkin endpoint
+        }
+      }
+      const res = await repository.qrCheckIn(token);
+      setFeedbackBanner(res.message);
+      if (res.success) {
+        setIsScannerOpen(false);
+        setCheckInItem(null);
+        setQrTokenInput('');
+        await fetchAssignments();
+      }
+    } catch (err) {
+      setFeedbackBanner(
+        err instanceof Error ? err.message : 'QR check-in request failed.',
       );
     } finally {
       setIsCheckingIn(false);
@@ -900,10 +945,18 @@ export function MyAssignmentsScreen({
               >
                 Option 2: On-Site QR Token
               </AppText>
+              <View style={{ marginBottom: 10 }}>
+                <AppButton
+                  label="Scan QR with Camera"
+                  variant="primary"
+                  disabled={isCheckingIn}
+                  onPress={() => setIsScannerOpen(true)}
+                />
+              </View>
               <AppInput
                 value={qrTokenInput}
                 onChangeText={setQrTokenInput}
-                placeholder="Enter or paste QR token..."
+                placeholder="Or enter / paste QR token..."
                 autoCapitalize="none"
               />
               <View style={{ marginTop: 8 }}>
@@ -929,6 +982,14 @@ export function MyAssignmentsScreen({
           </View>
         </View>
       </Modal>
+
+      {/* QR Camera Scanner Modal */}
+      <QrCameraScannerModal
+        visible={isScannerOpen}
+        onClose={() => setIsScannerOpen(false)}
+        onScan={handleCameraScan}
+        isProcessing={isCheckingIn}
+      />
 
       {/* Feedback Modal */}
       <Modal
