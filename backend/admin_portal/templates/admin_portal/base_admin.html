@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" class="h-full bg-slate-950">
+<html lang="en" class="h-full bg-slate-950 admin-shell">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -13,8 +13,18 @@
                 extend: {
                     colors: {
                         slate: {
-                            850: '#151f33',
-                            950: '#070b14',
+                            50: '#FAF4E8',
+                            100: '#FFFDF8',
+                            200: '#0E1A33',
+                            300: '#56607A',
+                            400: '#56607A',
+                            500: '#8E92A0',
+                            600: '#56607A',
+                            700: '#E7DCC4',
+                            800: '#E7DCC4',
+                            850: '#F3EAD8',
+                            900: '#FFFDF8',
+                            950: '#FAF4E8',
                         }
                     }
                 }
@@ -29,11 +39,98 @@
     <style>
         .scrollbar-none::-webkit-scrollbar { display: none; }
         .scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
+
+        :root {
+            color-scheme: light;
+            --vcs-bg: #FAF4E8;
+            --vcs-surface: #FFFDF8;
+            --vcs-surface-raised: #F3EAD8;
+            --vcs-text: #0E1A33;
+            --vcs-text-muted: #56607A;
+            --vcs-border: #E7DCC4;
+            --vcs-primary: #2563EB;
+            --vcs-shadow: 0 12px 30px rgba(14, 26, 51, 0.06);
+        }
+        html.admin-shell, body.admin-shell {
+            background: var(--vcs-bg) !important;
+            color: var(--vcs-text) !important;
+        }
+        .admin-shell header {
+            background: rgba(255, 253, 248, 0.96) !important;
+            border-color: var(--vcs-border) !important;
+            box-shadow: 0 4px 18px rgba(14, 26, 51, 0.05) !important;
+        }
+        .admin-shell header .text-white { color: var(--vcs-text) !important; }
+        .admin-shell header .bg-blue-600.text-white { color: #fff !important; }
+        .admin-shell header .bg-gradient-to-tr .text-white { color: #fff !important; }
+        .admin-shell header .border-slate-800\/80 { border-color: var(--vcs-border) !important; }
+        .admin-shell main { color: var(--vcs-text); }
+        .admin-shell main .text-white { color: var(--vcs-text) !important; }
+        .admin-shell main .bg-blue-600.text-white,
+        .admin-shell main .bg-emerald-600.text-white,
+        .admin-shell main .bg-rose-600.text-white,
+        .admin-shell main .bg-amber-600.text-white,
+        .admin-shell main .bg-indigo-600.text-white,
+        .admin-shell main .bg-sky-600.text-white { color: #fff !important; }
+        .admin-shell main .bg-blue-600 .text-white,
+        .admin-shell main .bg-emerald-600 .text-white,
+        .admin-shell main .bg-rose-600 .text-white,
+        .admin-shell main .bg-amber-600 .text-white,
+        .admin-shell main .bg-indigo-600 .text-white,
+        .admin-shell main .bg-sky-600 .text-white { color: #fff !important; }
+        .admin-shell main [class*="bg-slate-900"],
+        .admin-shell main [class*="bg-slate-950"] {
+            box-shadow: var(--vcs-shadow);
+        }
+        .admin-shell main input:not([type="checkbox"]):not([type="radio"]),
+        .admin-shell main select,
+        .admin-shell main textarea {
+            color: var(--vcs-text) !important;
+            background-color: var(--vcs-surface) !important;
+            border-color: var(--vcs-border) !important;
+        }
+        .admin-shell main input::placeholder,
+        .admin-shell main textarea::placeholder { color: #8E92A0 !important; }
+        .admin-shell main input:focus,
+        .admin-shell main select:focus,
+        .admin-shell main textarea:focus {
+            outline: none;
+            border-color: var(--vcs-primary) !important;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+        }
+        .admin-shell main table thead { background-color: var(--vcs-surface-raised); }
+        .admin-shell main table tbody tr { border-color: var(--vcs-border); }
+        .admin-shell main table tbody tr:hover { background-color: rgba(37, 99, 235, 0.045); }
+        .admin-shell footer {
+            background: rgba(255, 253, 248, 0.85) !important;
+            border-color: var(--vcs-border) !important;
+            color: var(--vcs-text-muted) !important;
+        }
+        .admin-shell footer .text-slate-600 { color: var(--vcs-text-muted) !important; }
+        .admin-shell .leaflet-control,
+        .admin-shell .leaflet-popup-content-wrapper,
+        .admin-shell .leaflet-popup-tip {
+            background: var(--vcs-surface) !important;
+            color: var(--vcs-text) !important;
+            border-color: var(--vcs-border) !important;
+        }
+        .admin-shell .leaflet-bar a,
+        .admin-shell .leaflet-bar a:hover {
+            background: var(--vcs-surface) !important;
+            color: var(--vcs-text) !important;
+            border-color: var(--vcs-border) !important;
+        }
+        @media (max-width: 640px) {
+            .admin-shell header > div:first-child { align-items: flex-start; }
+            .admin-shell header .font-bold.text-white { font-size: 0.875rem; }
+            .admin-shell main { padding-left: 1rem; padding-right: 1rem; }
+        }
+
     </style>
 
     {% block head_extra %}{% endblock %}
 </head>
-<body class="min-h-full min-w-[768px] bg-slate-950 text-slate-100 flex flex-col font-sans antialiased selection:bg-blue-600 selection:text-white">
+<body class="min-h-full w-full bg-slate-950 text-slate-100 flex flex-col font-sans antialiased selection:bg-blue-600 selection:text-white">
 
     <!-- Sticky Top Navigation Bar -->
     <header class="sticky top-0 z-50 bg-slate-900/95 backdrop-blur border-b border-slate-800 shadow-lg">
@@ -171,7 +268,7 @@
     </header>
 
     <!-- Main Content Container -->
-    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6">
+    <main class="admin-main flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6">
         <!-- Global Messages & Notifications -->
         {% if success_message %}
         <div class="mb-5 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 flex items-center justify-between shadow-lg shadow-emerald-900/10">
@@ -323,13 +420,13 @@
                 options: { position: "topright" },
                 onAdd: function() {
                     const div = L.DomUtil.create("div", "leaflet-bar leaflet-control");
-                    div.style.background = "rgba(15, 23, 42, 0.92)";
+                    div.style.background = "rgba(255, 253, 248, 0.96)";
                     div.style.padding = "4px 6px";
                     div.style.borderRadius = "8px";
-                    div.style.border = "1px solid #334155";
+                    div.style.border = "1px solid #E7DCC4";
                     const select = document.createElement("select");
-                    select.style.background = "#0f172a";
-                    select.style.color = "#f8fafc";
+                    select.style.background = "#FFFDF8";
+                    select.style.color = "#0E1A33";
                     select.style.fontSize = "11px";
                     select.style.fontFamily = "monospace";
                     select.style.border = "none";
