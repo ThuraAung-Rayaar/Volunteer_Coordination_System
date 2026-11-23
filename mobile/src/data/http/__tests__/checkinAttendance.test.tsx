@@ -139,7 +139,13 @@ describe('Phase 8: Onboarding, QR, Attendance & Feedback Integration', () => {
         .spyOn(checkinApi, 'submitGeoCheckIn')
         .mockResolvedValue({ ok: true, status: 200, data: mockResponse });
 
-      const result = await eventRepo.submitGeoCheckIn!('101', 16.805, 96.155, 10);
+      const result = await eventRepo.submitGeoCheckIn!('101', {
+        latitude: 16.805,
+        longitude: 96.155,
+        accuracyM: 10,
+        capturedAt: '2026-11-23T05:30:00.000Z',
+        isMocked: false,
+      });
 
       expect(result.success).toBe(true);
       expect(result.result).toBe('accepted');
@@ -151,6 +157,8 @@ describe('Phase 8: Onboarding, QR, Attendance & Feedback Integration', () => {
           latitude: 16.805,
           longitude: 96.155,
           accuracy_m: 10,
+          captured_at: '2026-11-23T05:30:00.000Z',
+          is_mocked: false,
         },
         mockClient,
       );
@@ -171,7 +179,13 @@ describe('Phase 8: Onboarding, QR, Attendance & Feedback Integration', () => {
         },
       });
 
-      const result = await eventRepo.submitGeoCheckIn!('101', 16.9, 96.2, 15);
+      const result = await eventRepo.submitGeoCheckIn!('101', {
+        latitude: 16.9,
+        longitude: 96.2,
+        accuracyM: 15,
+        capturedAt: '2026-11-23T04:00:00.000Z',
+        isMocked: false,
+      });
 
       expect(result.success).toBe(false);
       expect(result.result).toBe('outside_geofence');
@@ -485,10 +499,17 @@ describe('Phase 8: Onboarding, QR, Attendance & Feedback Integration', () => {
       expect(onboardingSpy).toHaveBeenCalledWith(firstAssignment.eventId);
 
       // Verify geo check-in trigger
+      const expectedFix = {
+        latitude: 16.805,
+        longitude: 96.155,
+        accuracyM: 15,
+        capturedAt: '2026-11-23T04:00:00.000Z',
+        isMocked: false,
+      };
       await act(async () => {
-        await mockRepo.submitGeoCheckIn(firstAssignment.eventId, 16.805, 96.155, 15);
+        await mockRepo.submitGeoCheckIn(firstAssignment.eventId, expectedFix);
       });
-      expect(checkinSpy).toHaveBeenCalledWith(firstAssignment.eventId, 16.805, 96.155, 15);
+      expect(checkinSpy).toHaveBeenCalledWith(firstAssignment.eventId, expectedFix);
 
       // Verify checkout trigger
       await act(async () => {

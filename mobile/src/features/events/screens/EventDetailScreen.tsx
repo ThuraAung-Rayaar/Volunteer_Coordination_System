@@ -23,6 +23,7 @@ import {
   EventDetail,
   EventPost,
 } from '../../../domain/models/event';
+import { appEventBus, AppEvents } from '../../../core/events/eventBus';
 import type { MainDrawerScreenProps } from '../../../navigation/navigationTypes';
 import {
   AppButton,
@@ -125,6 +126,22 @@ export function EventDetailScreen({
     fetchDetail();
   }, [fetchDetail]);
 
+  // Re-fetch event detail on focus or when event status changes
+  useEffect(() => {
+    const unsubFocus = navigation?.addListener?.('focus', () => {
+      fetchDetail();
+    });
+    const unsubBus = appEventBus.on(AppEvents.EVENT_STATUS_CHANGED, (data) => {
+      if (!data || !data.eventId || String(data.eventId) === String(eventId)) {
+        fetchDetail();
+      }
+    });
+    return () => {
+      unsubFocus?.();
+      unsubBus();
+    };
+  }, [navigation, fetchDetail, eventId]);
+
   const handleApplyPress = (post: EventPost) => {
     setSelectedPostForApply(post);
     setVolunteerNote('');
@@ -202,8 +219,20 @@ export function EventDetailScreen({
     );
   }
 
-  const isLive = event.status === 'active';
-  const statusLabel = isLive ? 'Live / Active Shift' : 'Published';
+  const statusStr = String(event.status);
+  const isEnded = Boolean(
+    statusStr === 'completed' ||
+      statusStr === 'ended' ||
+      statusStr === 'cancelled' ||
+      (isHttpMode() &&
+        Boolean(event.endAt && new Date(event.endAt).getTime() < Date.now())),
+  );
+  const isLive = !isEnded && event.status === 'active';
+  const statusLabel = isEnded
+    ? 'Ended'
+    : isLive
+    ? 'Live / Active Shift'
+    : 'Published';
   const userApplication = event.userApplication;
 
   return (
@@ -245,7 +274,7 @@ export function EventDetailScreen({
         <AppCard style={styles.sectionCard}>
           <View style={styles.titleHeaderRow}>
             <StatusBadge
-              status={isLive ? 'info' : 'success'}
+              status={isEnded ? 'muted' : isLive ? 'info' : 'success'}
               label={statusLabel}
             />
             <AppText variant="caption" color={theme.colors.textSecondary}>
@@ -534,9 +563,7 @@ export function EventDetailScreen({
         {event.posts.map(post => {
           const isAppliedThisPost =
             userApplication?.postId === post.id;
-          const isEventEnded =
-            isHttpMode() &&
-            Boolean(event.endAt && new Date(event.endAt).getTime() < Date.now());
+          const isEventEnded = isEnded;
           return (
             <EventPostCard
               key={post.id}

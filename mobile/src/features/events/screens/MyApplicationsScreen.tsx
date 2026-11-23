@@ -19,12 +19,13 @@ import {
   defaultEventRepository,
   MockEventRepository,
 } from '../../../data/mock/MockEventRepository';
-import { isMockMode } from '../../../app/configuration/dataMode';
+import { isHttpMode, isMockMode } from '../../../app/configuration/dataMode';
 import { useRepositories } from '../../../app/RepositoryProvider';
 import {
   EventApplicationStatus,
   VolunteerApplicationItem,
 } from '../../../domain/models/event';
+import { appEventBus, AppEvents } from '../../../core/events/eventBus';
 import type { MainDrawerScreenProps } from '../../../navigation/navigationTypes';
 import {
   AppButton,
@@ -83,11 +84,32 @@ function formatDate(isoString?: string): string {
   }
 }
 
-function getBadgeConfig(status: EventApplicationStatus): {
+function isApplicationEventEnded(item: VolunteerApplicationItem): boolean {
+  if (
+    item.eventStatus === 'completed' ||
+    item.eventStatus === 'ended' ||
+    item.eventStatus === 'cancelled'
+  ) {
+    return true;
+  }
+  if (isHttpMode() && item.eventEndAt) {
+    try {
+      return new Date(item.eventEndAt).getTime() < Date.now();
+    } catch {
+      return false;
+    }
+  }
+  return false;
+}
+
+function getBadgeConfig(item: VolunteerApplicationItem): {
   badgeStatus: BadgeStatus;
   label: string;
 } {
-  switch (status) {
+  if (isApplicationEventEnded(item)) {
+    return { badgeStatus: 'muted', label: 'Ended' };
+  }
+  switch (item.status) {
     case 'accepted':
       return { badgeStatus: 'emerald', label: 'Accepted' };
     case 'pending':
@@ -101,7 +123,7 @@ function getBadgeConfig(status: EventApplicationStatus): {
     case 'expired':
       return { badgeStatus: 'muted', label: 'Expired' };
     default:
-      return { badgeStatus: 'muted', label: status };
+      return { badgeStatus: 'muted', label: item.status };
   }
 }
 
@@ -148,6 +170,20 @@ export function MyApplicationsScreen({
   useEffect(() => {
     fetchApplications();
   }, [fetchApplications]);
+
+  // Re-fetch applications on focus or when event status changes
+  useEffect(() => {
+    const unsubFocus = navigation?.addListener?.('focus', () => {
+      fetchApplications();
+    });
+    const unsubBus = appEventBus.on(AppEvents.EVENT_STATUS_CHANGED, () => {
+      fetchApplications();
+    });
+    return () => {
+      unsubFocus?.();
+      unsubBus();
+    };
+  }, [navigation, fetchApplications]);
 
   // Restore scroll offset if returning to list
   useEffect(() => {
@@ -198,7 +234,6 @@ export function MyApplicationsScreen({
             ? `Application for "${appToWithdraw.eventTitle}" (${appToWithdraw.postTitle}) withdrawn (${result.message})`
             : result.message,
         );
-        setAppToWithdraw(null);
         await fetchApplications();
       } else {
         setFeedbackBanner(result.message);
@@ -209,6 +244,7 @@ export function MyApplicationsScreen({
       );
     } finally {
       setIsWithdrawing(false);
+      setAppToWithdraw(null);
     }
   };
 
@@ -315,11 +351,13 @@ export function MyApplicationsScreen({
             />
           }
           renderItem={({ item }) => {
-            const badge = getBadgeConfig(item.status);
-            const canWithdraw =
-              item.status === 'pending' ||
-              item.status === 'waitlisted' ||
-              item.status === 'accepted';
+            const badge = getBadgeConfig(item);
+            const isEnded = isApplicationEventEnded(item);
+            const isTerminal =
+              item.status === 'withdrawn' ||
+              item.status === 'rejected' ||
+              item.status === 'expired';
+            const canWithdraw = !isEnded && !isTerminal;
 
             return (
               <AppCard style={styles.cardSpacing}>
@@ -372,24 +410,26 @@ export function MyApplicationsScreen({
                 </Pressable>
 
                 {/* Action footer */}
-                {canWithdraw ? (
+                {!isEnded ? (
                   <View style={styles.cardActions}>
                     <AppButton
                       label="Withdraw application"
                       variant="outline"
-                      onPress={() => setAppToWithdraw(item)}
+                      disabled={!canWithdraw}
+                      onPress={canWithdraw ? () => setAppToWithdraw(item) : () => {}}
                       accessibilityLabel={`Withdraw application for ${item.postTitle}`}
                     />
-                  </View>
-                ) : item.status === 'accepted' ? (
-                  <View style={styles.acceptedNotice}>
-                    <AppText
-                      variant="caption"
-                      weight="semibold"
-                      color={theme.colors.success}
-                    >
-                      ✓ Application accepted — see My Assignments for confirmed shift.
-                    </AppText>
+                    {item.status === 'accepted' ? (
+                      <View style={styles.acceptedNotice}>
+                        <AppText
+                          variant="caption"
+                          weight="semibold"
+                          color={theme.colors.success}
+                        >
+                          ✓ Application accepted — see My Assignments for confirmed shift.
+                        </AppText>
+                      </View>
+                    ) : null}
                   </View>
                 ) : null}
               </AppCard>
@@ -505,7 +545,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     flexGrow: 1,
-    paddingBottom: 24,
+    paddingBottom: 88,
   },
   cardSpacing: {
     marginBottom: 14,

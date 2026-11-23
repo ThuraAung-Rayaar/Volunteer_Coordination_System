@@ -4,9 +4,18 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import {
+  PermissionsAndroid,
+  Platform,
   StyleSheet,
   View,
 } from 'react-native';
+import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
+import { useCurrentUser } from '../../../app/UserContext';
+import {
+  verificationPhotoStorage,
+  VerificationSlotType,
+  LocalEncryptedPhotoRecord,
+} from '../../../core/storage/verificationPhotoStorage';
 import type { ProfileRepository } from '../../../data/contracts/profileRepository';
 import { defaultProfileRepository } from '../../../data/mock/MockProfileRepository';
 import { useRepositories } from '../../../app/RepositoryProvider';
@@ -47,6 +56,10 @@ export function VerificationCoordinatorStatusScreen({
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  const { currentUser } = useCurrentUser();
+  const [localPhotos, setLocalPhotos] = useState<Record<string, LocalEncryptedPhotoRecord>>({});
+  const [uploadingSlots, setUploadingSlots] = useState<Record<string, boolean>>({});
+
   // Application Draft State
   const [applicationNote, setApplicationNote] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -72,6 +85,132 @@ export function VerificationCoordinatorStatusScreen({
   useEffect(() => {
     loadVerificationData();
   }, [loadVerificationData]);
+
+  useEffect(() => {
+    if (data?.imageSlots && currentUser?.id) {
+      const records: Record<string, LocalEncryptedPhotoRecord> = {};
+      data.imageSlots.forEach(slot => {
+        const found = verificationPhotoStorage.getAccountPhoto(
+          currentUser.id,
+          slot.imageType as VerificationSlotType,
+        );
+        if (found) {
+          records[slot.imageType] = found;
+        }
+      });
+      setLocalPhotos(records);
+    }
+  }, [data, currentUser]);
+
+  const handlePickPhoto = async (slotType: VerificationSlotType, source: 'camera' | 'library') => {
+    try {
+      if (slotType === 'mock_selfie' && source === 'library') {
+        setFeedbackBanner('Selfies must be captured live using the front camera and cannot be selected from the gallery.');
+        return;
+      }
+
+      if (source === 'camera' && Platform.OS === 'android') {
+        const hasCamera = await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.CAMERA);
+        if (!hasCamera) {
+          const granted = await PermissionsAndroid.request(
+            PermissionsAndroid.PERMISSIONS.CAMERA,
+            {
+              title: 'Camera Permission',
+              message: 'Volunteer app requires camera access to capture verification photos.',
+              buttonPositive: 'Grant',
+            },
+          );
+          if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+            setFeedbackBanner('Camera permission was denied. Cannot take photo.');
+            return;
+          }
+        }
+      }
+
+      const options = {
+        mediaType: 'photo' as const,
+        cameraType: (slotType === 'mock_selfie' ? 'front' : 'back') as 'front' | 'back',
+        quality: 0.8 as const,
+        maxWidth: 1920,
+        maxHeight: 1080,
+        saveToPhotos: false,
+      };
+      const response =
+        source === 'camera'
+          ? await launchCamera(options)
+          : await launchImageLibrary(options);
+
+      if (response.didCancel) {
+        return;
+      }
+
+      if (response.errorCode) {
+        setFeedbackBanner(`Camera error: ${response.errorMessage || response.errorCode}`);
+        return;
+      }
+
+      if (!response.assets || response.assets.length === 0) {
+        setFeedbackBanner('No photo was captured.');
+        return;
+      }
+
+      const asset = response.assets[0];
+      if (!asset.uri) {
+        setFeedbackBanner('Failed to obtain image from camera or library.');
+        return;
+      }
+
+      const fileSize = asset.fileSize || 1024 * 50;
+      const mime = asset.type || 'image/jpeg';
+      const record = await verificationPhotoStorage.saveAccountPhoto(
+        currentUser.id,
+        slotType,
+        asset.uri,
+        fileSize,
+        mime,
+        asset.fileName,
+      );
+      setLocalPhotos(prev => ({ ...prev, [slotType]: record }));
+      setFeedbackBanner(`Captured photo for ${slotType}. Tap Upload to submit.`);
+    } catch (err) {
+      setFeedbackBanner(err instanceof Error ? err.message : 'Photo selection failed.');
+    }
+  };
+
+  const handleUploadPhoto = async (slotType: VerificationSlotType) => {
+    const record = localPhotos[slotType];
+    if (!record || !repository.uploadVerificationImage) return;
+
+    setUploadingSlots(prev => ({ ...prev, [slotType]: true }));
+    try {
+      verificationPhotoStorage.updateUploadStatus(currentUser.id, slotType, 'uploading');
+      const res = await repository.uploadVerificationImage(
+        slotType,
+        record.fileUri,
+        record.mimeType,
+        record.fileName,
+      );
+      verificationPhotoStorage.updateUploadStatus(currentUser.id, slotType, 'uploaded');
+      setFeedbackBanner(`Verification image uploaded (ID: ${res.id}, Status: ${res.status}). Encrypted on server.`);
+      await loadVerificationData();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Upload failed due to network error.';
+      verificationPhotoStorage.updateUploadStatus(currentUser.id, slotType, 'failed', msg);
+      setFeedbackBanner(`Upload failed: ${msg}`);
+    } finally {
+      setUploadingSlots(prev => ({ ...prev, [slotType]: false }));
+    }
+  };
+
+  const handleRemovePhoto = (slotType: VerificationSlotType) => {
+    verificationPhotoStorage.removeAccountPhoto(currentUser.id, slotType);
+    setLocalPhotos(prev => {
+      const next = { ...prev };
+      delete next[slotType];
+      return next;
+    });
+    setFeedbackBanner('Local photo removed.');
+  };
 
   const handleSubmitCoordinatorApplication = async () => {
     if (!data?.canApplyForCoordinator) {
@@ -198,13 +337,15 @@ export function VerificationCoordinatorStatusScreen({
               color={theme.colors.textSecondary}
               style={styles.uploadNoticeText}
             >
-              Hardware camera and file uploads are disabled in this UI preview.
-              Document images are encrypted on the server in production.
+              Hardware camera and file uploads are disabled in this UI preview. Document images
+              are encrypted on the server in production (AES-256-GCM). Local copies are retained encrypted on this device.
             </AppText>
           </View>
 
           <View style={styles.slotsContainer}>
-            {data.imageSlots.map((slot: VerificationImageSlot) => (
+            {data.imageSlots.map((slot: VerificationImageSlot) => {
+              const isSelfie = slot.imageType === 'mock_selfie';
+              return (
               <View
                 key={slot.imageType}
                 style={[
@@ -225,7 +366,7 @@ export function VerificationCoordinatorStatusScreen({
                       {slot.label}
                     </AppText>
                     <AppText variant="caption" color={theme.colors.textSecondary}>
-                      Format: JPEG • {slot.description}
+                      Format: JPEG • {isSelfie ? 'Front Camera Only • ' : ''}{slot.description}
                     </AppText>
                   </View>
                   <StatusBadge
@@ -240,37 +381,119 @@ export function VerificationCoordinatorStatusScreen({
                   />
                 </View>
 
-                {/* Visual Placeholder Slot */}
-                <View
-                  style={[
-                    styles.visualPlaceholderBox,
-                    {
-                      borderColor: theme.colors.border,
-                      backgroundColor: theme.colors.surface,
-                    },
-                  ]}
-                >
-                  <AppIcon
-                    name={slot.status === 'verified' ? 'check' : 'user'}
-                    size={22}
-                    color={
-                      slot.status === 'verified'
-                        ? theme.colors.success
-                        : theme.colors.muted
-                    }
-                  />
-                  <AppText
-                    variant="caption"
-                    color={theme.colors.textSecondary}
-                    style={styles.placeholderLabel}
+                {/* Interactive Slot UI */}
+                {localPhotos[slot.imageType] ? (
+                  <View
+                    style={[
+                      styles.localPhotoBox,
+                      {
+                        borderColor: theme.colors.border,
+                        backgroundColor: theme.colors.surface,
+                      },
+                    ]}
                   >
-                    {slot.status === 'verified'
-                      ? 'Encrypted Document Stored On Server'
-                      : 'Visual Upload Slot (Demo Preview)'}
-                  </AppText>
-                </View>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <AppText variant="caption" weight="bold" color={theme.colors.textPrimary}>
+                        Local file: {localPhotos[slot.imageType].fileName}
+                      </AppText>
+                      <StatusBadge
+                        status={
+                          localPhotos[slot.imageType].uploadStatus === 'uploaded'
+                            ? 'success'
+                            : localPhotos[slot.imageType].uploadStatus === 'failed'
+                            ? 'danger'
+                            : 'warning'
+                        }
+                        label={localPhotos[slot.imageType].uploadStatus.toUpperCase()}
+                      />
+                    </View>
+                    <AppText variant="caption" color={theme.colors.textSecondary}>
+                      Size: {(localPhotos[slot.imageType].fileSizeBytes / 1024).toFixed(0)} KB • Encrypted on device
+                    </AppText>
+                    {localPhotos[slot.imageType].lastError ? (
+                      <AppText variant="caption" color={theme.colors.danger}>
+                        Error: {localPhotos[slot.imageType].lastError}
+                      </AppText>
+                    ) : null}
+
+                    <View style={styles.photoActionRow}>
+                      {localPhotos[slot.imageType].uploadStatus !== 'uploaded' ? (
+                        <AppButton
+                          label="Upload"
+                          variant="primary"
+                          loading={uploadingSlots[slot.imageType]}
+                          onPress={() => handleUploadPhoto(slot.imageType as VerificationSlotType)}
+                          style={{ flex: 1 }}
+                        />
+                      ) : null}
+                      <AppButton
+                        label={isSelfie ? 'Retake Selfie' : 'Replace'}
+                        variant="secondary"
+                        onPress={() => handlePickPhoto(slot.imageType as VerificationSlotType, 'camera')}
+                        style={{ flex: 1 }}
+                        accessibilityLabel={isSelfie ? 'Retake Selfie with Front Camera' : 'Replace'}
+                      />
+                      <AppButton
+                        label="Remove"
+                        variant="outline"
+                        onPress={() => handleRemovePhoto(slot.imageType as VerificationSlotType)}
+                      />
+                    </View>
+                  </View>
+                ) : (
+                  <View
+                    style={[
+                      styles.visualPlaceholderBox,
+                      {
+                        borderColor: theme.colors.border,
+                        backgroundColor: theme.colors.surface,
+                      },
+                    ]}
+                  >
+                    <AppIcon
+                      name={slot.status === 'verified' ? 'check' : 'user'}
+                      size={22}
+                      color={
+                        slot.status === 'verified'
+                          ? theme.colors.success
+                          : theme.colors.muted
+                      }
+                    />
+                    <AppText
+                      variant="caption"
+                      color={theme.colors.textSecondary}
+                      style={styles.placeholderLabel}
+                    >
+                      {slot.status === 'verified'
+                        ? 'Encrypted Document Stored On Server'
+                        : isSelfie
+                        ? 'No selfie captured yet (Front Camera Only)'
+                        : 'No local document selected'}
+                    </AppText>
+                    {slot.status !== 'verified' ? (
+                      <View style={styles.photoActionRow}>
+                        <AppButton
+                          label={isSelfie ? 'Take Selfie (Front Camera)' : 'Take Photo'}
+                          variant="primary"
+                          onPress={() => handlePickPhoto(slot.imageType as VerificationSlotType, 'camera')}
+                          style={{ flex: 1 }}
+                          accessibilityLabel={isSelfie ? 'Take Selfie with Front Camera' : 'Take Photo'}
+                        />
+                        {!isSelfie ? (
+                          <AppButton
+                            label="Gallery"
+                            variant="outline"
+                            onPress={() => handlePickPhoto(slot.imageType as VerificationSlotType, 'library')}
+                            style={{ flex: 1 }}
+                            accessibilityLabel="Gallery"
+                          />
+                        ) : null}
+                      </View>
+                    ) : null}
+                  </View>
+                )}
               </View>
-            ))}
+            );})}
           </View>
         </AppCard>
 
@@ -508,6 +731,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
+  },
+  localPhotoBox: {
+    padding: 12,
+    borderWidth: 1,
+    borderRadius: 6,
+    gap: 8,
+  },
+  photoActionRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 8,
   },
   placeholderLabel: {
     fontSize: 11,

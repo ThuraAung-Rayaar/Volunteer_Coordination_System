@@ -3,6 +3,8 @@
  */
 
 import { ApiClient, defaultApiClient } from '../../core/api/apiClient';
+import { appEventBus, AppEvents } from '../../core/events/eventBus';
+import { defaultDashboardRepository } from '../mock/MockDashboardRepository';
 import type {
   CoordinatorApplicationItem,
   CoordinatorApplicationStatus,
@@ -128,7 +130,9 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
     const events = await this.getMyEvents();
     const totalEventsCount = events.length;
     const activeEventsCount = events.filter(
-      e => e.status === 'active' || e.status === 'published',
+      e =>
+        (e.status === 'active' || e.status === 'published') &&
+        (!e.endAt || new Date(e.endAt).getTime() >= Date.now()),
     ).length;
     const draftEventsCount = events.filter(e => e.status === 'draft').length;
 
@@ -324,6 +328,26 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
         message: res.error.message,
       };
     }
+
+    if (targetStatus === 'completed' || targetStatus === 'cancelled') {
+      // Invalidate attendance and application cache for this event
+      for (const [key, item] of this.applicationCache.entries()) {
+        if (String(item.eventId) === String(eventId)) {
+          this.applicationCache.delete(key);
+        }
+      }
+      for (const [key, item] of this.attendanceCache.entries()) {
+        if (String(item.eventId) === String(eventId)) {
+          this.attendanceCache.delete(key);
+        }
+      }
+      defaultDashboardRepository.removeCommitmentsForEvent(eventId);
+    }
+
+    appEventBus.emit(AppEvents.EVENT_STATUS_CHANGED, {
+      eventId,
+      status: targetStatus,
+    });
 
     const updated = await this.getEventDetail(eventId);
     return {

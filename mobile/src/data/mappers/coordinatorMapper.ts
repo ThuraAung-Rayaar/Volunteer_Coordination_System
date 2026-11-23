@@ -126,11 +126,19 @@ export function mapCoordinatorEventSummary(
   dto: CoordinatorEventListItemDto,
   summaryDto?: EventSummaryViewDto | null,
 ): CoordinatorEventSummary {
+  const isPast = Boolean(
+    dto.end_at && new Date(dto.end_at).getTime() < Date.now(),
+  );
+  const resolvedStatus: CoordinatorEventStatus =
+    (dto.status === 'active' || dto.status === 'published') && isPast
+      ? 'ended'
+      : (dto.status as CoordinatorEventStatus);
+
   return {
     id: String(dto.id),
     title: dto.title,
     description: dto.description ?? '',
-    status: dto.status as CoordinatorEventStatus,
+    status: resolvedStatus,
     purposeType: (dto.purpose_type as EventPurposeType) || 'charity_event',
     startAt: dto.start_at,
     endAt: dto.end_at,

@@ -20,13 +20,15 @@ import {
   defaultEventRepository,
   MockEventRepository,
 } from '../../../data/mock/MockEventRepository';
-import { isMockMode } from '../../../app/configuration/dataMode';
+import { isHttpMode, isMockMode } from '../../../app/configuration/dataMode';
 import { useRepositories } from '../../../app/RepositoryProvider';
 import {
   VolunteerAssignmentItem,
   VolunteerAssignmentStatus,
 } from '../../../domain/models/event';
+import { appEventBus, AppEvents } from '../../../core/events/eventBus';
 import type { MainDrawerScreenProps } from '../../../navigation/navigationTypes';
+import { QrCameraScannerModal } from '../components/QrCameraScannerModal';
 import {
   AppButton,
   AppCard,
@@ -101,17 +103,45 @@ function formatDateTimeRange(startIso?: string, endIso?: string): string {
   }
 }
 
-function getAssignmentBadgeConfig(
-  status: VolunteerAssignmentStatus,
-  attendanceStatus?: string,
-): {
+function isAssignmentEnded(item: VolunteerAssignmentItem): boolean {
+  if (
+    item.eventStatus === 'completed' ||
+    item.eventStatus === 'ended' ||
+    item.eventStatus === 'cancelled'
+  ) {
+    return true;
+  }
+  if (isHttpMode() && item.endAt) {
+    try {
+      return new Date(item.endAt).getTime() < Date.now();
+    } catch {
+      return false;
+    }
+  }
+  return false;
+}
+
+function isWithinLockWindow(startIso?: string): boolean {
+  if (!isHttpMode() || !startIso) return false;
+  try {
+    const startMs = new Date(startIso).getTime();
+    return startMs - Date.now() < 48 * 60 * 60 * 1000;
+  } catch {
+    return false;
+  }
+}
+
+function getAssignmentBadgeConfig(item: VolunteerAssignmentItem): {
   badgeStatus: BadgeStatus;
   label: string;
 } {
-  if (status === 'completed' || attendanceStatus === 'completed') {
+  if (isAssignmentEnded(item)) {
+    return { badgeStatus: 'muted', label: 'Ended' };
+  }
+  if (item.status === 'completed' || item.attendanceStatus === 'completed') {
     return { badgeStatus: 'emerald', label: 'Attendance Verified' };
   }
-  switch (status) {
+  switch (item.status) {
     case 'confirmed':
       return { badgeStatus: 'emerald', label: 'Confirmed Shift' };
     case 'assigned':
@@ -119,7 +149,7 @@ function getAssignmentBadgeConfig(
     case 'cancelled':
       return { badgeStatus: 'rose', label: 'Participation Cancelled' };
     default:
-      return { badgeStatus: 'muted', label: status };
+      return { badgeStatus: 'muted', label: item.status };
   }
 }
 
@@ -163,6 +193,7 @@ export function MyAssignmentsScreen({
     useState<VolunteerAssignmentItem | null>(null);
   const [qrTokenInput, setQrTokenInput] = useState('');
   const [isCheckingIn, setIsCheckingIn] = useState(false);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
 
   // Feedback modal state
   const [feedbackItem, setFeedbackItem] =
@@ -191,6 +222,20 @@ export function MyAssignmentsScreen({
   useEffect(() => {
     fetchAssignments();
   }, [fetchAssignments]);
+
+  // Re-fetch assignments on focus or when event status changes
+  useEffect(() => {
+    const unsubFocus = navigation?.addListener?.('focus', () => {
+      fetchAssignments();
+    });
+    const unsubBus = appEventBus.on(AppEvents.EVENT_STATUS_CHANGED, () => {
+      fetchAssignments();
+    });
+    return () => {
+      unsubFocus?.();
+      unsubBus();
+    };
+  }, [navigation, fetchAssignments]);
 
   // Restore scroll offset if returning to list
   useEffect(() => {
@@ -278,6 +323,7 @@ export function MyAssignmentsScreen({
       );
     } finally {
       setIsCancelling(false);
+      setAssignmentToCancel(null);
     }
   };
 
@@ -342,9 +388,7 @@ export function MyAssignmentsScreen({
       const fix = await defaultLocationProvider.getCurrentPosition();
       const res = await repository.submitGeoCheckIn(
         checkInItem.eventId,
-        fix.latitude,
-        fix.longitude,
-        fix.accuracyM ?? undefined,
+        fix,
       );
       setFeedbackBanner(res.message);
       if (res.success) {
@@ -360,13 +404,56 @@ export function MyAssignmentsScreen({
     }
   };
 
-  const handleRedeemQrCheckIn = async () => {
-    if (!checkInItem || !repository.redeemQrToken || !qrTokenInput.trim()) {
+  const handleCameraScan = async (scannedToken: string) => {
+    if (!checkInItem || !repository.qrCheckIn) {
+      return;
+    }
+    const token = scannedToken.trim();
+    if (!token) {
+      setFeedbackBanner('Invalid empty QR code scanned.');
       return;
     }
     setIsCheckingIn(true);
     try {
-      const res = await repository.redeemQrToken(qrTokenInput.trim());
+      if (repository.resolveQrToken) {
+        try {
+          const preview = await repository.resolveQrToken(token);
+          if (!preview.isValid) {
+            setFeedbackBanner(`Cannot check in: ${preview.reason || 'QR code is not valid.'}`);
+            return;
+          }
+          if (preview.purpose && preview.purpose !== 'checkin') {
+            setFeedbackBanner(`QR code purpose "${preview.purpose}" cannot be used for attendance check-in.`);
+            return;
+          }
+        } catch {
+          // Fall through to direct checkin endpoint
+        }
+      }
+      const res = await repository.qrCheckIn(token);
+      setFeedbackBanner(res.message);
+      if (res.success) {
+        setIsScannerOpen(false);
+        setCheckInItem(null);
+        setQrTokenInput('');
+        await fetchAssignments();
+      }
+    } catch (err) {
+      setFeedbackBanner(
+        err instanceof Error ? err.message : 'QR check-in request failed.',
+      );
+    } finally {
+      setIsCheckingIn(false);
+    }
+  };
+
+  const handleRedeemQrCheckIn = async () => {
+    if (!checkInItem || !repository.qrCheckIn || !qrTokenInput.trim()) {
+      return;
+    }
+    setIsCheckingIn(true);
+    try {
+      const res = await repository.qrCheckIn(qrTokenInput.trim());
       setFeedbackBanner(res.message);
       if (res.success) {
         setCheckInItem(null);
@@ -537,12 +624,14 @@ export function MyAssignmentsScreen({
             />
           }
           renderItem={({ item }) => {
-            const badge = getAssignmentBadgeConfig(
-              item.status,
-              item.attendanceStatus,
-            );
+            const isEnded = isAssignmentEnded(item);
+            const badge = getAssignmentBadgeConfig(item);
+            const isWithin48h = isWithinLockWindow(item.startAt);
             const canCancel =
-              item.status === 'assigned' || item.status === 'confirmed';
+              !isEnded &&
+              (item.status === 'assigned' || item.status === 'confirmed') &&
+              item.attendanceStatus !== 'checked_in' &&
+              !isWithin48h;
             const isCompleted =
               item.status === 'completed' ||
               item.attendanceStatus === 'completed';
@@ -606,68 +695,71 @@ export function MyAssignmentsScreen({
                   </View>
                 </Pressable>
 
-                {/* Action footer */}
-                <View style={styles.cardActions}>
-                  {item.status === 'assigned' ? (
-                    <AppButton
-                      label="Confirm Shift"
-                      variant="primary"
-                      loading={confirmingId === item.id}
-                      onPress={() => handleConfirmShift(item)}
-                      accessibilityLabel={`Confirm shift for ${item.postTitle}`}
-                      style={{ marginRight: 8, marginBottom: 8 }}
-                    />
-                  ) : null}
+                {/* Action footer: No button is allowed if event is finished */}
+                {!isEnded ? (
+                  <View style={styles.cardActions}>
+                    {item.status === 'assigned' ? (
+                      <AppButton
+                        label="Confirm Shift"
+                        variant="primary"
+                        loading={confirmingId === item.id}
+                        onPress={() => handleConfirmShift(item)}
+                        accessibilityLabel={`Confirm shift for ${item.postTitle}`}
+                        style={{ marginRight: 8, marginBottom: 8 }}
+                      />
+                    ) : null}
 
-                  <AppButton
-                    label="Onboarding"
-                    variant="secondary"
-                    onPress={() => handleOpenOnboarding(item)}
-                    accessibilityLabel={`View onboarding for ${item.eventTitle}`}
-                    style={{ marginRight: 8, marginBottom: 8 }}
-                  />
-
-                  {(item.status === 'confirmed' || item.status === 'assigned') &&
-                  item.attendanceStatus !== 'checked_in' ? (
                     <AppButton
-                      label="Check-In"
-                      variant="primary"
-                      onPress={() => setCheckInItem(item)}
-                      accessibilityLabel={`Check in for ${item.postTitle}`}
-                      style={{ marginRight: 8, marginBottom: 8 }}
-                    />
-                  ) : null}
-
-                  {item.attendanceStatus === 'checked_in' ? (
-                    <AppButton
-                      label="Check-Out"
-                      variant="primary"
-                      onPress={() => handleCheckOut(item)}
-                      accessibilityLabel={`Check out of ${item.postTitle}`}
-                      style={{ marginRight: 8, marginBottom: 8 }}
-                    />
-                  ) : null}
-
-                  {isCompleted ? (
-                    <AppButton
-                      label="Feedback"
+                      label="Onboarding"
                       variant="secondary"
-                      onPress={() => setFeedbackItem(item)}
-                      accessibilityLabel={`Leave feedback for ${item.eventTitle}`}
+                      onPress={() => handleOpenOnboarding(item)}
+                      accessibilityLabel={`View onboarding for ${item.eventTitle}`}
                       style={{ marginRight: 8, marginBottom: 8 }}
                     />
-                  ) : null}
 
-                  {canCancel ? (
-                    <AppButton
-                      label="Cancel participation"
-                      variant="outline"
-                      onPress={() => setAssignmentToCancel(item)}
-                      accessibilityLabel={`Cancel participation for ${item.postTitle}`}
-                      style={{ marginBottom: 8 }}
-                    />
-                  ) : null}
-                </View>
+                    {(item.status === 'confirmed' || item.status === 'assigned') &&
+                    item.attendanceStatus !== 'checked_in' ? (
+                      <AppButton
+                        label="Check-In"
+                        variant="primary"
+                        onPress={() => setCheckInItem(item)}
+                        accessibilityLabel={`Check in for ${item.postTitle}`}
+                        style={{ marginRight: 8, marginBottom: 8 }}
+                      />
+                    ) : null}
+
+                    {item.attendanceStatus === 'checked_in' ? (
+                      <AppButton
+                        label="Check-Out"
+                        variant="primary"
+                        onPress={() => handleCheckOut(item)}
+                        accessibilityLabel={`Check out of ${item.postTitle}`}
+                        style={{ marginRight: 8, marginBottom: 8 }}
+                      />
+                    ) : null}
+
+                    {isCompleted ? (
+                      <AppButton
+                        label="Feedback"
+                        variant="secondary"
+                        onPress={() => setFeedbackItem(item)}
+                        accessibilityLabel={`Leave feedback for ${item.eventTitle}`}
+                        style={{ marginRight: 8, marginBottom: 8 }}
+                      />
+                    ) : null}
+
+                    {item.status === 'assigned' || item.status === 'confirmed' ? (
+                      <AppButton
+                        label="Cancel participation"
+                        variant="outline"
+                        disabled={!canCancel}
+                        onPress={canCancel ? () => setAssignmentToCancel(item) : () => {}}
+                        accessibilityLabel={`Cancel participation for ${item.postTitle}`}
+                        style={{ marginBottom: 8 }}
+                      />
+                    ) : null}
+                  </View>
+                ) : null}
               </AppCard>
             );
           }}
@@ -902,10 +994,18 @@ export function MyAssignmentsScreen({
               >
                 Option 2: On-Site QR Token
               </AppText>
+              <View style={{ marginBottom: 10 }}>
+                <AppButton
+                  label="Scan QR with Camera"
+                  variant="primary"
+                  disabled={isCheckingIn}
+                  onPress={() => setIsScannerOpen(true)}
+                />
+              </View>
               <AppInput
                 value={qrTokenInput}
                 onChangeText={setQrTokenInput}
-                placeholder="Enter or paste QR token..."
+                placeholder="Or enter / paste QR token..."
                 autoCapitalize="none"
               />
               <View style={{ marginTop: 8 }}>
@@ -931,6 +1031,14 @@ export function MyAssignmentsScreen({
           </View>
         </View>
       </Modal>
+
+      {/* QR Camera Scanner Modal */}
+      <QrCameraScannerModal
+        visible={isScannerOpen}
+        onClose={() => setIsScannerOpen(false)}
+        onScan={handleCameraScan}
+        isProcessing={isCheckingIn}
+      />
 
       {/* Feedback Modal */}
       <Modal
@@ -1051,7 +1159,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     flexGrow: 1,
-    paddingBottom: 24,
+    paddingBottom: 88,
   },
   cardSpacing: {
     marginBottom: 14,

@@ -95,6 +95,7 @@ export interface VolunteerApplicationDto {
   event_id: number;
   event_title: string | null;
   event_status: string | null;
+  event_end_at?: string | null;
   post_id: number | null;
   post_title: string | null;
   source: string;

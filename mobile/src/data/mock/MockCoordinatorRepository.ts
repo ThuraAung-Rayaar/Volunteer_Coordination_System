@@ -34,6 +34,9 @@ import {
   deepClone,
   IdGenerator,
 } from './mockUtils';
+import { defaultEventRepository } from './MockEventRepository';
+import { defaultDashboardRepository } from './MockDashboardRepository';
+import { appEventBus, AppEvents } from '../../core/events/eventBus';
 
 export interface MockCoordinatorIdentity {
   id: string;
@@ -417,6 +420,38 @@ export class MockCoordinatorRepository implements CoordinatorRepository {
     }
 
     event.status = targetStatus;
+
+    if (targetStatus === 'completed' || targetStatus === 'cancelled') {
+      this.assignments.forEach(a => {
+        if (a.eventId === eventId) {
+          if (
+            targetStatus === 'completed' &&
+            (a.status === 'assigned' || a.status === 'confirmed')
+          ) {
+            a.status = 'completed';
+          } else if (targetStatus === 'cancelled') {
+            a.status = 'cancelled';
+          }
+        }
+      });
+
+      this.applications.forEach(a => {
+        if (
+          a.eventId === eventId &&
+          (a.status === 'pending' || a.status === 'waitlisted')
+        ) {
+          a.status = 'expired';
+        }
+      });
+
+      defaultEventRepository.syncEventStatus(eventId, targetStatus, event);
+      defaultDashboardRepository.removeCommitmentsForEvent(eventId);
+    }
+
+    appEventBus.emit(AppEvents.EVENT_STATUS_CHANGED, {
+      eventId,
+      status: targetStatus,
+    });
 
     return {
       success: true,

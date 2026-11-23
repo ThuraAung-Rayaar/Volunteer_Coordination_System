@@ -632,9 +632,7 @@ export class VolunteerUseCases {
 
     const result = await this.eventRepo.submitGeoCheckIn(
       eventId,
-      fix.latitude,
-      fix.longitude,
-      fix.accuracyM ?? undefined,
+      fix,
     );
     if (result.success) {
       await this.eventRepo.getUserAssignments();

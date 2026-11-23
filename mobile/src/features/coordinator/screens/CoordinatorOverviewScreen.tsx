@@ -11,6 +11,7 @@ import {
 import type { CoordinatorRepository } from '../../../data/contracts/coordinatorRepository';
 import { defaultCoordinatorRepository } from '../../../data/mock/MockCoordinatorRepository';
 import { useRepositories } from '../../../app/RepositoryProvider';
+import { isMockMode } from '../../../app/configuration/dataMode';
 import type {
   CoordinatorEventSummary,
   CoordinatorOverviewMetrics,
@@ -29,6 +30,7 @@ import {
   SegmentedControl,
 } from '../../../shared';
 import { hexToRgba, useAppTheme } from '../../../theme';
+import { appEventBus, AppEvents } from '../../../core/events/eventBus';
 import {
   CoordinatorDynamicIsland,
   CoordinatorEventCard,
@@ -77,6 +79,22 @@ export function CoordinatorOverviewScreen({
   useEffect(() => {
     loadDashboard();
   }, [loadDashboard]);
+
+  // Re-load coordinator overview on focus or when event status changes
+  useEffect(() => {
+    const unsubFocus = navigation?.addListener?.('focus', () => {
+      loadDashboard();
+    });
+    const unsubBus = appEventBus.on(AppEvents.EVENT_STATUS_CHANGED, () => {
+      if (!navigation?.isFocused || navigation.isFocused()) {
+        loadDashboard();
+      }
+    });
+    return () => {
+      unsubFocus?.();
+      unsubBus();
+    };
+  }, [navigation, loadDashboard]);
 
   const handleEventPress = (eventId: string) => {
     navigation?.navigate?.('CoordinatorEventDetail', { eventId });
@@ -176,7 +194,7 @@ export function CoordinatorOverviewScreen({
                   value={metrics.totalEventsCount}
                   icon="calendar"
                   color={theme.colors.sky ?? theme.colors.accent}
-                  subtext={`${metrics.activeEventsCount} currently live`}
+                  subtext={`${events.filter(e => (e.status === 'active' || e.status === 'published') && (isMockMode() || !e.endAt || new Date(e.endAt).getTime() >= Date.now())).length} currently live`}
                 />
               </View>
               <View style={styles.metricCol}>
@@ -292,23 +310,56 @@ export function CoordinatorOverviewScreen({
               </Pressable>
             </View>
 
-            {/* Managed Events Section (Excludes completed and cancelled events from main dashboard) */}
+            {/* Managed Events Section (Excludes completed, cancelled, and ended events from main dashboard) */}
             <SectionHeader
               title="My Managed Events"
               actionLabel="View All"
               onActionPress={() => navigation?.navigate?.('CoordinatorEvents')}
             />
 
-            {events
-              .filter(e => e.status !== 'completed' && e.status !== 'cancelled')
-              .slice(0, 4)
-              .map(event => (
+            {(() => {
+              const liveEvents = events.filter(
+                e =>
+                  e.status !== 'completed' &&
+                  e.status !== 'cancelled' &&
+                  e.status !== 'ended' &&
+                  (isMockMode() || !e.endAt || new Date(e.endAt).getTime() >= Date.now()),
+              );
+              if (liveEvents.length === 0) {
+                return (
+                  <View
+                    style={[
+                      styles.emptyEventsBox,
+                      {
+                        backgroundColor: theme.colors.surface,
+                        borderColor: theme.colors.border,
+                      },
+                    ]}
+                  >
+                    <AppText
+                      variant="body"
+                      weight="semibold"
+                      color={theme.colors.textSecondary}
+                    >
+                      No active events
+                    </AppText>
+                    <AppText
+                      variant="caption"
+                      color={theme.colors.textSecondary}
+                    >
+                      All previous events have ended. View event history in all events.
+                    </AppText>
+                  </View>
+                );
+              }
+              return liveEvents.slice(0, 4).map(event => (
                 <CoordinatorEventCard
                   key={event.id}
                   event={event}
                   onPress={handleEventPress}
                 />
-              ))}
+              ));
+            })()}
           </ScreenContainer>
         )}
 
@@ -377,6 +428,14 @@ const styles = StyleSheet.create({
   },
   metricCol: {
     width: '48.5%',
+  },
+  emptyEventsBox: {
+    padding: 18,
+    borderWidth: 1,
+    borderRadius: 12,
+    alignItems: 'center',
+    gap: 4,
+    marginVertical: 8,
   },
   createCtaContainer: {
     marginBottom: 14,

@@ -70,6 +70,30 @@ export function AppHeader({
       ]}
     >
       <View style={styles.leftContainer}>
+        {onMenuPress ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Open navigation menu"
+            onPress={onMenuPress}
+            hitSlop={8}
+            style={[
+              styles.iconButton,
+              {
+                backgroundColor: theme.colors.surface,
+                borderColor: theme.colors.border,
+                borderRadius: theme.radius.squircle ?? 13,
+                marginRight: onBackPress ? 6 : 10,
+              },
+            ]}
+          >
+            <AppIcon
+              name="menu"
+              size={18}
+              color={theme.colors.textSecondary}
+            />
+          </Pressable>
+        ) : null}
+
         {onBackPress ? (
           <Pressable
             accessibilityRole="button"
@@ -89,28 +113,6 @@ export function AppHeader({
             <AppIcon
               name="chevron-left"
               size={20}
-              color={theme.colors.textSecondary}
-            />
-          </Pressable>
-        ) : onMenuPress ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Open navigation menu"
-            onPress={onMenuPress}
-            hitSlop={8}
-            style={[
-              styles.iconButton,
-              {
-                backgroundColor: theme.colors.surface,
-                borderColor: theme.colors.border,
-                borderRadius: theme.radius.squircle ?? 13,
-                marginRight: 10,
-              },
-            ]}
-          >
-            <AppIcon
-              name="menu"
-              size={18}
               color={theme.colors.textSecondary}
             />
           </Pressable>

@@ -27,6 +27,7 @@ import {
   LoadingState,
 } from '../../../shared';
 import { useAppTheme } from '../../../theme';
+import { appEventBus, AppEvents } from '../../../core/events/eventBus';
 import {
   CoordinatorEventCard,
   CoordinatorGuard,
@@ -72,6 +73,22 @@ export function CoordinatorEventsScreen({
     fetchEvents();
   }, [fetchEvents]);
 
+  // Re-fetch coordinator events on focus or when event status changes
+  useEffect(() => {
+    const unsubFocus = navigation?.addListener?.('focus', () => {
+      fetchEvents();
+    });
+    const unsubBus = appEventBus.on(AppEvents.EVENT_STATUS_CHANGED, () => {
+      if (!navigation?.isFocused || navigation.isFocused()) {
+        fetchEvents();
+      }
+    });
+    return () => {
+      unsubFocus?.();
+      unsubBus();
+    };
+  }, [navigation, fetchEvents]);
+
   const handleRefresh = () => {
     setIsRefreshing(true);
     fetchEvents();
@@ -109,7 +126,8 @@ export function CoordinatorEventsScreen({
         <AppHeader
           title="Coordinator Events"
           subtitle="Managed volunteer projects"
-          onBackPress={handleBack}
+          onMenuPress={navigation ? () => navigation.openDrawer() : undefined}
+          onBackPress={navigation && navigation.canGoBack() ? handleBack : undefined}
           rightAction={
             <AppButton
               label="+ New"

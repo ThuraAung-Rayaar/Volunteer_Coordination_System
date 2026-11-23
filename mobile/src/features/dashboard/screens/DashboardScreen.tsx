@@ -2,8 +2,9 @@
  * @format
  */
 
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, Modal, Pressable, StyleSheet, View } from 'react-native';
+import { appEventBus, AppEvents } from '../../../core/events/eventBus';
 import { useCurrentUser } from '../../../app/UserContext';
 import { IDashboardRepository } from '../../../data/contracts';
 import { CompletedActivity, UpcomingCommitment } from '../../../domain/models';
@@ -48,6 +49,20 @@ export function DashboardScreen({
   const repository = propRepository ?? repositories.dashboardRepository;
   const { summary, loading, error, refresh, cancelParticipation } =
     useDashboard(repository);
+
+  // Re-fetch dashboard when screen gains focus or when an event status changes across tabs/workspaces
+  useEffect(() => {
+    const unsubFocus = navigation?.addListener?.('focus', () => {
+      refresh();
+    });
+    const unsubBus = appEventBus.on(AppEvents.EVENT_STATUS_CHANGED, () => {
+      refresh();
+    });
+    return () => {
+      unsubFocus?.();
+      unsubBus();
+    };
+  }, [navigation, refresh]);
 
   // Cancel Participation confirmation modal state
   const [commitmentToCancel, setCommitmentToCancel] =

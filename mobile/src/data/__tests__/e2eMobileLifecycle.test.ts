@@ -665,7 +665,13 @@ describe('Phase 9: Full End-to-End Mobile Lifecycle & Parity Verification', () =
     // -------------------------------------------------------------------------
     // Step 9: Volunteer Geo Check-In (Constraint 3)
     // -------------------------------------------------------------------------
-    const geoResult = await eventRepo.submitGeoCheckIn!('101', 37.7749, -122.4194, 5);
+    const geoResult = await eventRepo.submitGeoCheckIn!('101', {
+      latitude: 37.7749,
+      longitude: -122.4194,
+      accuracyM: 5,
+      capturedAt: '2026-11-23T04:00:00.000Z',
+      isMocked: false,
+    });
     expect(geoResult.success).toBe(true);
     expect(geoResult.result).toBe('accepted');
     expect(geoResult.distanceM).toBe(14.2);

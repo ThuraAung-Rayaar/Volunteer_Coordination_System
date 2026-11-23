@@ -9,4 +9,5 @@ export interface IDashboardRepository {
   cancelUpcomingParticipation?(
     commitmentId: string,
   ): Promise<{ success: boolean; message: string; data?: DashboardSummary }>;
+  removeCommitmentsForEvent?(eventId: string): void;
 }

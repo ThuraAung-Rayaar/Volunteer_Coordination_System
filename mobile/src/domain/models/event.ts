@@ -128,6 +128,8 @@ export interface VolunteerApplicationItem {
   id: string;
   eventId: string;
   eventTitle: string;
+  eventStatus?: string;
+  eventEndAt?: string;
   postId: string;
   postTitle: string;
   status: EventApplicationStatus;
@@ -146,6 +148,7 @@ export interface VolunteerAssignmentItem {
   id: string;
   eventId: string;
   eventTitle: string;
+  eventStatus?: string;
   applicationId?: string;
   postId: string;
   postTitle: string;

@@ -58,11 +58,19 @@ export function mapDashboardSummary(
     }
   });
 
-  // Upcoming means assigned/confirmed and not already past the scheduled end.
-  // Invalid timestamps are excluded rather than displayed with fabricated dates.
+  // Upcoming means assigned/confirmed, event is active/published, and not already past the scheduled end.
+  // Invalid timestamps and completed/cancelled/ended events are excluded in all cases.
   const upcomingCommitments: UpcomingCommitment[] = assignments
     .filter(a => {
       if (a.status !== 'assigned' && a.status !== 'confirmed') return false;
+      const eventStatusLower = (a.event_status || '').toLowerCase();
+      if (
+        eventStatusLower === 'completed' ||
+        eventStatusLower === 'ended' ||
+        eventStatusLower === 'cancelled'
+      ) {
+        return false;
+      }
       const endAtMs = Date.parse(a.schedule_end);
       return Number.isFinite(endAtMs) && endAtMs >= now.getTime();
     })
