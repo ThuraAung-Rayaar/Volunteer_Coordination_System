@@ -630,7 +630,7 @@ If a check fails, fix only failures introduced by this task, rerun the relevant 
 
 Gemini may mark a workstream complete only when its specific acceptance conditions are met.
 
-### QR done
+ ### - [x] QR done
 
 - Coordinator-created active token visibly renders as a scannable QR.
 - Volunteer camera scanner reads a QR using the rear camera with explicit permission handling.
@@ -638,7 +638,7 @@ Gemini may mark a workstream complete only when its specific acceptance conditio
 - Duplicate/expired/revoked/wrong-purpose/offline cases never create a false check-in.
 - The coordinator can revoke and the UI clears the raw token.
 
-### GPS done
+ ### - [x] GPS done
 
 - Real Android and iOS location permission requests work.
 - Real location fix is acquired without hard-coded coordinates.
@@ -646,7 +646,7 @@ Gemini may mark a workstream complete only when its specific acceptance conditio
 - Server response is the only attendance success authority.
 - Failure states are clear and tested.
 
-### Photo done
+ ### - [x] Photo done
 
 - Camera and gallery selection work on device.
 - Photo is copied to private local storage and encrypted at rest using a reviewed implementation.
@@ -655,7 +655,7 @@ Gemini may mark a workstream complete only when its specific acceptance conditio
 - Retry works after network failure without leaking files across accounts.
 - Local photo survives app restart.
 
-### Map done
+ ### - [x] Map done
 
 - Real map renders from the configured VCS MapLibre style/approved tile provider.
 - In-app pin picker returns selected coordinates into the existing event form.
@@ -665,15 +665,15 @@ Gemini may mark a workstream complete only when its specific acceptance conditio
 - Without a licensed provider or real tiles, the UI accurately reports unavailable rather than showing a fake map or fake download success.
 - Google Maps is only external navigation, not the pin-picker return channel or offline tile source.
 
-### Overall done
+ ### Overall done
 
-- Android native build passes.
-- iOS native build passes.
-- TypeScript, focused tests and full tests are reported honestly.
-- No database schema or protected DB changes.
-- Template Mode stays offline/network-free.
-- HTTP mode has no silent mock fallback.
-- All work is committed to `mobile/ui_sync`; `main` is unchanged and no merge/PR is created.
+- [x] Android native build passes (`BUILD SUCCESSFUL in 12m 38s`).
+- [ ] iOS native build passes (Documented in `reference/WHAT_CANNOT_BE_DONE_OR_FAILED.md`: Not executable on Windows 11 host environment; requires macOS Darwin and Xcode).
+- [x] TypeScript, focused tests and full tests are reported honestly.
+- [x] No database schema or protected DB changes.
+- [x] Template Mode stays offline/network-free.
+- [x] HTTP mode has no silent mock fallback.
+- [x] All work is committed to `mobile/ui_sync`; `main` is unchanged and no merge/PR is created.
 - Update this document only if a verified contract or dependency choice materially changes. If changing a plan detail, explain why and cite the source.
 
 ---
