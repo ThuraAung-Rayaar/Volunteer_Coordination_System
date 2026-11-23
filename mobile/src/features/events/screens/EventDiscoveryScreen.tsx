@@ -28,6 +28,7 @@ import {
   EventFilters,
   EventSummary,
 } from '../../../domain/models/event';
+import { appEventBus, AppEvents } from '../../../core/events/eventBus';
 import type { MainDrawerScreenProps } from '../../../navigation/navigationTypes';
 import {
   AppButton,
@@ -144,6 +145,20 @@ export function EventDiscoveryScreen({
   useEffect(() => {
     fetchEvents();
   }, [fetchEvents]);
+
+  // Re-fetch events when tab/screen gains focus or when an event status changes across tabs
+  useEffect(() => {
+    const unsubFocus = navigation?.addListener?.('focus', () => {
+      fetchEvents();
+    });
+    const unsubBus = appEventBus.on(AppEvents.EVENT_STATUS_CHANGED, () => {
+      fetchEvents();
+    });
+    return () => {
+      unsubFocus?.();
+      unsubBus();
+    };
+  }, [navigation, fetchEvents]);
 
   // Restore scroll offset if returning to a populated list
   useEffect(() => {

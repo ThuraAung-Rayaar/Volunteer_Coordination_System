@@ -608,6 +608,52 @@ export class MockEventRepository implements EventRepository {
       },
     ];
   }
+
+  public findEventById(eventId: string): EventDetail | undefined {
+    return this.events.find(e => e.id === eventId);
+  }
+
+  public syncEventStatus(
+    eventId: string,
+    targetStatus: string,
+    eventDetail?: any,
+  ): void {
+    let event = this.events.find(e => e.id === eventId);
+    if (!event && eventDetail) {
+      const newEvent: EventDetail = {
+        ...eventDetail,
+        status: targetStatus as any,
+      };
+      this.events.push(newEvent);
+    } else if (event) {
+      event.status = targetStatus as any;
+    }
+
+    if (targetStatus === 'completed' || targetStatus === 'cancelled') {
+      this.assignments.forEach(a => {
+        if (a.eventId === eventId) {
+          if (
+            targetStatus === 'completed' &&
+            (a.status === 'assigned' || a.status === 'confirmed')
+          ) {
+            a.status = 'completed';
+            (a as any).attendanceStatus = 'completed';
+          } else if (targetStatus === 'cancelled') {
+            a.status = 'cancelled';
+          }
+        }
+      });
+
+      this.applications.forEach(a => {
+        if (
+          a.eventId === eventId &&
+          (a.status === 'pending' || a.status === 'waitlisted')
+        ) {
+          a.status = 'expired';
+        }
+      });
+    }
+  }
 }
 
 function toSummary(event: EventDetail): EventSummary {

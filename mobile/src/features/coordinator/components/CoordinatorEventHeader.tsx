@@ -5,19 +5,21 @@
 import React from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import type { CoordinatorEventSummary } from '../../../domain/models/coordinator';
-import { AppCard, AppIcon, AppText, FilterChip, StatusBadge } from '../../../shared';
+import { AppButton, AppCard, AppIcon, AppText, FilterChip, StatusBadge } from '../../../shared';
 import { useAppTheme } from '../../../theme';
 
 interface CoordinatorEventHeaderProps {
   events: CoordinatorEventSummary[];
   selectedEventId: string;
   onSelectEvent: (eventId: string) => void;
+  onSwitchEvent?: () => void;
 }
 
 export function CoordinatorEventHeader({
   events,
   selectedEventId,
   onSelectEvent,
+  onSwitchEvent,
 }: CoordinatorEventHeaderProps): React.JSX.Element | null {
   const { theme } = useAppTheme();
 
@@ -27,11 +29,32 @@ export function CoordinatorEventHeader({
   }
 
   const isMonitorMode = currentEvent.isOwnerAsMonitor;
+  const isEnded =
+    currentEvent.status === 'completed' ||
+    currentEvent.status === 'ended' ||
+    Boolean(
+      currentEvent.endAt && new Date(currentEvent.endAt).getTime() < Date.now(),
+    );
+
+  const displayStatus = isEnded ? 'ENDED' : currentEvent.status.toUpperCase();
+  const badgeStatus = isEnded
+    ? 'muted'
+    : currentEvent.status === 'active'
+    ? 'success'
+    : 'info';
+
+  const activeEvents = events.filter(
+    e =>
+      e.status !== 'completed' &&
+      e.status !== 'cancelled' &&
+      e.status !== 'ended' &&
+      (!e.endAt || new Date(e.endAt).getTime() >= Date.now()),
+  );
 
   return (
     <View style={styles.container}>
       {/* Event Selection Switcher Chips */}
-      {events.length > 1 ? (
+      {activeEvents.length > 1 ? (
         <View style={styles.selectorWrapper}>
           <AppText
             variant="label"
@@ -45,7 +68,7 @@ export function CoordinatorEventHeader({
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.chipsScroll}
           >
-            {events.map(ev => {
+            {activeEvents.map(ev => {
               const isSelected = ev.id === currentEvent.id;
               const label = ev.isOwnerAsMonitor
                 ? `${ev.title} (Monitor)`
@@ -100,10 +123,21 @@ export function CoordinatorEventHeader({
             </AppText>
           </View>
           <StatusBadge
-            status={currentEvent.status === 'active' ? 'success' : 'info'}
-            label={currentEvent.status.toUpperCase()}
+            status={badgeStatus}
+            label={displayStatus}
           />
         </View>
+
+        {onSwitchEvent ? (
+          <View style={{ marginTop: 8, flexDirection: 'row', justifyContent: 'flex-end' }}>
+            <AppButton
+              label="Switch Event"
+              variant="outline"
+              onPress={onSwitchEvent}
+              style={{ minHeight: 28, paddingHorizontal: 10 }}
+            />
+          </View>
+        ) : null}
 
         <View style={styles.metaRow}>
           <View style={styles.metaItem}>

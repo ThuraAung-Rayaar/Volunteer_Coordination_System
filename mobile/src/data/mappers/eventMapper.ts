@@ -168,6 +168,8 @@ export function mapVolunteerApplication(
     id: String(dto.id),
     eventId: String(dto.event_id),
     eventTitle: dto.event_title ?? 'Volunteer Event',
+    eventStatus: dto.event_status ?? undefined,
+    eventEndAt: dto.event_end_at ?? undefined,
     postId: String(dto.post_id ?? ''),
     postTitle: dto.post_title ?? 'General Volunteer Support',
     status: dto.status as EventApplicationStatus,
@@ -187,6 +189,7 @@ export function mapVolunteerAssignment(
     id: String(dto.id),
     eventId: String(dto.event_id),
     eventTitle: dto.event_title ?? 'Volunteer Assignment',
+    eventStatus: dto.event_status ?? undefined,
     applicationId:
       dto.application_id !== null && dto.application_id !== undefined
         ? String(dto.application_id)

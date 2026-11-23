@@ -35,6 +35,7 @@ import {
 } from '../../../shared';
 import { useAppTheme } from '../../../theme';
 import { CoordinatorGuard } from '../components';
+import { appEventBus, AppEvents } from '../../../core/events/eventBus';
 
 export interface CoordinatorEventDetailScreenProps
   extends Partial<MainDrawerScreenProps<'CoordinatorEventDetail'>> {
@@ -125,6 +126,10 @@ export function CoordinatorEventDetailScreen({
           `Event status updated to ${pendingTargetStatus.toUpperCase()} (${result.message})`,
         );
         setEvent(result.data);
+        appEventBus.emit(AppEvents.EVENT_STATUS_CHANGED, {
+          eventId: event.id,
+          status: pendingTargetStatus,
+        });
       } else {
         setFeedbackBanner(result.message);
       }

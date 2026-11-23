@@ -4,9 +4,14 @@
 
 import React from 'react';
 import ReactTestRenderer from 'react-test-renderer';
+import { Modal } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { mockEventsFixture } from '../src/data/mock/fixtures/eventFixtures';
 import { MockEventRepository } from '../src/data/mock/MockEventRepository';
+import type {
+  VolunteerApplicationItem,
+  VolunteerAssignmentItem,
+} from '../src/domain/models/event';
 import {
   CharityCategoryChips,
   EventCard,
@@ -937,6 +942,124 @@ describe('MyApplicationsScreen', () => {
     expect(json).toContain('Riverbank Environmental Cleanup & Waste Audit');
     expect(json).not.toContain('Emergency Food Bank Packaging & Logistics');
   });
+
+  it('dismisses withdrawal modal and shows error banner when withdrawal fails', async () => {
+    const nav = createMockNavigation();
+    const repo = new MockEventRepository();
+    jest.spyOn(repo, 'withdrawApplication').mockResolvedValueOnce({
+      success: false,
+      message: 'Network timeout / 409 conflict',
+    });
+
+    let renderer!: ReactTestRenderer.ReactTestRenderer;
+    await ReactTestRenderer.act(async () => {
+      renderer = ReactTestRenderer.create(
+        renderWithTheme(
+          <MyApplicationsScreen navigation={nav} repository={repo} />,
+        ),
+      );
+    });
+
+    const withdrawBtn = renderer.root
+      .findAllByProps({ accessibilityRole: 'button' })
+      .find(b =>
+        b.props.accessibilityLabel ===
+        'Withdraw application for Recycling & Waste Data Auditor',
+      );
+    expect(withdrawBtn).toBeDefined();
+
+    await ReactTestRenderer.act(async () => {
+      withdrawBtn!.props.onPress();
+    });
+
+    // Confirm withdrawal which fails
+    const confirmBtn = renderer.root
+      .findAllByProps({ accessibilityRole: 'button' })
+      .find(b => b.props.accessibilityLabel === 'Confirm Withdrawal');
+    expect(confirmBtn).toBeDefined();
+
+    await ReactTestRenderer.act(async () => {
+      await confirmBtn!.props.onPress();
+    });
+
+    const modal = renderer.root.findByType(Modal);
+    expect(modal.props.visible).toBe(false);
+
+    const json = safeStringify(renderer.toJSON());
+    expect(json).toContain('Network timeout / 409 conflict');
+  });
+
+  it('greys out withdraw button when application cannot be withdrawn and hides buttons when event is ended', async () => {
+    const nav = createMockNavigation();
+    const repo = new MockEventRepository();
+    const customApps: VolunteerApplicationItem[] = [
+      {
+        id: 'app-terminal',
+        eventId: 'evt-101',
+        eventTitle: 'Active Event',
+        postId: 'post-1',
+        postTitle: 'Role Withdrawn',
+        status: 'withdrawn',
+        appliedAt: '2026-11-10T09:30:00Z',
+      },
+      {
+        id: 'app-ended-event',
+        eventId: 'evt-ended',
+        eventTitle: 'Completed Event',
+        eventStatus: 'completed',
+        postId: 'post-2',
+        postTitle: 'Role in Ended Event',
+        status: 'accepted',
+        appliedAt: '2026-11-10T09:30:00Z',
+      },
+    ];
+    jest.spyOn(repo, 'getUserApplications').mockResolvedValue(customApps);
+
+    let renderer!: ReactTestRenderer.ReactTestRenderer;
+    await ReactTestRenderer.act(async () => {
+      renderer = ReactTestRenderer.create(
+        renderWithTheme(
+          <MyApplicationsScreen navigation={nav} repository={repo} />,
+        ),
+      );
+    });
+
+    const json = safeStringify(renderer.toJSON());
+    expect(json).toContain('Ended');
+
+    // Terminal application has greyed-out (disabled) button
+    const terminalBtn = renderer.root
+      .findAllByProps({ accessibilityRole: 'button' })
+      .find(b =>
+        b.props.accessibilityLabel === 'Withdraw application for Role Withdrawn',
+      );
+    expect(terminalBtn).toBeDefined();
+    expect(terminalBtn!.props.accessibilityState.disabled).toBe(true);
+
+    // Ended event application has NO withdraw button allowed
+    const endedBtn = renderer.root
+      .findAllByProps({ accessibilityRole: 'button' })
+      .find(b =>
+        b.props.accessibilityLabel ===
+        'Withdraw application for Role in Ended Event',
+      );
+    expect(endedBtn).toBeUndefined();
+
+    // But event detail can still be opened
+    const detailBtn = renderer.root
+      .findAllByProps({ accessibilityRole: 'button' })
+      .find(b =>
+        b.props.accessibilityLabel === 'View details for Completed Event',
+      );
+    expect(detailBtn).toBeDefined();
+    await ReactTestRenderer.act(async () => {
+      detailBtn!.props.onPress();
+    });
+    expect(nav.navigate).toHaveBeenCalledWith('EventDetail', {
+      eventId: 'evt-ended',
+      returnTo: 'MyApplications',
+    });
+  });
 });
 
 describe('MyAssignmentsScreen', () => {
@@ -1134,6 +1257,70 @@ describe('MyAssignmentsScreen', () => {
     expect(json).not.toContain('Emergency Food Bank Packaging & Logistics');
   });
 
+  it('renders Ended badge and no action buttons when assignment event is completed', async () => {
+    const nav = createMockNavigation();
+    const repo = new MockEventRepository();
+    const completedAssignments: VolunteerAssignmentItem[] = [
+      {
+        id: 'asgn-ended',
+        eventId: 'evt-comp',
+        eventTitle: 'Finished Flood Relief',
+        eventStatus: 'completed',
+        postId: 'post-relief',
+        postTitle: 'Flood Helper',
+        status: 'confirmed',
+        startAt: '2026-11-01T08:00:00Z',
+        endAt: '2026-11-01T12:00:00Z',
+        location: 'Downtown Center',
+        assignedAt: '2026-10-25T10:00:00Z',
+      },
+    ];
+    jest
+      .spyOn(repo, 'getUserAssignments')
+      .mockResolvedValue(completedAssignments);
+
+    let renderer!: ReactTestRenderer.ReactTestRenderer;
+    await ReactTestRenderer.act(async () => {
+      renderer = ReactTestRenderer.create(
+        renderWithTheme(
+          <MyAssignmentsScreen navigation={nav} repository={repo} />,
+        ),
+      );
+    });
+
+    const json = safeStringify(renderer.toJSON());
+    expect(json).toContain('Ended');
+    expect(json).not.toContain('Confirmed Shift');
+
+    // No buttons allowed for ended event
+    const confirmBtn = renderer.root
+      .findAllByProps({ accessibilityRole: 'button' })
+      .find(b => b.props.accessibilityLabel === 'Confirm shift for Flood Helper');
+    expect(confirmBtn).toBeUndefined();
+
+    const cancelBtn = renderer.root
+      .findAllByProps({ accessibilityRole: 'button' })
+      .find(b =>
+        b.props.accessibilityLabel === 'Cancel participation for Flood Helper',
+      );
+    expect(cancelBtn).toBeUndefined();
+
+    // Event details can still be viewed
+    const viewDetailBtn = renderer.root
+      .findAllByProps({ accessibilityRole: 'button' })
+      .find(b =>
+        b.props.accessibilityLabel === 'View details for Finished Flood Relief',
+      );
+    expect(viewDetailBtn).toBeDefined();
+    await ReactTestRenderer.act(async () => {
+      viewDetailBtn!.props.onPress();
+    });
+    expect(nav.navigate).toHaveBeenCalledWith('EventDetail', {
+      eventId: 'evt-comp',
+      returnTo: 'MyAssignments',
+    });
+  });
+
   describe('VolunteerWorkspaceScreen', () => {
     it('renders combined volunteer workspace with Applications and Assignments tabs', async () => {
       const nav = createMockNavigation();
@@ -1164,6 +1351,43 @@ describe('MyAssignmentsScreen', () => {
 
       const updatedJson = safeStringify(renderer.toJSON());
       expect(updatedJson).toContain('My Confirmed Shifts & Assignments');
+    });
+
+    it('switches between Applications and Assignments tabs when swiped horizontally', async () => {
+      const nav = createMockNavigation();
+      const repo = new MockEventRepository();
+
+      let renderer!: ReactTestRenderer.ReactTestRenderer;
+      await ReactTestRenderer.act(async () => {
+        renderer = ReactTestRenderer.create(
+          renderWithTheme(
+            <VolunteerWorkspaceScreen navigation={nav} repository={repo} />,
+          ),
+        );
+      });
+
+      const scrollView = renderer.root.findByProps({ horizontal: true });
+      expect(scrollView).toBeDefined();
+
+      // Simulate swipe to assignments (page 1)
+      await ReactTestRenderer.act(async () => {
+        scrollView.props.onMomentumScrollEnd({
+          nativeEvent: { contentOffset: { x: 750 } },
+        });
+      });
+
+      let json = safeStringify(renderer.toJSON());
+      expect(json).toContain('My Confirmed Shifts & Assignments');
+
+      // Simulate swipe back to applications (page 0)
+      await ReactTestRenderer.act(async () => {
+        scrollView.props.onMomentumScrollEnd({
+          nativeEvent: { contentOffset: { x: 0 } },
+        });
+      });
+
+      json = safeStringify(renderer.toJSON());
+      expect(json).toContain('My Applications & Requests');
     });
   });
 });

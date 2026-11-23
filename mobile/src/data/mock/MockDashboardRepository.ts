@@ -41,6 +41,17 @@ export class MockDashboardRepository implements IDashboardRepository {
     this.summary = deepClone(summary);
   }
 
+  removeCommitmentsForEvent(eventId: string): void {
+    const updatedCommitments = this.summary.upcomingCommitments.filter(
+      c => c.eventId !== eventId,
+    );
+    this.summary = {
+      ...this.summary,
+      upcomingCommitments: updatedCommitments,
+      upcomingCommitmentCount: updatedCommitments.length,
+    };
+  }
+
   async getDashboardSummary(userId?: string): Promise<DashboardSummary> {
     if (this.shouldFail) {
       throw new Error('Failed to load dashboard summary from mock repository');

@@ -20,6 +20,10 @@ import {
   defaultDashboardRepository,
   MockDashboardRepository,
 } from '../src/data/mock/MockDashboardRepository';
+import { defaultCoordinatorRepository } from '../src/data/mock/MockCoordinatorRepository';
+import { defaultEventRepository } from '../src/data/mock/MockEventRepository';
+import { mapDashboardSummary } from '../src/data/mappers/dashboardMapper';
+import { appEventBus, AppEvents } from '../src/core/events/eventBus';
 import { DashboardScreen } from '../src/features/dashboard/screens/DashboardScreen';
 import { ThemeProvider } from '../src/theme/ThemeProvider';
 
@@ -466,5 +470,178 @@ describe('DashboardScreen UI & Visibility Rules', () => {
     const str = safeStringify(renderer.toJSON());
     expect(str).toContain('Verified Attendance Project');
     expect(str).not.toContain('Unverified No-Show Shift');
+  });
+
+  describe('Cross-Workspace Event Ending & Dashboard Synchronization', () => {
+    it('mapDashboardSummary excludes assignments where event_status is completed, ended, or cancelled even if scheduled in the future', () => {
+      const futureEnd = new Date(Date.now() + 86400000).toISOString();
+      const futureStart = new Date(Date.now() + 3600000).toISOString();
+
+      const assignments: any[] = [
+        {
+          id: 101,
+          event_id: 1,
+          event_title: 'Active Event',
+          event_status: 'published',
+          schedule_start: futureStart,
+          schedule_end: futureEnd,
+          status: 'confirmed',
+        },
+        {
+          id: 102,
+          event_id: 2,
+          event_title: 'Completed Event',
+          event_status: 'completed',
+          schedule_start: futureStart,
+          schedule_end: futureEnd,
+          status: 'confirmed',
+        },
+        {
+          id: 103,
+          event_id: 3,
+          event_title: 'Cancelled Event',
+          event_status: 'cancelled',
+          schedule_start: futureStart,
+          schedule_end: futureEnd,
+          status: 'confirmed',
+        },
+        {
+          id: 104,
+          event_id: 4,
+          event_title: 'Ended Event',
+          event_status: 'ended',
+          schedule_start: futureStart,
+          schedule_end: futureEnd,
+          status: 'confirmed',
+        },
+      ];
+
+      const result = mapDashboardSummary(assignments, [], null, new Date());
+      expect(result.upcomingCommitmentCount).toBe(1);
+      expect(result.upcomingCommitments.length).toBe(1);
+      expect(result.upcomingCommitments[0].eventTitle).toBe('Active Event');
+    });
+
+    it('MockDashboardRepository removeCommitmentsForEvent removes commitments and updates upcomingCommitmentCount', async () => {
+      const repo = new MockDashboardRepository(volunteerDashboardSummary);
+      const initial = await repo.getDashboardSummary();
+      expect(initial.upcomingCommitmentCount).toBe(2);
+
+      repo.removeCommitmentsForEvent('evt-preview-101');
+      const updated = await repo.getDashboardSummary();
+      expect(updated.upcomingCommitmentCount).toBe(1);
+      expect(updated.upcomingCommitments.some(c => c.eventId === 'evt-preview-101')).toBe(false);
+      expect(updated.upcomingCommitments.some(c => c.eventId === 'evt-preview-102')).toBe(true);
+    });
+
+    it('transitioning an event to completed in MockCoordinatorRepository cascades to defaultEventRepository, defaultDashboardRepository, and emits AppEvents.EVENT_STATUS_CHANGED', async () => {
+      const testEventId = 'evt-coord-001';
+      // Ensure event is present in defaultEventRepository
+      defaultEventRepository.syncEventStatus(testEventId, 'published');
+      defaultDashboardRepository.setSummary({
+        ...volunteerDashboardSummary,
+        upcomingCommitments: [
+          {
+            id: 'comm-test-999',
+            eventId: testEventId,
+            eventTitle: 'Test Event Sync',
+            roleName: 'Lead',
+            startAt: new Date(Date.now() + 3600000).toISOString(),
+            endAt: new Date(Date.now() + 7200000).toISOString(),
+            location: 'Downtown Hub',
+            status: 'confirmed',
+          },
+        ],
+        upcomingCommitmentCount: 1,
+      });
+
+      let emittedPayload: any = null;
+      const unsubscribe = appEventBus.on(AppEvents.EVENT_STATUS_CHANGED, payload => {
+        emittedPayload = payload;
+      });
+
+      try {
+        const result = await defaultCoordinatorRepository.transitionEventStatus(
+          testEventId,
+          'completed',
+        );
+        expect(result.success).toBe(true);
+        expect(result.data?.status).toBe('completed');
+
+        // Check synchronization to defaultEventRepository
+        const eventInEventRepo = defaultEventRepository.findEventById(testEventId);
+        expect(eventInEventRepo?.status).toBe('completed');
+
+        // Check synchronization to defaultDashboardRepository
+        const dashboardData = await defaultDashboardRepository.getDashboardSummary();
+        expect(
+          dashboardData.upcomingCommitments.some(c => c.eventId === testEventId),
+        ).toBe(false);
+        expect(dashboardData.upcomingCommitmentCount).toBe(0);
+
+        // Check appEventBus notification
+        expect(emittedPayload).toEqual({
+          eventId: testEventId,
+          status: 'completed',
+        });
+      } finally {
+        unsubscribe();
+      }
+    });
+
+    it('DashboardScreen re-fetches when focus listener triggers or appEventBus emits EVENT_STATUS_CHANGED', async () => {
+      let focusListener: (() => void) | null = null;
+      const navigation = {
+        ...createMockNavigation(),
+        addListener: jest.fn((event: string, cb: () => void) => {
+          if (event === 'focus') {
+            focusListener = cb;
+          }
+          return () => {};
+        }),
+      };
+
+      const spyGetDashboard = jest.spyOn(defaultDashboardRepository, 'getDashboardSummary');
+      spyGetDashboard.mockClear();
+
+      const mockUserContext: UserContextValue = {
+        currentUser: ordinaryVolunteerUser,
+        setCurrentUser: jest.fn(),
+        isCoordinator: false,
+        switchUserPreset: jest.fn(),
+      };
+
+      await ReactTestRenderer.act(async () => {
+        ReactTestRenderer.create(
+          renderWithProviders(
+            <DashboardScreen
+              navigation={navigation}
+              route={{} as any}
+            />,
+            mockUserContext,
+          ),
+        );
+      });
+
+      // Called on mount
+      expect(spyGetDashboard).toHaveBeenCalledTimes(1);
+
+      // Trigger focus
+      await ReactTestRenderer.act(async () => {
+        focusListener?.();
+      });
+      expect(spyGetDashboard).toHaveBeenCalledTimes(2);
+
+      // Trigger appEventBus event_status_changed
+      await ReactTestRenderer.act(async () => {
+        appEventBus.emit(AppEvents.EVENT_STATUS_CHANGED, {
+          eventId: 'evt-test',
+          status: 'completed',
+        });
+      });
+      expect(spyGetDashboard).toHaveBeenCalledTimes(3);
+
+      spyGetDashboard.mockRestore();
+    });
   });
 });

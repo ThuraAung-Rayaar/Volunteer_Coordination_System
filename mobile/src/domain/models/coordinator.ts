@@ -10,7 +10,8 @@ export type CoordinatorEventStatus =
   | 'published'
   | 'active'
   | 'completed'
-  | 'cancelled';
+  | 'cancelled'
+  | 'ended';
 
 export type EventPurposeType = 'charity_event' | 'help_wanted_event';
 export type AcceptanceMode = 'manual' | 'auto';

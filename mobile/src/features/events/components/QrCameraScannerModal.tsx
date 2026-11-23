@@ -6,6 +6,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Modal,
+  PermissionsAndroid,
+  Platform,
   Pressable,
   StyleSheet,
   View,
@@ -60,6 +62,29 @@ export function QrCameraScannerModal({
   }, [visible]);
 
   const checkAndRequestPermission = async () => {
+    if (Platform.OS === 'android') {
+      try {
+        const hasPermissionCheck = await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.CAMERA);
+        if (hasPermissionCheck) {
+          setHasPermission(true);
+          return;
+        }
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.CAMERA,
+          {
+            title: 'Camera Permission',
+            message: 'Volunteer app requires camera access to scan event QR codes.',
+            buttonPositive: 'Grant',
+          },
+        );
+        if (granted === PermissionsAndroid.RESULTS.GRANTED) {
+          setHasPermission(true);
+          return;
+        }
+      } catch {
+        // Fallback to VisionCamera check
+      }
+    }
     if (requestCameraPermissionFn) {
       try {
         const status = await requestCameraPermissionFn();

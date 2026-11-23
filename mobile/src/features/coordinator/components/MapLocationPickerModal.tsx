@@ -11,12 +11,14 @@
 
 import React, { useEffect, useState } from 'react';
 import {
+  Alert,
   Linking,
   Modal,
   Pressable,
   StyleSheet,
   View,
 } from 'react-native';
+import { Map, Camera } from '@maplibre/maplibre-react-native';
 import {
   AppButton,
   AppHeader,
@@ -26,6 +28,31 @@ import {
 } from '../../../shared';
 import { useAppTheme } from '../../../theme';
 import { mapApi, MapCatalogResponseDto } from '../../../data/endpoints/mapApi';
+import {
+  defaultLocationProvider,
+  defaultNativeLocationProvider,
+} from '../../../core/location/locationProvider';
+
+const DEFAULT_MAP_STYLE = {
+  version: 8,
+  sources: {
+    'carto-raster': {
+      type: 'raster',
+      tiles: [
+        'https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
+      ],
+      tileSize: 256,
+      attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+    },
+  },
+  layers: [
+    {
+      id: 'carto-raster-layer',
+      type: 'raster',
+      source: 'carto-raster',
+    },
+  ],
+};
 
 export interface MapLocationPickerModalProps {
   visible: boolean;
@@ -49,6 +76,7 @@ export function MapLocationPickerModal({
   const [lng, setLng] = useState<string>(String(initialLongitude || 96.15));
   const [catalog, setCatalog] = useState<MapCatalogResponseDto | null>(null);
   const [isLoadingCatalog, setIsLoadingCatalog] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
 
   useEffect(() => {
     if (visible) {
@@ -69,6 +97,35 @@ export function MapLocationPickerModal({
       // In template mode or offline, catalog remains null
     } finally {
       setIsLoadingCatalog(false);
+    }
+  };
+
+  const handleUseCurrentLocation = async () => {
+    setIsLocating(true);
+    try {
+      let fix = null;
+      try {
+        const perm = await defaultNativeLocationProvider.requestPermission();
+        if (perm === 'granted') {
+          fix = await defaultNativeLocationProvider.getCurrentPosition();
+        }
+      } catch {
+        // Fallback to default provider
+      }
+
+      if (!fix) {
+        fix = await defaultLocationProvider.getCurrentPosition();
+      }
+
+      setLat(fix.latitude.toFixed(6));
+      setLng(fix.longitude.toFixed(6));
+    } catch (err) {
+      Alert.alert(
+        'GPS Location Error',
+        err instanceof Error ? err.message : 'Unable to acquire GPS fix.',
+      );
+    } finally {
+      setIsLocating(false);
     }
   };
 
@@ -156,7 +213,7 @@ export function MapLocationPickerModal({
             </View>
           )}
 
-          {/* Interactive Map Viewport Simulation */}
+          {/* Interactive Map Viewport */}
           <View
             style={[
               styles.mapViewport,
@@ -166,14 +223,36 @@ export function MapLocationPickerModal({
               },
             ]}
           >
-            {/* Grid background representing tiles */}
-            <View style={styles.gridOverlay}>
-              <View style={[styles.gridLineHorizontal, { borderColor: theme.colors.border }]} />
-              <View style={[styles.gridLineVertical, { borderColor: theme.colors.border }]} />
-            </View>
+            <Map
+              style={StyleSheet.absoluteFill}
+              mapStyle={catalog?.style_url || (DEFAULT_MAP_STYLE as any)}
+              onPress={(e: any) => {
+                const coords =
+                  e?.lngLat ||
+                  e?.nativeEvent?.lngLat ||
+                  e?.geometry?.coordinates;
+                if (Array.isArray(coords) && coords.length >= 2) {
+                  const [pressLng, pressLat] = coords;
+                  if (!Number.isNaN(pressLat) && !Number.isNaN(pressLng)) {
+                    setLat(Number(pressLat).toFixed(6));
+                    setLng(Number(pressLng).toFixed(6));
+                  }
+                }
+              }}
+            >
+              <Camera
+                initialViewState={{
+                  center: [Number(lng) || 96.15, Number(lat) || 16.8],
+                  zoom: 14,
+                }}
+              />
+            </Map>
 
             {/* Central Target Pin */}
-            <View style={[styles.centerPin, { backgroundColor: theme.colors.primary }]}>
+            <View
+              pointerEvents="none"
+              style={[styles.centerPin, { backgroundColor: theme.colors.primary }]}
+            >
               <AppIcon name="pin" size={24} color="#FFFFFF" />
             </View>
 
@@ -183,36 +262,68 @@ export function MapLocationPickerModal({
                 accessibilityRole="button"
                 accessibilityLabel="Pan North"
                 onPress={() => adjustCoordinate(0.005, 0)}
-                style={[styles.panBtn, { backgroundColor: theme.colors.surfaceRaised, borderColor: theme.colors.border }]}
+                style={[
+                  styles.panBtn,
+                  {
+                    backgroundColor: theme.colors.surfaceRaised,
+                    borderColor: theme.colors.border,
+                  },
+                ]}
               >
-                <AppText variant="caption" weight="bold">▲ N</AppText>
+                <AppText variant="caption" weight="bold">
+                  ▲ N
+                </AppText>
               </Pressable>
               <View style={styles.panRow}>
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel="Pan West"
                   onPress={() => adjustCoordinate(0, -0.005)}
-                  style={[styles.panBtn, { backgroundColor: theme.colors.surfaceRaised, borderColor: theme.colors.border }]}
+                  style={[
+                    styles.panBtn,
+                    {
+                      backgroundColor: theme.colors.surfaceRaised,
+                      borderColor: theme.colors.border,
+                    },
+                  ]}
                 >
-                  <AppText variant="caption" weight="bold">◀ W</AppText>
+                  <AppText variant="caption" weight="bold">
+                    ◀ W
+                  </AppText>
                 </Pressable>
                 <View style={{ width: 36 }} />
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel="Pan East"
                   onPress={() => adjustCoordinate(0, 0.005)}
-                  style={[styles.panBtn, { backgroundColor: theme.colors.surfaceRaised, borderColor: theme.colors.border }]}
+                  style={[
+                    styles.panBtn,
+                    {
+                      backgroundColor: theme.colors.surfaceRaised,
+                      borderColor: theme.colors.border,
+                    },
+                  ]}
                 >
-                  <AppText variant="caption" weight="bold">E ▶</AppText>
+                  <AppText variant="caption" weight="bold">
+                    E ▶
+                  </AppText>
                 </Pressable>
               </View>
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Pan South"
                 onPress={() => adjustCoordinate(-0.005, 0)}
-                style={[styles.panBtn, { backgroundColor: theme.colors.surfaceRaised, borderColor: theme.colors.border }]}
+                style={[
+                  styles.panBtn,
+                  {
+                    backgroundColor: theme.colors.surfaceRaised,
+                    borderColor: theme.colors.border,
+                  },
+                ]}
               >
-                <AppText variant="caption" weight="bold">▼ S</AppText>
+                <AppText variant="caption" weight="bold">
+                  ▼ S
+                </AppText>
               </Pressable>
             </View>
           </View>
@@ -240,18 +351,29 @@ export function MapLocationPickerModal({
           {/* Action Buttons */}
           <View style={styles.actionButtonsCol}>
             <AppButton
+              label={
+                isLocating
+                  ? 'Acquiring GPS Position...'
+                  : 'Use Current Device GPS Location'
+              }
+              variant="secondary"
+              loading={isLocating}
+              disabled={isLocating}
+              onPress={handleUseCurrentLocation}
+            />
+            <AppButton
               label="Confirm Pin Location"
               variant="primary"
               onPress={handleConfirm}
             />
             <AppButton
               label="Preview in Google Maps (External)"
-              variant="secondary"
+              variant="outline"
               onPress={handleOpenGoogleMaps}
             />
             <AppButton
               label="Cancel"
-              variant="outline"
+              variant="ghost"
               onPress={onClose}
             />
           </View>

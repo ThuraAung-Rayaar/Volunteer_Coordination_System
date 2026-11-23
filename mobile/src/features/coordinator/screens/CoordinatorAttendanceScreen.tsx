@@ -14,6 +14,7 @@ import QRCode from 'react-native-qrcode-svg';
 import { CoordinatorRepository } from '../../../data/contracts/coordinatorRepository';
 import { defaultCoordinatorRepository } from '../../../data/mock/MockCoordinatorRepository';
 import { useRepositories } from '../../../app/RepositoryProvider';
+import { isMockMode } from '../../../app/configuration/dataMode';
 import type {
   AttendanceRecordStatus,
   CoordinatorAttendanceItem,
@@ -22,6 +23,7 @@ import type {
 import type { MainDrawerScreenProps } from '../../../navigation/navigationTypes';
 import {
   AppButton,
+  AppCard,
   AppHeader,
   AppIcon,
   AppInput,
@@ -30,6 +32,7 @@ import {
   FilterChip,
   LoadingState,
   SectionHeader,
+  StatusBadge,
 } from '../../../shared';
 import { useAppTheme } from '../../../theme';
 import {
@@ -99,7 +102,11 @@ export function CoordinatorAttendanceScreen({
       try {
         const evList = await repo.getMyEvents();
         const operationalEvents = evList.filter(
-          e => e.status !== 'cancelled' && e.status !== 'completed',
+          e =>
+            e.status !== 'cancelled' &&
+            e.status !== 'completed' &&
+            e.status !== 'ended' &&
+            (isMockMode() || !e.endAt || new Date(e.endAt).getTime() >= Date.now()),
         );
         setEvents(operationalEvents);
 
@@ -109,11 +116,6 @@ export function CoordinatorAttendanceScreen({
           route?.params?.eventId ||
           operationalEvents[0]?.id ||
           'evt-coord-001';
-
-        if (selectedEventIdRef.current !== eventIdToUse) {
-          selectedEventIdRef.current = eventIdToUse;
-          setSelectedEventId(eventIdToUse);
-        }
 
         const [roster, geoPending] = await Promise.all([
           repo.getAttendanceRoster(eventIdToUse),
@@ -256,7 +258,10 @@ export function CoordinatorAttendanceScreen({
   };
 
   const handleBack = () => {
-    if (navigation && navigation.canGoBack()) {
+    if (selectedEventId && !route?.params?.eventId) {
+      setSelectedEventId('');
+      selectedEventIdRef.current = '';
+    } else if (navigation && navigation.canGoBack()) {
       navigation.goBack();
     } else if (navigation) {
       navigation.navigate('CoordinatorWorkspace');
@@ -274,6 +279,10 @@ export function CoordinatorAttendanceScreen({
           setCreatedQrToken(null);
           setRevokeQrId('');
           loadData(id);
+        }}
+        onSwitchEvent={() => {
+          setSelectedEventId('');
+          selectedEventIdRef.current = '';
         }}
       />
 
@@ -485,11 +494,112 @@ export function CoordinatorAttendanceScreen({
         <View style={[styles.root, { backgroundColor: theme.colors.background }]}>
         <AppHeader
           title="Attendance & Check-In"
-          subtitle={selectedEvent?.title}
-          onBackPress={handleBack}
+          subtitle={selectedEventId ? selectedEvent?.title : 'Select an active event'}
+          onMenuPress={navigation ? () => navigation.openDrawer() : undefined}
+          onBackPress={selectedEventId ? handleBack : undefined}
         />
 
-        {isLoading ? (
+        {!selectedEventId ? (
+          <ScrollView contentContainerStyle={styles.pickerContainer}>
+            {events.length === 0 ? (
+              <EmptyState
+                title="No Active Events"
+                description="There are no active events to manage. Completed and ended events are archived."
+              />
+            ) : (
+              events.map(ev => (
+                <Pressable
+                  key={ev.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Manage attendance for ${ev.title}`}
+                  onPress={() => {
+                    setSelectedEventId(ev.id);
+                    selectedEventIdRef.current = ev.id;
+                    setCreatedQrToken(null);
+                    setRevokeQrId('');
+                    loadData(ev.id);
+                  }}
+                  style={({ pressed }) => [{ opacity: pressed ? 0.92 : 1 }]}
+                >
+                  <AppCard style={styles.pickerCard}>
+                    <View style={styles.pickerHeader}>
+                      <AppText
+                        variant="title"
+                        weight="bold"
+                        color={theme.colors.textPrimary}
+                        style={{ flex: 1 }}
+                      >
+                        {ev.title}
+                      </AppText>
+                      <StatusBadge status="success" label="ACTIVE" />
+                    </View>
+
+                    <View style={styles.pickerMetaRow}>
+                      <View style={styles.pickerMetaItem}>
+                        <AppIcon
+                          name="calendar"
+                          size={14}
+                          color={theme.colors.textSecondary}
+                        />
+                        <AppText variant="caption" color={theme.colors.textSecondary}>
+                          {new Date(ev.startAt).toLocaleDateString(undefined, {
+                            month: 'short',
+                            day: 'numeric',
+                          })}
+                        </AppText>
+                      </View>
+                      <View style={[styles.pickerMetaItem, { flex: 1 }]}>
+                        <AppIcon
+                          name="location"
+                          size={14}
+                          color={theme.colors.textSecondary}
+                        />
+                        <AppText
+                          variant="caption"
+                          color={theme.colors.textSecondary}
+                          numberOfLines={1}
+                        >
+                          {ev.locationName}
+                        </AppText>
+                      </View>
+                    </View>
+
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 8,
+                        marginTop: 2,
+                      }}
+                    >
+                      <AppText
+                        variant="caption"
+                        weight="semibold"
+                        color={theme.colors.primary}
+                      >
+                        {ev.checkedInTodayCount ?? 0} checked in today
+                      </AppText>
+                    </View>
+
+                    <AppButton
+                      label="Manage Attendance & Check-In"
+                      variant="primary"
+                      onPress={() => {
+                        setSelectedEventId(ev.id);
+                        selectedEventIdRef.current = ev.id;
+                        setCreatedQrToken(null);
+                        setRevokeQrId('');
+                        loadData(ev.id);
+                      }}
+                      style={{ marginTop: 4 }}
+                    />
+                  </AppCard>
+                </Pressable>
+              ))
+            )}
+            {renderFooter()}
+          </ScrollView>
+        ) : isLoading ? (
           <LoadingState label="Loading attendance records..." />
         ) : (
           <FlatList
@@ -611,5 +721,30 @@ const styles = StyleSheet.create({
   qrMetadataRow: {
     marginTop: 4,
     gap: 2,
+  },
+  pickerContainer: {
+    padding: 16,
+    paddingBottom: 88,
+    gap: 12,
+  },
+  pickerCard: {
+    padding: 16,
+    gap: 10,
+  },
+  pickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 8,
+  },
+  pickerMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  pickerMetaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
 });

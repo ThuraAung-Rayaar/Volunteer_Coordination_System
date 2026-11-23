@@ -4,6 +4,8 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import {
+  PermissionsAndroid,
+  Platform,
   StyleSheet,
   View,
 } from 'react-native';
@@ -102,18 +104,53 @@ export function VerificationCoordinatorStatusScreen({
 
   const handlePickPhoto = async (slotType: VerificationSlotType, source: 'camera' | 'library') => {
     try {
+      if (slotType === 'mock_selfie' && source === 'library') {
+        setFeedbackBanner('Selfies must be captured live using the front camera and cannot be selected from the gallery.');
+        return;
+      }
+
+      if (source === 'camera' && Platform.OS === 'android') {
+        const hasCamera = await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.CAMERA);
+        if (!hasCamera) {
+          const granted = await PermissionsAndroid.request(
+            PermissionsAndroid.PERMISSIONS.CAMERA,
+            {
+              title: 'Camera Permission',
+              message: 'Volunteer app requires camera access to capture verification photos.',
+              buttonPositive: 'Grant',
+            },
+          );
+          if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+            setFeedbackBanner('Camera permission was denied. Cannot take photo.');
+            return;
+          }
+        }
+      }
+
       const options = {
         mediaType: 'photo' as const,
+        cameraType: (slotType === 'mock_selfie' ? 'front' : 'back') as 'front' | 'back',
         quality: 0.8 as const,
         maxWidth: 1920,
         maxHeight: 1080,
+        saveToPhotos: false,
       };
       const response =
         source === 'camera'
           ? await launchCamera(options)
           : await launchImageLibrary(options);
 
-      if (response.didCancel || !response.assets || response.assets.length === 0) {
+      if (response.didCancel) {
+        return;
+      }
+
+      if (response.errorCode) {
+        setFeedbackBanner(`Camera error: ${response.errorMessage || response.errorCode}`);
+        return;
+      }
+
+      if (!response.assets || response.assets.length === 0) {
+        setFeedbackBanner('No photo was captured.');
         return;
       }
 
@@ -306,7 +343,9 @@ export function VerificationCoordinatorStatusScreen({
           </View>
 
           <View style={styles.slotsContainer}>
-            {data.imageSlots.map((slot: VerificationImageSlot) => (
+            {data.imageSlots.map((slot: VerificationImageSlot) => {
+              const isSelfie = slot.imageType === 'mock_selfie';
+              return (
               <View
                 key={slot.imageType}
                 style={[
@@ -327,7 +366,7 @@ export function VerificationCoordinatorStatusScreen({
                       {slot.label}
                     </AppText>
                     <AppText variant="caption" color={theme.colors.textSecondary}>
-                      Format: JPEG • {slot.description}
+                      Format: JPEG • {isSelfie ? 'Front Camera Only • ' : ''}{slot.description}
                     </AppText>
                   </View>
                   <StatusBadge
@@ -388,10 +427,11 @@ export function VerificationCoordinatorStatusScreen({
                         />
                       ) : null}
                       <AppButton
-                        label="Replace"
+                        label={isSelfie ? 'Retake Selfie' : 'Replace'}
                         variant="secondary"
                         onPress={() => handlePickPhoto(slot.imageType as VerificationSlotType, 'camera')}
                         style={{ flex: 1 }}
+                        accessibilityLabel={isSelfie ? 'Retake Selfie with Front Camera' : 'Replace'}
                       />
                       <AppButton
                         label="Remove"
@@ -426,28 +466,34 @@ export function VerificationCoordinatorStatusScreen({
                     >
                       {slot.status === 'verified'
                         ? 'Encrypted Document Stored On Server'
+                        : isSelfie
+                        ? 'No selfie captured yet (Front Camera Only)'
                         : 'No local document selected'}
                     </AppText>
                     {slot.status !== 'verified' ? (
                       <View style={styles.photoActionRow}>
                         <AppButton
-                          label="Take Photo"
+                          label={isSelfie ? 'Take Selfie (Front Camera)' : 'Take Photo'}
                           variant="primary"
                           onPress={() => handlePickPhoto(slot.imageType as VerificationSlotType, 'camera')}
                           style={{ flex: 1 }}
+                          accessibilityLabel={isSelfie ? 'Take Selfie with Front Camera' : 'Take Photo'}
                         />
-                        <AppButton
-                          label="Gallery"
-                          variant="outline"
-                          onPress={() => handlePickPhoto(slot.imageType as VerificationSlotType, 'library')}
-                          style={{ flex: 1 }}
-                        />
+                        {!isSelfie ? (
+                          <AppButton
+                            label="Gallery"
+                            variant="outline"
+                            onPress={() => handlePickPhoto(slot.imageType as VerificationSlotType, 'library')}
+                            style={{ flex: 1 }}
+                            accessibilityLabel="Gallery"
+                          />
+                        ) : null}
                       </View>
                     ) : null}
                   </View>
                 )}
               </View>
-            ))}
+            );})}
           </View>
         </AppCard>
 

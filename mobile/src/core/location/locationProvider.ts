@@ -145,50 +145,74 @@ export class NativeDeviceLocationProvider implements LocationProvider {
     }
 
     return new Promise<LocationFix>((resolve, reject) => {
+      let isSettled = false;
+
+      const handleSuccess = (position: any) => {
+        if (isSettled) return;
+        if (!position || !position.coords) {
+          isSettled = true;
+          reject(new Error('Invalid GPS fix received from device: Missing coordinates.'));
+          return;
+        }
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        const acc = position.coords.accuracy ?? null;
+        const timestamp = position.timestamp || Date.now();
+
+        // Reject invalid coordinates
+        if (typeof lat !== 'number' || typeof lng !== 'number' || Number.isNaN(lat) || Number.isNaN(lng)) {
+          isSettled = true;
+          reject(new Error('Invalid GPS coordinates received from device.'));
+          return;
+        }
+        if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+          isSettled = true;
+          reject(new Error(`GPS coordinates out of geographical range: (${lat}, ${lng}).`));
+          return;
+        }
+
+        // Detect mocked location truthfully across Android and iOS
+        const isMocked =
+          typeof position.mocked === 'boolean'
+            ? position.mocked
+            : typeof position.coords.mocked === 'boolean'
+            ? position.coords.mocked
+            : false;
+
+        isSettled = true;
+        resolve({
+          latitude: lat,
+          longitude: lng,
+          accuracyM: acc,
+          capturedAt: new Date(timestamp).toISOString(),
+          isMocked,
+        });
+      };
+
+      // Try GPS provider first with 10s timeout, then fall back to Network provider if indoors/timeout
       geo.getCurrentPosition(
-        (position: any) => {
-          if (!position || !position.coords) {
-            reject(new Error('Invalid GPS fix received from device: Missing coordinates.'));
-            return;
-          }
-          const lat = position.coords.latitude;
-          const lng = position.coords.longitude;
-          const acc = position.coords.accuracy ?? null;
-          const timestamp = position.timestamp || Date.now();
-
-          // Reject invalid coordinates
-          if (typeof lat !== 'number' || typeof lng !== 'number' || Number.isNaN(lat) || Number.isNaN(lng)) {
-            reject(new Error('Invalid GPS coordinates received from device.'));
-            return;
-          }
-          if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-            reject(new Error(`GPS coordinates out of geographical range: (${lat}, ${lng}).`));
-            return;
-          }
-
-          // Detect mocked location truthfully across Android and iOS
-          const isMocked =
-            typeof position.mocked === 'boolean'
-              ? position.mocked
-              : typeof position.coords.mocked === 'boolean'
-              ? position.coords.mocked
-              : false;
-
-          resolve({
-            latitude: lat,
-            longitude: lng,
-            accuracyM: acc,
-            capturedAt: new Date(timestamp).toISOString(),
-            isMocked,
-          });
-        },
-        (error: any) => {
-          const message = error?.message || 'Failed to capture GPS fix.';
-          reject(new Error(`Device GPS fix failed: ${message}`));
+        handleSuccess,
+        (highAccErr: any) => {
+          if (isSettled) return;
+          // Fallback to low accuracy (network/wifi/cell)
+          geo.getCurrentPosition(
+            handleSuccess,
+            (lowAccErr: any) => {
+              if (isSettled) return;
+              isSettled = true;
+              const message = lowAccErr?.message || highAccErr?.message || 'Failed to capture GPS fix.';
+              reject(new Error(`Device GPS fix failed: ${message}`));
+            },
+            {
+              enableHighAccuracy: false,
+              timeout: 15000,
+              maximumAge: 30000,
+            },
+          );
         },
         {
           enableHighAccuracy: true,
-          timeout: 15000,
+          timeout: 10000,
           maximumAge: 10000,
         },
       );
