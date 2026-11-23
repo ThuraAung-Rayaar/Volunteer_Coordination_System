@@ -51,7 +51,8 @@ def map_catalog_api_view(request) -> JsonResponse:
 @permission_classes([AllowAny])
 def map_style_api_view(request) -> JsonResponse:
     """Return a MapLibre-compatible raster style backed by the VCS tile proxy."""
-    tile_template = request.build_absolute_uri("/api/v1/maps/tiles/{z}/{x}/{y}.png")
+    tile_base = request.build_absolute_uri("/api/v1/maps/tiles/")
+    tile_template = f"{tile_base}{{z}}/{{x}}/{{y}}.png"
     attribution = str(getattr(settings, "MAP_TILE_ATTRIBUTION", "") or "")
     return JsonResponse({
         "version": 8,
