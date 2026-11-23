@@ -301,6 +301,7 @@ def get_own_applications(user, event_id: Optional[int] = None) -> list[dict]:
             "event_id": app.event_id,
             "event_title": app.event.title,
             "event_status": app.event.status,
+            "event_end_at": app.event.end_at,
             "post_id": app.post_id,
             "post_title": app.post.title if app.post else None,
             "source": app.source,

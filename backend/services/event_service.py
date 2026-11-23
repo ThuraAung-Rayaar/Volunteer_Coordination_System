@@ -350,6 +350,11 @@ def list_coordinator_events(user) -> list[dict]:
             else:
                 coord_name = getattr(event.current_coordinator, "display_name", "")
 
+        event_status = event.status
+        now = timezone.now()
+        if (event_status in ("active", "published")) and event.end_at and event.end_at < now:
+            event_status = "ended"
+
         results.append({
             "id": event.id,
             "title": event.title,
@@ -359,7 +364,7 @@ def list_coordinator_events(user) -> list[dict]:
             "landmark_text": event.landmark_text,
             "coordinator_name": coord_name,
             "charity_fields": [cf.field_code_id for cf in event.charity_fields.all()],
-            "status": event.status,
+            "status": event_status,
             "start_at": event.start_at,
             "end_at": event.end_at,
             "owner_id": event.owner_id,

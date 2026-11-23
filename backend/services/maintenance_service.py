@@ -53,15 +53,46 @@ def purge_geo_evidence(older_than: str = "90 days") -> int:
     return count
 
 
+def complete_ended_events() -> int:
+    """
+    Check against current date/time to end schedule (end_at <= now()).
+    Transition active events that have reached or passed their end schedule to 'completed'.
+    PostgreSQL trigger trg_events_after_update automatically cascades attendance,
+    assignments, and applications.
+    Returns the count of events transitioned to completed.
+    """
+    from apps.events.models import Events
+    from common.db_context import set_system_actor_context
+    from django.utils import timezone
+
+    set_system_actor_context()
+    now = timezone.now()
+    ended_events = list(
+        Events.objects.filter(
+            status=Events.Status.ACTIVE,
+            end_at__lte=now,
+            deleted_at__isnull=True,
+        )
+    )
+    count = 0
+    for event in ended_events:
+        event.status = Events.Status.COMPLETED
+        event.save()
+        count += 1
+    logger.info("maintenance.complete_ended_events", extra={"completed": count})
+    return count
+
+
 def run_all_maintenance() -> dict:
     """
-    Run all four maintenance jobs and return an operational summary.
+    Run all maintenance jobs and return an operational summary.
     Each job is isolated so one failure does not block the others.
     """
     summary = {}
     for name, fn in [
         ("released_expired_blocks", release_expired_blocks),
         ("expired_stale_applications", expire_stale_applications),
+        ("completed_ended_events", complete_ended_events),
         ("purged_expired_otps", purge_expired_otps),
         ("purged_geo_evidence", purge_geo_evidence),
     ]:
@@ -119,6 +150,6 @@ def execute_refresh_coordinator_aggregates() -> int:
 run_all_maintenance_tasks = run_all_maintenance
 execute_release_expired_blocks = release_expired_blocks
 execute_purge_expired_tokens = purge_expired_otps
-execute_archive_completed_events = expire_stale_applications
+execute_archive_completed_events = complete_ended_events
 
 
