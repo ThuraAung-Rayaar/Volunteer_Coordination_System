@@ -35,7 +35,11 @@
 		<true/>
 	</dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string></string>
+	<string>Volunteer Coordination System requires your foreground location to verify on-site attendance within the event geofence.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Volunteer Coordination System requires camera access to scan event QR codes and capture verification photos.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Volunteer Coordination System requires photo library access to upload volunteer identity verification documents.</string>
 	<key>RCTNewArchEnabled</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>
