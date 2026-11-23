@@ -359,6 +359,7 @@ def get_own_assignments(user, event_id: Optional[int] = None) -> list[dict]:
     qs = (
         Assignments.objects.filter(user=user)
         .exclude(status="cancelled")
+        .exclude(event__status="cancelled")
         .select_related("event", "post")
         .order_by("schedule_start")
     )

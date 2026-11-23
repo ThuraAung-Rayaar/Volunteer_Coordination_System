@@ -26,6 +26,7 @@ import {
   MyAssignmentsScreen,
   resetAssignmentsCache,
 } from '../src/features/events/screens/MyAssignmentsScreen';
+import { VolunteerWorkspaceScreen } from '../src/features/events/screens/VolunteerWorkspaceScreen';
 import { ThemeProvider } from '../src/theme/ThemeProvider';
 
 const activeRenderers: ReactTestRenderer.ReactTestRenderer[] = [];
@@ -261,6 +262,46 @@ describe('Event Feature Components', () => {
       pressable.props.onPress();
     });
     expect(onPressMock).toHaveBeenCalledWith(event.id);
+  });
+
+  it('renders Ended badge and never Live / Active when event endAt is in the past', async () => {
+    const onPressMock = jest.fn();
+    const endedEvent = {
+      ...mockEventsFixture[0],
+      status: 'active' as const,
+      endAt: '2026-11-10T12:00:00Z',
+    };
+
+    let renderer!: ReactTestRenderer.ReactTestRenderer;
+    await ReactTestRenderer.act(async () => {
+      renderer = ReactTestRenderer.create(
+        renderWithTheme(<EventCard event={endedEvent} onPress={onPressMock} />),
+      );
+    });
+
+    const json = safeStringify(renderer.toJSON());
+    expect(json).toContain('Ended');
+    expect(json).not.toContain('Live / Active');
+  });
+
+  it('renders Live / Active badge when active event is currently ongoing into the future', async () => {
+    const onPressMock = jest.fn();
+    const liveEvent = {
+      ...mockEventsFixture[0],
+      status: 'active' as const,
+      endAt: '2026-12-30T12:00:00Z',
+    };
+
+    let renderer!: ReactTestRenderer.ReactTestRenderer;
+    await ReactTestRenderer.act(async () => {
+      renderer = ReactTestRenderer.create(
+        renderWithTheme(<EventCard event={liveEvent} onPress={onPressMock} />),
+      );
+    });
+
+    const json = safeStringify(renderer.toJSON());
+    expect(json).toContain('Live / Active');
+    expect(json).not.toContain('Ended');
   });
 
   it('renders EventPostCard with physical level, capacity, required skills', async () => {
@@ -1091,5 +1132,38 @@ describe('MyAssignmentsScreen', () => {
     const json = safeStringify(renderer.toJSON());
     expect(json).toContain('Animal Shelter Wellness & Adoption Fair');
     expect(json).not.toContain('Emergency Food Bank Packaging & Logistics');
+  });
+
+  describe('VolunteerWorkspaceScreen', () => {
+    it('renders combined volunteer workspace with Applications and Assignments tabs', async () => {
+      const nav = createMockNavigation();
+      const repo = new MockEventRepository();
+
+      let renderer!: ReactTestRenderer.ReactTestRenderer;
+      await ReactTestRenderer.act(async () => {
+        renderer = ReactTestRenderer.create(
+          renderWithTheme(
+            <VolunteerWorkspaceScreen navigation={nav} repository={repo} />,
+          ),
+        );
+      });
+
+      const json = safeStringify(renderer.toJSON());
+      expect(json).toContain('Volunteer Workspace');
+      expect(json).toContain('My Applications');
+      expect(json).toContain('My Assignments');
+
+      const assignmentsTab = renderer.root
+        .findAllByProps({ accessibilityRole: 'tab' })
+        .find(t => t.props.accessibilityLabel === 'Assignments tab');
+      expect(assignmentsTab).toBeDefined();
+
+      await ReactTestRenderer.act(async () => {
+        assignmentsTab!.props.onPress();
+      });
+
+      const updatedJson = safeStringify(renderer.toJSON());
+      expect(updatedJson).toContain('My Confirmed Shifts & Assignments');
+    });
   });
 });

@@ -2,8 +2,9 @@
  * @format
  */
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
+  Keyboard,
   ScrollView,
   StyleProp,
   StyleSheet,
@@ -45,6 +46,29 @@ export function ScreenContainer({
     backgroundColor: theme.colors.background,
   };
 
+  const scrollDragCount = useRef(0);
+
+  useEffect(() => {
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => {
+      scrollDragCount.current = 0;
+    });
+    return () => {
+      hideSub.remove();
+    };
+  }, []);
+
+  const handleScrollBeginDrag = (e: any) => {
+    scrollDragCount.current += 1;
+    // Dismiss keyboard after 4 intentional scroll gestures, not on the first single swipe
+    if (scrollDragCount.current >= 4) {
+      Keyboard.dismiss();
+      scrollDragCount.current = 0;
+    }
+    if (typeof (restProps as any).onScrollBeginDrag === 'function') {
+      (restProps as any).onScrollBeginDrag(e);
+    }
+  };
+
   if (scroll) {
     return (
       <ScrollView
@@ -55,6 +79,9 @@ export function ScreenContainer({
           contentContainerStyle,
         ]}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="none"
+        onScrollBeginDrag={handleScrollBeginDrag}
         {...restProps}
       >
         {children}

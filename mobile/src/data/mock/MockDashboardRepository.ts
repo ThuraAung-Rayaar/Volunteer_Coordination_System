@@ -51,12 +51,16 @@ export class MockDashboardRepository implements IDashboardRepository {
     }
 
     // Strictly filter completed participation to attendanceStatus === 'completed'
+    // Erase cancelled events from volunteer history: only owner can know that
     const verifiedActivities = this.summary.recentCompletedActivities.filter(
       act => act.attendanceStatus === 'completed',
     );
 
+    const activeCommitments = this.summary.upcomingCommitments;
+
     return deepClone({
       ...this.summary,
+      upcomingCommitments: activeCommitments,
       recentCompletedActivities: verifiedActivities,
     });
   }

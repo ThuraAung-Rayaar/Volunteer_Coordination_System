@@ -68,6 +68,7 @@ class TokenizedOtpRequestView(APIView):
         identity_token = data.get("identity_token")
         purpose = data.get("purpose", "login")
         request_id = data.get("request_id")
+        is_new_user = data.get("is_new_user", False)
 
         if identity_token and not phone:
             # CIT verification stub: Client Identity Envelope decoding
@@ -82,6 +83,7 @@ class TokenizedOtpRequestView(APIView):
             raw_phone=phone,
             purpose=purpose,
             request_id=request_id,
+            is_new_user=is_new_user,
         )
         return Response(result, status=status.HTTP_200_OK)
 

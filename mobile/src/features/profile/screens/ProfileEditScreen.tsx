@@ -171,6 +171,38 @@ export function ProfileEditScreen({
     );
   };
 
+  const handleToggleGoodEyesight = () => {
+    const nextVal = !goodEyesight;
+    setGoodEyesight(nextVal);
+    if (nextVal) {
+      setNeedsGlasses(false);
+    }
+  };
+
+  const handleToggleNeedsGlasses = () => {
+    const nextVal = !needsGlasses;
+    setNeedsGlasses(nextVal);
+    if (nextVal) {
+      setGoodEyesight(false);
+    }
+  };
+
+  const handleToggleLeaderExperience = () => {
+    const nextVal = !hasLeaderExperience;
+    setHasLeaderExperience(nextVal);
+    if (nextVal) {
+      setNewToVolunteer(false);
+    }
+  };
+
+  const handleToggleNewToVolunteer = () => {
+    const nextVal = !newToVolunteer;
+    setNewToVolunteer(nextVal);
+    if (nextVal) {
+      setHasLeaderExperience(false);
+    }
+  };
+
   const handleSave = async () => {
     setEmergencyContactError(null);
     setFeedbackBanner(null);
@@ -196,12 +228,12 @@ export function ProfileEditScreen({
         charityInterests,
         capabilities: {
           physicalOk,
-          goodEyesight,
-          needsGlasses,
+          goodEyesight: goodEyesight && !needsGlasses,
+          needsGlasses: needsGlasses && !goodEyesight,
           canLiftHeavy,
           canWorkOutdoor,
-          hasLeaderExperience,
-          newToVolunteer,
+          hasLeaderExperience: hasLeaderExperience && !newToVolunteer,
+          newToVolunteer: newToVolunteer && !hasLeaderExperience,
         },
         supportPreferences: {
           needsMealSupport,
@@ -223,6 +255,11 @@ export function ProfileEditScreen({
             ? `Profile saved in local mock state (${result.message})`
             : result.message,
         );
+        if (navigation?.navigate) {
+          navigation.navigate('Profile');
+        } else if (navigation?.goBack) {
+          navigation.goBack();
+        }
       } else {
         setFeedbackBanner(result.message);
       }
@@ -527,22 +564,22 @@ export function ProfileEditScreen({
             <FilterChip
               label="Good Eyesight"
               selected={goodEyesight}
-              onPress={() => setGoodEyesight(!goodEyesight)}
+              onPress={handleToggleGoodEyesight}
             />
             <FilterChip
               label="Needs Glasses"
               selected={needsGlasses}
-              onPress={() => setNeedsGlasses(!needsGlasses)}
+              onPress={handleToggleNeedsGlasses}
             />
             <FilterChip
               label="Team Leader Experience"
               selected={hasLeaderExperience}
-              onPress={() => setHasLeaderExperience(!hasLeaderExperience)}
+              onPress={handleToggleLeaderExperience}
             />
             <FilterChip
               label="New to Volunteering"
               selected={newToVolunteer}
-              onPress={() => setNewToVolunteer(!newToVolunteer)}
+              onPress={handleToggleNewToVolunteer}
             />
           </View>
 

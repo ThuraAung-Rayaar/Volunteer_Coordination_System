@@ -59,12 +59,15 @@ export const authApi = {
     data: TokenizedOtpRequestDto,
     client: ApiClient = defaultApiClient,
   ): Promise<ApiResult<TokenizedOtpResponseDto>> {
-    const payload: Record<string, string> = {
+    const payload: Record<string, any> = {
       phone: data.phone,
       purpose: data.purpose ?? 'login',
     };
     if (data.request_id) {
       payload.request_id = data.request_id;
+    }
+    if (data.is_new_user !== undefined) {
+      payload.is_new_user = data.is_new_user;
     }
     return client.post<TokenizedOtpResponseDto>(
       'auth/tokenized/request-otp/',

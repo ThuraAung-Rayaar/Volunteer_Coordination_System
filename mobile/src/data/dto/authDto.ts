@@ -86,6 +86,7 @@ export interface TokenizedOtpRequestDto {
   phone: string;
   purpose?: 'login' | 'qr_registration';
   request_id?: string;
+  is_new_user?: boolean;
 }
 
 /**

@@ -127,7 +127,11 @@ export function SettingsScreen({
         onMenuPress={navigation ? () => navigation.openDrawer() : undefined}
       />
 
-      <ScreenContainer scroll style={styles.scroll}>
+      <ScreenContainer
+        scroll
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContentContainer}
+      >
         {/* Appearance Settings */}
         <SectionHeader title="Appearance & Theme" />
         <AppCard style={styles.cardSpacing}>
@@ -158,6 +162,26 @@ export function SettingsScreen({
           >
             {`Active: ${themeMode.toUpperCase()} (${isDark ? 'Dark Theme' : 'Light Theme'})`}
           </AppText>
+        </AppCard>
+
+        {/* Notifications & Activity Alerts */}
+        <SectionHeader title="Notifications" />
+        <AppCard style={styles.cardSpacing}>
+          <AppText
+            variant="caption"
+            color={theme.colors.textSecondary}
+            style={styles.subtextSpacing}
+          >
+            Review activity alerts, schedule updates, and system announcements:
+          </AppText>
+
+          <AppButton
+            label="Open Notifications"
+            variant="secondary"
+            accessibilityLabel="Open Notifications"
+            leftIcon="bell"
+            onPress={() => navigation?.navigate?.('Notifications')}
+          />
         </AppCard>
 
         {/* Account & Session Placeholder */}
@@ -348,6 +372,9 @@ const styles = StyleSheet.create({
   },
   scroll: {
     paddingVertical: 16,
+  },
+  scrollContentContainer: {
+    paddingBottom: 64,
   },
   cardSpacing: {
     marginBottom: 16,

@@ -439,9 +439,11 @@ describe('CreateEventWizardScreen Schedule & Location Step Integrations', () => 
     expect(json).toContain('Step 3 of 7: Schedule');
     expect(json).toContain(MYANMAR_TIMEZONE_LABEL);
     expect(json).toContain('EVENT START *');
-    expect(json).toContain('Start Time (24h MMT) *');
+    expect(json).toContain('Start Time (AM/PM MMT) *');
+    expect(json).toContain('Start time AM');
+    expect(json).toContain('Start time PM');
     expect(json).toContain('EVENT END *');
-    expect(json).toContain('End Time (24h MMT) *');
+    expect(json).toContain('End Time (AM/PM MMT) *');
     expect(json).toContain('APPLICATION DEADLINE (OPTIONAL)');
   });
 

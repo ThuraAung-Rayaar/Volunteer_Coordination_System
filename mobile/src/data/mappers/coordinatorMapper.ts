@@ -73,6 +73,7 @@ export function mapCreateEventDraftToRequest(
     require_onboarding_ack: Boolean(draft.requireOnboardingAck),
     qr_registration_enabled: Boolean(draft.qrRegistrationEnabled),
     charity_field_codes: draft.charityFieldCodes || [],
+    publish: Boolean(draft.publish),
   };
 }
 

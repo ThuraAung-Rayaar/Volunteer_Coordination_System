@@ -22,6 +22,7 @@ export interface EventPostCardProps {
   post: EventPost;
   isApplied: boolean;
   onApplyPress: (post: EventPost) => void;
+  isEventEnded?: boolean;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -29,6 +30,7 @@ export function EventPostCard({
   post,
   isApplied,
   onApplyPress,
+  isEventEnded = false,
   style,
 }: EventPostCardProps): React.JSX.Element {
   const { theme } = useAppTheme();
@@ -58,11 +60,14 @@ export function EventPostCard({
   };
 
   const isActionDisabled =
-    isApplied || post.status === 'full' || post.status === 'closed';
+    isApplied || isEventEnded || post.status === 'full' || post.status === 'closed';
 
   const getButtonLabel = () => {
     if (isApplied) {
       return 'Already Applied';
+    }
+    if (isEventEnded) {
+      return 'Event Ended';
     }
     if (post.status === 'closed') {
       return 'Post Closed';

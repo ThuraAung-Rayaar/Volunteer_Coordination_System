@@ -30,9 +30,11 @@ import {
 } from '../../../shared';
 import { hexToRgba, useAppTheme } from '../../../theme';
 import {
+  CoordinatorDynamicIsland,
   CoordinatorEventCard,
   CoordinatorGuard,
   CoordinatorMetricCard,
+  CoordinatorSwipeWrapper,
 } from '../components';
 
 export interface CoordinatorOverviewScreenProps
@@ -93,7 +95,8 @@ export function CoordinatorOverviewScreen({
 
   return (
     <CoordinatorGuard navigation={navigation}>
-      <View style={[styles.root, { backgroundColor: theme.colors.background }]}>
+      <CoordinatorSwipeWrapper currentTab="dashboard" navigation={navigation}>
+        <View style={[styles.root, { backgroundColor: theme.colors.background }]}>
         <AppHeader
           title="Coordinator Workspace"
           subtitle="Events & roster operations"
@@ -208,56 +211,118 @@ export function CoordinatorOverviewScreen({
             {/* Primary Action Button */}
             <View style={styles.createCtaContainer}>
               <AppButton
-                label="Launch Create Event Wizard"
+                label="Organize a Charity Event"
+                accessibilityLabel="Organize a Charity Event"
                 variant="primary"
                 leftIcon="plus"
                 onPress={() => navigation?.navigate?.('CreateEventWizard')}
               />
             </View>
 
-            {/* Operational Management Segmented Control (.seg) */}
+            {/* Operational Management Quick Jump */}
             <SectionHeader title="Operational Roster Management" />
-            <SegmentedControl
-              options={[
-                {
-                  key: 'applications',
-                  label: 'Applications',
-                  count: metrics.pendingApplicationsCount,
-                },
-                {
-                  key: 'assignments',
-                  label: 'Assignments',
-                  count: metrics.acceptedApplicantsCount,
-                },
-                {
-                  key: 'attendance',
-                  label: 'Attendance',
-                  count: metrics.checkedInTodayCount,
-                },
-              ]}
-              selectedKey={activeSegment}
-              onSelect={handleSegmentSelect}
-              style={styles.segmentedControl}
-            />
+            <View style={styles.rosterQuickRow}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Go to Applications"
+                onPress={() => navigation?.navigate?.('CoordinatorApplications')}
+                style={[
+                  styles.rosterCard,
+                  {
+                    backgroundColor: theme.colors.surface,
+                    borderColor: theme.colors.border,
+                  },
+                ]}
+              >
+                <AppIcon name="user" size={18} color={theme.colors.warning} />
+                <View style={styles.rosterCardText}>
+                  <AppText variant="caption" weight="bold" color={theme.colors.textPrimary}>
+                    Applications
+                  </AppText>
+                  <AppText variant="caption" color={theme.colors.textSecondary}>
+                    {metrics.pendingApplicationsCount} pending review
+                  </AppText>
+                </View>
+              </Pressable>
 
-            {/* Managed Events Section */}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Go to Assignments"
+                onPress={() => navigation?.navigate?.('CoordinatorAssignments')}
+                style={[
+                  styles.rosterCard,
+                  {
+                    backgroundColor: theme.colors.surface,
+                    borderColor: theme.colors.border,
+                  },
+                ]}
+              >
+                <AppIcon name="brief" size={18} color={theme.colors.success} />
+                <View style={styles.rosterCardText}>
+                  <AppText variant="caption" weight="bold" color={theme.colors.textPrimary}>
+                    Assignments
+                  </AppText>
+                  <AppText variant="caption" color={theme.colors.textSecondary}>
+                    {metrics.acceptedApplicantsCount} placed in roster
+                  </AppText>
+                </View>
+              </Pressable>
+
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Go to Attendance"
+                onPress={() => navigation?.navigate?.('CoordinatorAttendance')}
+                style={[
+                  styles.rosterCard,
+                  {
+                    backgroundColor: theme.colors.surface,
+                    borderColor: theme.colors.border,
+                  },
+                ]}
+              >
+                <AppIcon name="clock" size={18} color={theme.colors.primary} />
+                <View style={styles.rosterCardText}>
+                  <AppText variant="caption" weight="bold" color={theme.colors.textPrimary}>
+                    Attendance
+                  </AppText>
+                  <AppText variant="caption" color={theme.colors.textSecondary}>
+                    {metrics.checkedInTodayCount} checked in today
+                  </AppText>
+                </View>
+              </Pressable>
+            </View>
+
+            {/* Managed Events Section (Excludes completed and cancelled events from main dashboard) */}
             <SectionHeader
               title="My Managed Events"
               actionLabel="View All"
               onActionPress={() => navigation?.navigate?.('CoordinatorEvents')}
             />
 
-            {events.slice(0, 4).map(event => (
-              <CoordinatorEventCard
-                key={event.id}
-                event={event}
-                onPress={handleEventPress}
-              />
-            ))}
+            {events
+              .filter(e => e.status !== 'completed' && e.status !== 'cancelled')
+              .slice(0, 4)
+              .map(event => (
+                <CoordinatorEventCard
+                  key={event.id}
+                  event={event}
+                  onPress={handleEventPress}
+                />
+              ))}
           </ScreenContainer>
         )}
+
+        {/* Dynamic Island Bottom Navigation */}
+        <CoordinatorDynamicIsland
+          activeTab="dashboard"
+          navigation={navigation}
+          pendingApplicationsCount={metrics?.pendingApplicationsCount ?? 0}
+          acceptedApplicantsCount={metrics?.acceptedApplicantsCount ?? 0}
+          checkedInTodayCount={metrics?.checkedInTodayCount ?? 0}
+        />
       </View>
-    </CoordinatorGuard>
+    </CoordinatorSwipeWrapper>
+  </CoordinatorGuard>
   );
 }
 
@@ -267,7 +332,7 @@ const styles = StyleSheet.create({
   },
   scroll: {
     paddingVertical: 12,
-    paddingBottom: 40,
+    paddingBottom: 88,
   },
   newHeaderButton: {
     minHeight: 36,
@@ -315,6 +380,21 @@ const styles = StyleSheet.create({
   },
   createCtaContainer: {
     marginBottom: 14,
+  },
+  rosterQuickRow: {
+    gap: 8,
+    marginBottom: 14,
+  },
+  rosterCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    gap: 12,
+  },
+  rosterCardText: {
+    flex: 1,
   },
   segmentedControl: {
     marginBottom: 14,

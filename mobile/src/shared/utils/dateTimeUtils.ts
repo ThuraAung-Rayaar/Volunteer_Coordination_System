@@ -45,6 +45,48 @@ export function isValid24HourTimeFormat(timeStr: string): boolean {
 }
 
 /**
+ * Parses 24-hour time (HH:mm) into 12-hour time (hh:mm) and AM/PM period.
+ */
+export function parse24hTo12h(time24: string): { time12: string; period: 'AM' | 'PM' } {
+  if (!time24 || !time24.includes(':')) {
+    return { time12: time24 || '', period: 'AM' };
+  }
+  const [hStr, mStr] = time24.split(':');
+  let h = parseInt(hStr, 10);
+  if (isNaN(h)) {
+    return { time12: time24, period: 'AM' };
+  }
+  const period: 'AM' | 'PM' = h >= 12 ? 'PM' : 'AM';
+  h = h % 12;
+  if (h === 0) h = 12;
+  const m = mStr !== undefined ? mStr.slice(0, 2) : '00';
+  return {
+    time12: `${String(h).padStart(2, '0')}:${m}`,
+    period,
+  };
+}
+
+/**
+ * Converts 12-hour time (hh:mm) with AM/PM period into 24-hour format (HH:mm).
+ */
+export function convert12hTo24h(time12: string, period: 'AM' | 'PM'): string {
+  if (!time12) return '';
+  const trimmed = time12.trim();
+  const parts = trimmed.split(':');
+  let h = parseInt(parts[0], 10);
+  if (isNaN(h)) return trimmed;
+  let m = parts[1] !== undefined ? parts[1].slice(0, 2) : '00';
+  if (m.length === 1) m = `0${m}`;
+
+  if (period === 'PM') {
+    if (h < 12) h += 12;
+  } else if (period === 'AM') {
+    if (h === 12) h = 0;
+  }
+  return `${String(h).padStart(2, '0')}:${m}`;
+}
+
+/**
  * Combines date (YYYY-MM-DD) and 24h time (HH:mm) into a strict Myanmar (UTC+06:30) offset ISO timestamp.
  *
  * CRITICAL TIMEZONE REQUIREMENT:

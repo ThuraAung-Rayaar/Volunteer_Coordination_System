@@ -402,4 +402,34 @@ describe('Production Safety: Side-Drawer QA Demo Switcher', () => {
       (globalThis as any).__DEV__ = originalDev;
     }
   });
+
+  it('renders Notifications section in SettingsScreen and navigates to Notifications', async () => {
+    const nav = createMockNavigation();
+    let renderer!: ReactTestRenderer.ReactTestRenderer;
+
+    await ReactTestRenderer.act(async () => {
+      renderer = ReactTestRenderer.create(
+        <SafeAreaProvider initialMetrics={initialMetrics}>
+          <ThemeProvider>
+            <SettingsScreen navigation={nav} />
+          </ThemeProvider>
+        </SafeAreaProvider>,
+      );
+    });
+
+    const json = safeStringify(renderer.toJSON());
+    expect(json).toContain('Notifications');
+    expect(json).toContain('Open Notifications');
+
+    const notifBtn = renderer.root
+      .findAllByProps({ accessibilityRole: 'button' })
+      .find(b => b.props.accessibilityLabel === 'Open Notifications');
+    expect(notifBtn).toBeDefined();
+
+    await ReactTestRenderer.act(async () => {
+      notifBtn!.props.onPress();
+    });
+
+    expect(nav.navigate).toHaveBeenCalledWith('Notifications');
+  });
 });

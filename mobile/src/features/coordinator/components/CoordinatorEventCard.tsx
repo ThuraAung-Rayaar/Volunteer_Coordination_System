@@ -51,6 +51,13 @@ export function CoordinatorEventCard({
   const { theme } = useAppTheme();
 
   const getStatusBadge = () => {
+    if (
+      (event.status === 'active' || event.status === 'published') &&
+      event.endAt &&
+      new Date(event.endAt).getTime() < Date.now()
+    ) {
+      return <StatusBadge status="muted" label="Ended" />;
+    }
     switch (event.status) {
       case 'active':
         return <StatusBadge status="sky" label="Active Shift" />;

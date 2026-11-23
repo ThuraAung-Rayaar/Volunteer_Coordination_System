@@ -89,6 +89,7 @@ describe('Navigation & Role Derivation Logic', () => {
     const expectedRoutes = [
       'Dashboard',
       'Events',
+      'Notifications',
       'Friends',
       'MyApplications',
       'MyAssignments',

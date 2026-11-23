@@ -11,6 +11,7 @@ import {
   ViewStyle,
 } from 'react-native';
 import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
+import { NavigationContext } from '@react-navigation/native';
 import { useAppTheme } from '../../theme';
 import { AppIcon } from '../components/AppIcon';
 import { AppText } from '../components/AppText';
@@ -44,7 +45,14 @@ export function AppHeader({
 }: AppHeaderProps): React.JSX.Element {
   const { theme } = useAppTheme();
   const insets = React.useContext(SafeAreaInsetsContext);
+  const navigation = React.useContext(NavigationContext);
   const topInset = insets?.top ?? 0;
+
+  const handleNotificationPress =
+    onNotificationPress ??
+    (() => {
+      navigation?.navigate?.('Notifications');
+    });
 
   return (
     <View
@@ -137,7 +145,7 @@ export function AppHeader({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Notifications"
-          onPress={onNotificationPress}
+          onPress={handleNotificationPress}
           hitSlop={8}
           style={[
             styles.iconButton,

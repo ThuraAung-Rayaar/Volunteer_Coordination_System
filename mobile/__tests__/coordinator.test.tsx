@@ -16,6 +16,7 @@ import {
   CoordinatorEventDetailScreen,
   CoordinatorEventsScreen,
   CoordinatorOverviewScreen,
+  CoordinatorSwipeWrapper,
   CreateEventWizardScreen,
 } from '../src/features/coordinator';
 import { ThemeProvider } from '../src/theme/ThemeProvider';
@@ -388,7 +389,38 @@ describe('Coordinator Screens Component Integration', () => {
     expect(json).toContain('Checked-in Today');
     expect(json).toContain('Action Needed');
     expect(json).toContain('Pending Applications');
-    expect(json).toContain('Launch Create Event Wizard');
+    expect(json).toContain('Organize a Charity Event');
+  });
+
+  it('renders CoordinatorDynamicIsland and handles navigation', async () => {
+    const nav = createMockNavigation();
+    const repo = new MockCoordinatorRepository();
+
+    let renderer!: ReactTestRenderer.ReactTestRenderer;
+    await ReactTestRenderer.act(async () => {
+      renderer = ReactTestRenderer.create(
+        renderWithProviders(
+          <CoordinatorOverviewScreen navigation={nav} repository={repo} />,
+        ),
+      );
+    });
+
+    const json = safeStringify(renderer.toJSON());
+    expect(json).toContain('Dashboard');
+    expect(json).toContain('Applications');
+    expect(json).toContain('Assignments');
+    expect(json).toContain('Attendance');
+
+    const appsTab = renderer.root
+      .findAllByProps({ accessibilityRole: 'tab' })
+      .find(t => t.props.accessibilityLabel === 'Applications tab');
+    expect(appsTab).toBeDefined();
+
+    await ReactTestRenderer.act(async () => {
+      appsTab!.props.onPress();
+    });
+
+    expect(nav.navigate).toHaveBeenCalledWith('CoordinatorApplications');
   });
 
   it('renders CoordinatorEventsScreen and filters by status', async () => {
@@ -411,6 +443,25 @@ describe('Coordinator Screens Component Integration', () => {
     expect(json).toContain('Published');
     expect(json).toContain('Draft');
     expect(json).toContain('Monitor Mode');
+    expect(json).not.toContain('Cancelled Event');
+  });
+
+  it('renders CoordinatorSwipeWrapper and handles gesture wrapping', async () => {
+    const nav = createMockNavigation();
+    let renderer!: ReactTestRenderer.ReactTestRenderer;
+
+    await ReactTestRenderer.act(async () => {
+      renderer = ReactTestRenderer.create(
+        renderWithProviders(
+          <CoordinatorSwipeWrapper currentTab="dashboard" navigation={nav}>
+            <CoordinatorOverviewScreen navigation={nav} repository={new MockCoordinatorRepository()} />
+          </CoordinatorSwipeWrapper>,
+        ),
+      );
+    });
+
+    const wrapper = renderer.root.findAllByType(CoordinatorSwipeWrapper);
+    expect(wrapper.length).toBeGreaterThan(0);
   });
 
   it('executes CreateEventWizardScreen through step 7 review with demo banner', async () => {
@@ -451,6 +502,75 @@ describe('Coordinator Screens Component Integration', () => {
 
     json = safeStringify(renderer.toJSON());
     expect(json).toContain('Step 2 of 7: Location');
+  });
+
+  it('publishes a new event directly on wizard completion when coordinator chooses Publish Event', async () => {
+    const nav = createMockNavigation();
+    const repo = new MockCoordinatorRepository();
+
+    let renderer!: ReactTestRenderer.ReactTestRenderer;
+    await ReactTestRenderer.act(async () => {
+      renderer = ReactTestRenderer.create(
+        renderWithProviders(
+          <CreateEventWizardScreen navigation={nav} repository={repo} />,
+        ),
+      );
+    });
+
+    // Step 1: Basics
+    const titleInput = renderer.root.findByProps({
+      placeholder: 'e.g. Riverbank Cleanup & Recycling Drive',
+    });
+    await ReactTestRenderer.act(async () => {
+      titleInput.props.onChangeText('Relief Volunteer Mobilization');
+    });
+
+    const nextButton = renderer.root
+      .findAllByProps({ accessibilityRole: 'button' })
+      .find(b => b.props.accessibilityLabel === 'Next')!;
+
+    // Advance 1 -> 2
+    await ReactTestRenderer.act(async () => {
+      nextButton.props.onPress();
+    });
+
+    // Step 2: Location
+    const locInput = renderer.root.findByProps({
+      placeholder: 'e.g. Downtown Riverwalk Plaza, Pier 4',
+    });
+    await ReactTestRenderer.act(async () => {
+      locInput.props.onChangeText('Community Center');
+    });
+
+    // Advance through steps 2 -> 3 -> 4 -> 5 -> 6 -> 7
+    for (let step = 2; step < 7; step++) {
+      await ReactTestRenderer.act(async () => {
+        nextButton.props.onPress();
+      });
+    }
+
+    let json = safeStringify(renderer.toJSON());
+    expect(json).toContain('Step 7 of 7: Review');
+    expect(json).toContain('Publish Event (Template)');
+    expect(json).toContain('Save as Draft (Template)');
+
+    // Tap Publish Event
+    const publishBtn = renderer.root
+      .findAllByProps({ accessibilityRole: 'button' })
+      .find(b => b.props.accessibilityLabel === 'Publish Event (Template)')!;
+
+    expect(publishBtn).toBeDefined();
+
+    await ReactTestRenderer.act(async () => {
+      publishBtn.props.onPress();
+    });
+
+    // Verify event was created and published in repository
+    const events = await repo.getMyEvents();
+    const createdEvent = events.find(e => e.title === 'Relief Volunteer Mobilization');
+    expect(createdEvent).toBeDefined();
+    expect(createdEvent?.status).toBe('published');
+    expect(nav.navigate).toHaveBeenCalledWith('CoordinatorEvents');
   });
 
   it('opens confirmation modal on CoordinatorEventDetailScreen consequential transition', async () => {

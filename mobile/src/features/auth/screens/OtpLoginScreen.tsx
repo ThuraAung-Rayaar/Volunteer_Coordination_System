@@ -3,7 +3,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { useCurrentUser } from '../../../app/UserContext';
 import { getDataMode } from '../../../app/configuration/dataMode';
 import type { RequestOtpResult, VerifyOtpResult } from '../../../app/UserContext';
@@ -68,14 +68,16 @@ export function OtpLoginScreen({
   } = useCurrentUser();
 
   const [step, setStep] = useState<'phone' | 'otp'>('phone');
-  const [phone, setPhone] = useState('+959');
+  const [userType, setUserType] = useState<'old' | 'new'>('old');
   const [displayName, setDisplayName] = useState('');
+  const [phone, setPhone] = useState('+959');
   const [code, setCode] = useState('');
   const [devCode, setDevCode] = useState<string | null>(null);
 
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [fieldError, setFieldError] = useState<string | null>(null);
+  const [nameError, setNameError] = useState<string | null>(null);
 
   // Clear ephemeral challenge and code state on navigation exit / unmount
   useEffect(() => {
@@ -109,11 +111,37 @@ export function OtpLoginScreen({
     if (isLoading) return; // Prevent double-submit while in flight
     setErrorMessage(null);
     setFieldError(null);
+    setNameError(null);
+
+    if (userType === 'new') {
+      const trimmedName = displayName.trim();
+      if (!trimmedName) {
+        setNameError('Please enter your name.');
+        return;
+      }
+    }
 
     const trimmedPhone = phone.trim();
     if (!trimmedPhone || trimmedPhone === '+959') {
       setFieldError('Please enter your mobile phone number.');
       return;
+    }
+
+    if (userType === 'new') {
+      // If existing user attempts to enter as new, reject with error
+      const KNOWN_EXISTING_PHONES = [
+        '+959111111111',
+        '+959222222222',
+        '+959333333333',
+        '+959444444444',
+        '+95912345678',
+      ];
+      if (KNOWN_EXISTING_PHONES.includes(trimmedPhone)) {
+        setErrorMessage(
+          'This phone number is already registered. Please switch to Returning User to sign in.',
+        );
+        return;
+      }
     }
 
     clearChallenge?.();
@@ -133,6 +161,7 @@ export function OtpLoginScreen({
           phone: trimmedPhone,
           purpose: 'login',
           requestId: explicitRequestId,
+          isNewUser: userType === 'new',
         });
       } else {
         throw new Error('Authentication service unavailable.');
@@ -227,15 +256,16 @@ export function OtpLoginScreen({
       if (challenge?.authSessionToken && verifyTokenizedOtp) {
         result = await verifyTokenizedOtp({
           code: trimmedCode,
-          displayName: displayName.trim() || undefined,
+          ...(userType === 'new' && displayName.trim()
+            ? { displayName: displayName.trim() }
+            : {}),
         });
       } else if (verifyOtp) {
         // Fallback for legacy mocks or providers where tokenized method is absent
-        result = await verifyOtp(
-          phone.trim(),
-          trimmedCode,
-          displayName.trim() || undefined,
-        );
+        result =
+          userType === 'new' && displayName.trim()
+            ? await verifyOtp(phone.trim(), trimmedCode, displayName.trim())
+            : await verifyOtp(phone.trim(), trimmedCode);
       } else {
         throw new Error('Authentication service unavailable.');
       }
@@ -265,6 +295,7 @@ export function OtpLoginScreen({
     setDevCode(null);
     setErrorMessage(null);
     setFieldError(null);
+    setNameError(null);
   };
 
   return (
@@ -296,9 +327,90 @@ export function OtpLoginScreen({
               >
                 {getDataMode() === 'mock'
                   ? 'Template Mode: enter any demo mobile number. No SMS or network request will be made.'
-                  : 'Enter your mobile phone number to receive a secure SMS one-time passcode.'}
+                  : userType === 'new'
+                    ? 'Enter your name and mobile number to register as a new volunteer.'
+                    : 'Enter your registered mobile phone number to receive an SMS one-time passcode.'}
               </AppText>
             </View>
+
+            {/* Old vs New user selector */}
+            <View
+              style={[
+                styles.userTypeTrack,
+                {
+                  backgroundColor: theme.colors.surfaceRaised,
+                  borderColor: theme.colors.border,
+                },
+              ]}
+            >
+              <Pressable
+                accessibilityRole="tab"
+                accessibilityLabel="Returning User tab"
+                accessibilityState={{ selected: userType === 'old' }}
+                onPress={() => {
+                  setUserType('old');
+                  setErrorMessage(null);
+                  setFieldError(null);
+                  setNameError(null);
+                }}
+                style={[
+                  styles.userTypePill,
+                  userType === 'old' && {
+                    backgroundColor: theme.colors.primary,
+                  },
+                ]}
+              >
+                <AppText
+                  variant="label"
+                  weight="bold"
+                  color={userType === 'old' ? '#FFFFFF' : theme.colors.textSecondary}
+                >
+                  Returning User
+                </AppText>
+              </Pressable>
+
+              <Pressable
+                accessibilityRole="tab"
+                accessibilityLabel="New User tab"
+                accessibilityState={{ selected: userType === 'new' }}
+                onPress={() => {
+                  setUserType('new');
+                  setErrorMessage(null);
+                  setFieldError(null);
+                  setNameError(null);
+                }}
+                style={[
+                  styles.userTypePill,
+                  userType === 'new' && {
+                    backgroundColor: theme.colors.primary,
+                  },
+                ]}
+              >
+                <AppText
+                  variant="label"
+                  weight="bold"
+                  color={userType === 'new' ? '#FFFFFF' : theme.colors.textSecondary}
+                >
+                  New User
+                </AppText>
+              </Pressable>
+            </View>
+
+            {/* Display Name Input (Only for new user) */}
+            {userType === 'new' ? (
+              <AppInput
+                label="Full Name / Display Name *"
+                placeholder="e.g. Alex Morgan"
+                value={displayName}
+                onChangeText={text => {
+                  setDisplayName(text);
+                  if (nameError) setNameError(null);
+                }}
+                error={nameError ?? undefined}
+                autoCapitalize="words"
+                style={styles.nameInputSpacing}
+              />
+            ) : null}
 
             <AppInput
               label="Phone Number"
@@ -314,17 +426,6 @@ export function OtpLoginScreen({
               helperText={getDataMode() === 'mock'
                 ? 'Template Mode: any demo number is accepted locally.'
                 : 'E.g. +959 followed by your 8-9 digit phone number'}
-            />
-
-            <View style={styles.fieldSpacer} />
-
-            <AppInput
-              label="Display Name (Optional)"
-              placeholder="e.g. Daw Khin, Ko Aung"
-              value={displayName}
-              onChangeText={setDisplayName}
-              autoCapitalize="words"
-              helperText="Used if creating a new volunteer profile"
             />
 
             {errorMessage ? (
@@ -345,7 +446,11 @@ export function OtpLoginScreen({
 
             <View style={styles.buttonBlock}>
               <AppButton
-                label="Send Verification Code"
+                label={
+                  userType === 'new'
+                    ? 'Register & Send Code'
+                    : 'Send Verification Code'
+                }
                 variant="primary"
                 onPress={handleSendOtp}
                 loading={isLoading}
@@ -504,6 +609,23 @@ const styles = StyleSheet.create({
     padding: 12,
     borderWidth: 1,
     borderRadius: 8,
+  },
+  userTypeTrack: {
+    flexDirection: 'row',
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 3,
+    marginBottom: 16,
+  },
+  userTypePill: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    borderRadius: 9,
+  },
+  nameInputSpacing: {
+    marginBottom: 12,
   },
   devBanner: {
     marginBottom: 16,

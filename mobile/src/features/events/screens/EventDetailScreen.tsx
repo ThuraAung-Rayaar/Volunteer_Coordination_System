@@ -15,7 +15,7 @@ import {
   defaultEventRepository,
   MockEventRepository,
 } from '../../../data/mock/MockEventRepository';
-import { isMockMode } from '../../../app/configuration/dataMode';
+import { isHttpMode, isMockMode } from '../../../app/configuration/dataMode';
 import { useRepositories } from '../../../app/RepositoryProvider';
 import {
   CHARITY_CATEGORIES,
@@ -95,6 +95,7 @@ export function EventDetailScreen({
   const [volunteerNote, setVolunteerNote] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [feedbackBanner, setFeedbackBanner] = useState<string | null>(null);
+  const [modalError, setModalError] = useState<string | null>(null);
 
   const fetchDetail = useCallback(async () => {
     if (!eventId) {
@@ -127,6 +128,7 @@ export function EventDetailScreen({
   const handleApplyPress = (post: EventPost) => {
     setSelectedPostForApply(post);
     setVolunteerNote('');
+    setModalError(null);
   };
 
   const handleConfirmApply = async () => {
@@ -135,6 +137,7 @@ export function EventDetailScreen({
     }
 
     setIsSubmitting(true);
+    setModalError(null);
     try {
       const result = await repository.applyToPost(
         event.id,
@@ -149,15 +152,18 @@ export function EventDetailScreen({
             : result.message,
         );
         setSelectedPostForApply(null);
+        setModalError(null);
         // Refresh detail to get updated application and capacity
         await fetchDetail();
       } else {
+        setModalError(result.message);
         setFeedbackBanner(result.message);
       }
     } catch (err) {
-      setFeedbackBanner(
-        err instanceof Error ? err.message : 'Application submission failed',
-      );
+      const msg =
+        err instanceof Error ? err.message : 'Application submission failed';
+      setModalError(msg);
+      setFeedbackBanner(msg);
     } finally {
       setIsSubmitting(false);
     }
@@ -528,12 +534,16 @@ export function EventDetailScreen({
         {event.posts.map(post => {
           const isAppliedThisPost =
             userApplication?.postId === post.id;
+          const isEventEnded =
+            isHttpMode() &&
+            Boolean(event.endAt && new Date(event.endAt).getTime() < Date.now());
           return (
             <EventPostCard
               key={post.id}
               post={post}
               isApplied={Boolean(isAppliedThisPost)}
               onApplyPress={handleApplyPress}
+              isEventEnded={isEventEnded}
             />
           );
         })}
@@ -620,6 +630,27 @@ export function EventDetailScreen({
               multiline
               style={styles.modalInput}
             />
+
+            {/* In-Modal Error Feedback */}
+            {modalError ? (
+              <View
+                style={[
+                  styles.modalErrorBox,
+                  {
+                    backgroundColor: theme.colors.surfaceRaised,
+                    borderColor: theme.colors.danger,
+                  },
+                ]}
+              >
+                <AppText
+                  variant="caption"
+                  weight="medium"
+                  color={theme.colors.danger}
+                >
+                  {modalError}
+                </AppText>
+              </View>
+            ) : null}
 
             {/* Modal Actions */}
             <View style={styles.modalActionsRow}>
@@ -783,5 +814,11 @@ const styles = StyleSheet.create({
   },
   modalButtonWrap: {
     flex: 1,
+  },
+  modalErrorBox: {
+    marginVertical: 10,
+    padding: 10,
+    borderWidth: 1,
+    borderRadius: 8,
   },
 });

@@ -33,8 +33,10 @@ import {
 import { useAppTheme } from '../../../theme';
 import {
   AttendanceRow,
+  CoordinatorDynamicIsland,
   CoordinatorEventHeader,
   CoordinatorGuard,
+  CoordinatorSwipeWrapper,
 } from '../components';
 
 export interface CoordinatorAttendanceScreenProps
@@ -82,13 +84,16 @@ export function CoordinatorAttendanceScreen({
       setIsLoading(true);
       try {
         const evList = await repo.getMyEvents();
-        setEvents(evList);
+        const operationalEvents = evList.filter(
+          e => e.status !== 'cancelled' && e.status !== 'completed',
+        );
+        setEvents(operationalEvents);
 
         const eventIdToUse =
           targetId ||
           selectedEventIdRef.current ||
           route?.params?.eventId ||
-          evList[0]?.id ||
+          operationalEvents[0]?.id ||
           'evt-coord-001';
 
         if (selectedEventIdRef.current !== eventIdToUse) {
@@ -432,7 +437,8 @@ export function CoordinatorAttendanceScreen({
 
   return (
     <CoordinatorGuard navigation={navigation}>
-      <View style={[styles.root, { backgroundColor: theme.colors.background }]}>
+      <CoordinatorSwipeWrapper currentTab="attendance" navigation={navigation}>
+        <View style={[styles.root, { backgroundColor: theme.colors.background }]}>
         <AppHeader
           title="Attendance & Check-In"
           subtitle={selectedEvent?.title}
@@ -465,8 +471,15 @@ export function CoordinatorAttendanceScreen({
             }
           />
         )}
+
+        <CoordinatorDynamicIsland
+          activeTab="attendance"
+          navigation={navigation}
+          checkedInTodayCount={counts.checkedIn}
+        />
       </View>
-    </CoordinatorGuard>
+    </CoordinatorSwipeWrapper>
+  </CoordinatorGuard>
   );
 }
 
@@ -476,7 +489,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     padding: 16,
-    paddingBottom: 40,
+    paddingBottom: 88,
   },
   headerContainer: {
     marginBottom: 8,

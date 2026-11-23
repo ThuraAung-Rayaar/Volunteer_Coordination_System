@@ -30,8 +30,11 @@ const MAIN_ITEMS: DrawerItemConfig[] = [
 ];
 
 const ACCOUNT_ITEMS: DrawerItemConfig[] = [
-  { name: 'MyApplications', label: 'My Applications', icon: 'check' },
-  { name: 'MyAssignments', label: 'My Assignments', icon: 'calendar' },
+  {
+    name: 'VolunteerWorkspace',
+    label: 'Volunteer Workspace',
+    icon: 'brief',
+  },
   { name: 'Profile', label: 'Profile', icon: 'user' },
   { name: 'Availability', label: 'Availability', icon: 'clock' },
   {
@@ -42,6 +45,7 @@ const ACCOUNT_ITEMS: DrawerItemConfig[] = [
 ];
 
 const PREFERENCE_ITEMS: DrawerItemConfig[] = [
+  { name: 'Notifications', label: 'Notifications', icon: 'bell' },
   { name: 'Settings', label: 'Settings', icon: 'refresh' },
 ];
 

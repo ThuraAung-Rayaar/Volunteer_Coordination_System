@@ -1,3 +1,5 @@
+from django.db.models import Q
+from django.utils import timezone
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.pagination import PageNumberPagination
@@ -76,6 +78,27 @@ class PublicEventListView(APIView):
             else:
                 flat[k] = v[0]
         queryset = query_service.list_public_events(flat)
+        now = timezone.now()
+        if request.user and request.user.is_authenticated:
+            user_id = request.user.id
+            from apps.events.models import EventApplications, Events
+            from apps.coordination.models import Assignments
+
+            managed_ids = Events.objects.filter(
+                Q(owner_id=user_id) | Q(current_coordinator_id=user_id)
+            ).values_list("id", flat=True)
+            applied_ids = EventApplications.objects.filter(
+                user_id=user_id
+            ).values_list("event_id", flat=True)
+            assigned_ids = Assignments.objects.filter(
+                user_id=user_id
+            ).exclude(status="cancelled").values_list("event_id", flat=True)
+
+            allowed_ended = set(managed_ids).union(applied_ids, assigned_ids)
+            queryset = queryset.filter(Q(end_at__gte=now) | Q(event_id__in=allowed_ended))
+        else:
+            queryset = queryset.filter(end_at__gte=now)
+
         paginator = PublicEventPagination()
         page = paginator.paginate_queryset(queryset, request, view=self)
         serializer = PublicEventSerializer(page, many=True)

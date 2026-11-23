@@ -4,6 +4,7 @@
 
 import React, { useState } from 'react';
 import {
+  Pressable,
   StyleProp,
   StyleSheet,
   TextInput,
@@ -24,6 +25,7 @@ export interface AppInputProps
   error?: string;
   helperText?: string;
   rightIcon?: IconName;
+  onRightIconPress?: () => void;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -35,6 +37,7 @@ export function AppInput({
   error,
   helperText,
   rightIcon,
+  onRightIconPress,
   style,
   onFocus,
   onBlur,
@@ -100,12 +103,28 @@ export function AppInput({
         />
 
         {rightIcon ? (
-          <AppIcon
-            name={rightIcon}
-            size={16}
-            color={theme.colors.primary}
-            style={styles.rightIcon}
-          />
+          onRightIconPress ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`${rightIcon} button`}
+              onPress={onRightIconPress}
+              hitSlop={8}
+            >
+              <AppIcon
+                name={rightIcon}
+                size={16}
+                color={theme.colors.primary}
+                style={styles.rightIcon}
+              />
+            </Pressable>
+          ) : (
+            <AppIcon
+              name={rightIcon}
+              size={16}
+              color={theme.colors.primary}
+              style={styles.rightIcon}
+            />
+          )
         ) : null}
       </View>
 

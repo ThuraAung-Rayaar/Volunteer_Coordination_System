@@ -20,6 +20,7 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
+from django.utils import timezone
 from rest_framework.permissions import BasePermission
 
 from .exceptions import (
@@ -190,8 +191,24 @@ def get_visible_event_or_404(user, event_id: int):
             raise ResourceMaskedNotFound()
         return event
 
-    # Published/active: visible to everyone
+    # Published/active: visible to everyone unless it has ended
     if event.status in ("published", "active"):
+        if event.end_at and event.end_at < timezone.now():
+            # Ended events are only visible to managers, admins, and active participants
+            if user and user.is_authenticated:
+                if user.is_admin and user.is_active:
+                    return event
+                if _is_event_manager(user, event):
+                    return event
+                from apps.events.models import EventApplications
+                from apps.coordination.models import Assignments
+                has_participation = (
+                    EventApplications.objects.filter(event_id=event_id, user_id=user.id).exists()
+                    or Assignments.objects.filter(event_id=event_id, user_id=user.id).exclude(status="cancelled").exists()
+                )
+                if has_participation:
+                    return event
+            raise ResourceMaskedNotFound()
         return event
 
     # Draft/completed/cancelled: managers, admins, and active participants

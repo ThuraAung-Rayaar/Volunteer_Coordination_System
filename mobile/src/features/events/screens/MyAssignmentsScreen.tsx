@@ -69,6 +69,7 @@ export function getAssignmentsCache(): AssignmentsStateCache {
 export interface MyAssignmentsScreenProps
   extends Partial<MainDrawerScreenProps<'MyAssignments'>> {
   repository?: EventRepository;
+  hideHeader?: boolean;
 }
 
 function formatDateTimeRange(startIso?: string, endIso?: string): string {
@@ -125,6 +126,7 @@ function getAssignmentBadgeConfig(
 export function MyAssignmentsScreen({
   navigation,
   repository: propRepository,
+  hideHeader = false,
 }: MyAssignmentsScreenProps): React.JSX.Element {
   const { theme } = useAppTheme();
   const repositories = useRepositories();
@@ -423,20 +425,22 @@ export function MyAssignmentsScreen({
   };
 
   const filteredAssignments = useMemo(() => {
+    // Cancelled events are erased from volunteer history (only owner can know about cancellations)
+    const nonCancelled = assignments.filter(a => a.status !== 'cancelled');
     if (statusFilter === 'all') {
-      return assignments;
+      return nonCancelled;
     }
     if (statusFilter === 'active') {
-      return assignments.filter(
+      return nonCancelled.filter(
         a => a.status === 'assigned' || a.status === 'confirmed',
       );
     }
     if (statusFilter === 'completed') {
-      return assignments.filter(
+      return nonCancelled.filter(
         a => a.status === 'completed' || a.attendanceStatus === 'completed',
       );
     }
-    return assignments.filter(a => a.status === statusFilter);
+    return nonCancelled;
   }, [assignments, statusFilter]);
 
   const filterTabs: Array<{
@@ -446,16 +450,17 @@ export function MyAssignmentsScreen({
     { key: 'all', label: 'All Shifts' },
     { key: 'active', label: 'Active Shifts' },
     { key: 'completed', label: 'Completed' },
-    { key: 'cancelled', label: 'Cancelled' },
   ];
 
   return (
     <View style={[styles.root, { backgroundColor: theme.colors.background }]}>
-      <AppHeader
-        title="My Assignments"
-        subtitle="Confirmed shifts & attendance"
-        onMenuPress={navigation ? () => navigation.openDrawer() : undefined}
-      />
+      {!hideHeader && (
+        <AppHeader
+          title="My Assignments"
+          subtitle="Confirmed shifts & attendance"
+          onMenuPress={navigation ? () => navigation.openDrawer() : undefined}
+        />
+      )}
 
       {/* Filter tab bar */}
       <View

@@ -284,9 +284,12 @@ def get_own_applications(user, event_id: Optional[int] = None) -> list[dict]:
     Retrieve the authenticated user's applications.
     Optionally filter by event.
     """
-    qs = EventApplications.objects.filter(user=user).select_related(
-        "event", "post"
-    ).order_by("-applied_at")
+    qs = (
+        EventApplications.objects.filter(user=user)
+        .exclude(event__status="cancelled")
+        .select_related("event", "post")
+        .order_by("-applied_at")
+    )
 
     if event_id is not None:
         qs = qs.filter(event_id=event_id)

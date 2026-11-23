@@ -49,6 +49,42 @@ export interface CreateEventWizardScreenProps
   repository?: CoordinatorRepository;
 }
 
+export function parse24hTo12h(time24: string): { time12: string; period: 'AM' | 'PM' } {
+  if (!time24 || !time24.includes(':')) {
+    return { time12: time24 || '', period: 'AM' };
+  }
+  const [hStr, mStr] = time24.split(':');
+  let h = parseInt(hStr, 10);
+  if (isNaN(h)) {
+    return { time12: time24, period: 'AM' };
+  }
+  const period: 'AM' | 'PM' = h >= 12 ? 'PM' : 'AM';
+  h = h % 12;
+  if (h === 0) h = 12;
+  const m = mStr !== undefined ? mStr.slice(0, 2) : '00';
+  return {
+    time12: `${String(h).padStart(2, '0')}:${m}`,
+    period,
+  };
+}
+
+export function convert12hTo24h(time12: string, period: 'AM' | 'PM'): string {
+  if (!time12) return '';
+  const trimmed = time12.trim();
+  const parts = trimmed.split(':');
+  let h = parseInt(parts[0], 10);
+  if (isNaN(h)) return trimmed;
+  let m = parts[1] !== undefined ? parts[1].slice(0, 2) : '00';
+  if (m.length === 1) m = `0${m}`;
+
+  if (period === 'PM') {
+    if (h < 12) h += 12;
+  } else if (period === 'AM') {
+    if (h === 12) h = 0;
+  }
+  return `${String(h).padStart(2, '0')}:${m}`;
+}
+
 function toMyanmarDateTimeParts(value?: string | null): { date: string; time: string } {
   if (!value) return { date: '', time: '' };
   const timestamp = new Date(value).getTime();
@@ -125,13 +161,22 @@ export function CreateEventWizardScreen({
   const [requireConfirmation, setRequireConfirmation] = useState(true);
   const [mapProvider, setMapProvider] = useState<'openstreetmap' | 'google'>('openstreetmap');
 
-  // Step 3: Schedule & Deadlines (Separated date and 24h MMT time)
+  // Step 3: Schedule & Deadlines (Separated date and 12h AM/PM MMT time)
   const [startDate, setStartDate] = useState('2026-12-10');
-  const [startTime, setStartTime] = useState('08:00');
+  const [startTime12, setStartTime12] = useState('08:00');
+  const [startPeriod, setStartPeriod] = useState<'AM' | 'PM'>('AM');
   const [endDate, setEndDate] = useState('2026-12-10');
-  const [endTime, setEndTime] = useState('14:00');
+  const [endTime12, setEndTime12] = useState('02:00');
+  const [endPeriod, setEndPeriod] = useState<'AM' | 'PM'>('PM');
   const [deadlineDate, setDeadlineDate] = useState('2026-12-08');
-  const [deadlineTime, setDeadlineTime] = useState('18:00');
+  const [deadlineTime12, setDeadlineTime12] = useState('06:00');
+  const [deadlinePeriod, setDeadlinePeriod] = useState<'AM' | 'PM'>('PM');
+
+  const startTime = convert12hTo24h(startTime12, startPeriod);
+  const endTime = convert12hTo24h(endTime12, endPeriod);
+  const deadlineTime = deadlineTime12.trim()
+    ? convert12hTo24h(deadlineTime12, deadlinePeriod)
+    : '';
 
   // Calendar Date Picker Modal Target: 'start' | 'end' | 'deadline' | null
   const [datePickerTarget, setDatePickerTarget] = useState<
@@ -210,12 +255,19 @@ export function CreateEventWizardScreen({
         setGeoOpensBeforeMin(String(existing.geoCheckinOpensBeforeMin));
         setRequireConfirmation(existing.requireCheckinConfirmation);
         setMapProvider(existing.mapProvider);
+        const parsedStart = parse24hTo12h(start.time);
+        const parsedEnd = parse24hTo12h(end.time);
+        const parsedDeadline = parse24hTo12h(deadline.time);
+
         setStartDate(start.date);
-        setStartTime(start.time);
+        setStartTime12(parsedStart.time12);
+        setStartPeriod(parsedStart.period);
         setEndDate(end.date);
-        setEndTime(end.time);
+        setEndTime12(parsedEnd.time12);
+        setEndPeriod(parsedEnd.period);
         setDeadlineDate(deadline.date);
-        setDeadlineTime(deadline.time);
+        setDeadlineTime12(parsedDeadline.time12);
+        setDeadlinePeriod(parsedDeadline.period);
         setAcceptanceMode(existing.acceptanceMode);
         setAutoAssignEnabled(existing.autoAssignEnabled);
         setGroupSize(existing.groupSize === undefined ? '' : String(existing.groupSize));
@@ -381,8 +433,8 @@ export function CreateEventWizardScreen({
     }
   };
 
-  // Save Draft (Step 7)
-  const handleSaveDraft = async () => {
+  // Save Draft / Publish Event (Step 7)
+  const handleSaveDraft = async (publish: boolean = false) => {
     if (isLoadingExisting || (isEditMode && existingEventStatus === null)) return;
     setIsSubmitting(true);
     setErrorMessage(null);
@@ -456,6 +508,7 @@ export function CreateEventWizardScreen({
         onboardingText: onboardingText.trim() ? onboardingText : isEditMode ? null : undefined,
         requireOnboardingAck,
         qrRegistrationEnabled,
+        publish: !isEditMode ? publish : undefined,
       };
       const result = eventId
         ? await repository.updateEvent(eventId, draft)
@@ -476,7 +529,9 @@ export function CreateEventWizardScreen({
           ? err.message
           : isEditMode
             ? 'Failed to update event'
-            : 'Failed to create draft event',
+            : publish
+              ? 'Failed to publish event'
+              : 'Failed to create draft event',
       );
     } finally {
       setIsSubmitting(false);
@@ -886,46 +941,96 @@ export function CreateEventWizardScreen({
               >
                 EVENT START *
               </AppText>
-              <View style={styles.dateTimePairRow}>
-                <View style={styles.dateCol}>
-                  <View style={styles.dateInputWithButton}>
-                    <View style={styles.flexOne}>
-                      <AppInput
-                        label="Start Date *"
-                        value={startDate}
-                        onChangeText={setStartDate}
-                        placeholder="YYYY-MM-DD"
-                      />
-                    </View>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel="Open start date picker"
-                      onPress={() => setDatePickerTarget('start')}
-                      style={[
-                        styles.calendarPickerButton,
-                        {
-                          borderColor: theme.colors.border,
-                          backgroundColor: theme.colors.surfaceRaised,
-                        },
-                      ]}
-                      hitSlop={6}
-                    >
-                      <AppIcon
-                        name="calendar"
-                        size={18}
-                        color={theme.colors.primary}
-                      />
-                    </Pressable>
-                  </View>
-                </View>
-
-                <View style={styles.timeCol}>
+              <View style={styles.dateRow}>
+                <View style={styles.flexOne}>
                   <AppInput
-                    label="Start Time (24h MMT) *"
-                    value={startTime}
-                    onChangeText={setStartTime}
+                    label="Start Date *"
+                    value={startDate}
+                    onChangeText={setStartDate}
+                    placeholder="YYYY-MM-DD"
+                  />
+                </View>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Open start date picker"
+                  onPress={() => setDatePickerTarget('start')}
+                  style={[
+                    styles.calendarPickerButton,
+                    {
+                      borderColor: theme.colors.border,
+                      backgroundColor: theme.colors.surfaceRaised,
+                    },
+                  ]}
+                  hitSlop={6}
+                >
+                  <AppIcon
+                    name="calendar"
+                    size={20}
+                    color={theme.colors.primary}
+                  />
+                </Pressable>
+              </View>
+              <View style={styles.timeRow}>
+                <View style={styles.flexOne}>
+                  <AppInput
+                    label="Start Time (AM/PM MMT) *"
+                    value={startTime12}
+                    onChangeText={setStartTime12}
                     placeholder="08:00"
                   />
+                </View>
+                <View style={styles.ampmCol}>
+                  <AppText variant="label" color={theme.colors.muted} style={styles.ampmLabel}>
+                    PERIOD
+                  </AppText>
+                  <View
+                    style={[
+                      styles.ampmContainer,
+                      {
+                        borderColor: theme.colors.border,
+                        backgroundColor: theme.colors.surfaceRaised,
+                      },
+                    ]}
+                  >
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Start time AM"
+                      onPress={() => setStartPeriod('AM')}
+                      style={[
+                        styles.ampmButton,
+                        startPeriod === 'AM' && {
+                          backgroundColor: theme.colors.primary,
+                        },
+                      ]}
+                    >
+                      <AppText
+                        variant="caption"
+                        weight="bold"
+                        color={startPeriod === 'AM' ? '#FFFFFF' : theme.colors.textSecondary}
+                      >
+                        AM
+                      </AppText>
+                    </Pressable>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Start time PM"
+                      onPress={() => setStartPeriod('PM')}
+                      style={[
+                        styles.ampmButton,
+                        startPeriod === 'PM' && {
+                          backgroundColor: theme.colors.primary,
+                        },
+                      ]}
+                    >
+                      <AppText
+                        variant="caption"
+                        weight="bold"
+                        color={startPeriod === 'PM' ? '#FFFFFF' : theme.colors.textSecondary}
+                      >
+                        PM
+                      </AppText>
+                    </Pressable>
+                  </View>
                 </View>
               </View>
 
@@ -938,46 +1043,96 @@ export function CreateEventWizardScreen({
               >
                 EVENT END *
               </AppText>
-              <View style={styles.dateTimePairRow}>
-                <View style={styles.dateCol}>
-                  <View style={styles.dateInputWithButton}>
-                    <View style={styles.flexOne}>
-                      <AppInput
-                        label="End Date *"
-                        value={endDate}
-                        onChangeText={setEndDate}
-                        placeholder="YYYY-MM-DD"
-                      />
-                    </View>
+              <View style={styles.dateRow}>
+                <View style={styles.flexOne}>
+                  <AppInput
+                    label="End Date *"
+                    value={endDate}
+                    onChangeText={setEndDate}
+                    placeholder="YYYY-MM-DD"
+                  />
+                </View>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Open end date picker"
+                  onPress={() => setDatePickerTarget('end')}
+                  style={[
+                    styles.calendarPickerButton,
+                    {
+                      borderColor: theme.colors.border,
+                      backgroundColor: theme.colors.surfaceRaised,
+                    },
+                  ]}
+                  hitSlop={6}
+                >
+                  <AppIcon
+                    name="calendar"
+                    size={20}
+                    color={theme.colors.primary}
+                  />
+                </Pressable>
+              </View>
+              <View style={styles.timeRow}>
+                <View style={styles.flexOne}>
+                  <AppInput
+                    label="End Time (AM/PM MMT) *"
+                    value={endTime12}
+                    onChangeText={setEndTime12}
+                    placeholder="02:00"
+                  />
+                </View>
+                <View style={styles.ampmCol}>
+                  <AppText variant="label" color={theme.colors.muted} style={styles.ampmLabel}>
+                    PERIOD
+                  </AppText>
+                  <View
+                    style={[
+                      styles.ampmContainer,
+                      {
+                        borderColor: theme.colors.border,
+                        backgroundColor: theme.colors.surfaceRaised,
+                      },
+                    ]}
+                  >
                     <Pressable
                       accessibilityRole="button"
-                      accessibilityLabel="Open end date picker"
-                      onPress={() => setDatePickerTarget('end')}
+                      accessibilityLabel="End time AM"
+                      onPress={() => setEndPeriod('AM')}
                       style={[
-                        styles.calendarPickerButton,
-                        {
-                          borderColor: theme.colors.border,
-                          backgroundColor: theme.colors.surfaceRaised,
+                        styles.ampmButton,
+                        endPeriod === 'AM' && {
+                          backgroundColor: theme.colors.primary,
                         },
                       ]}
-                      hitSlop={6}
                     >
-                      <AppIcon
-                        name="calendar"
-                        size={18}
-                        color={theme.colors.primary}
-                      />
+                      <AppText
+                        variant="caption"
+                        weight="bold"
+                        color={endPeriod === 'AM' ? '#FFFFFF' : theme.colors.textSecondary}
+                      >
+                        AM
+                      </AppText>
+                    </Pressable>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="End time PM"
+                      onPress={() => setEndPeriod('PM')}
+                      style={[
+                        styles.ampmButton,
+                        endPeriod === 'PM' && {
+                          backgroundColor: theme.colors.primary,
+                        },
+                      ]}
+                    >
+                      <AppText
+                        variant="caption"
+                        weight="bold"
+                        color={endPeriod === 'PM' ? '#FFFFFF' : theme.colors.textSecondary}
+                      >
+                        PM
+                      </AppText>
                     </Pressable>
                   </View>
-                </View>
-
-                <View style={styles.timeCol}>
-                  <AppInput
-                    label="End Time (24h MMT) *"
-                    value={endTime}
-                    onChangeText={setEndTime}
-                    placeholder="14:00"
-                  />
                 </View>
               </View>
 
@@ -993,46 +1148,96 @@ export function CreateEventWizardScreen({
               <AppText variant="caption" color={theme.colors.textSecondary} style={styles.deadlineSubhint}>
                 Must be on or before the event start time.
               </AppText>
-              <View style={styles.dateTimePairRow}>
-                <View style={styles.dateCol}>
-                  <View style={styles.dateInputWithButton}>
-                    <View style={styles.flexOne}>
-                      <AppInput
-                        label="Deadline Date"
-                        value={deadlineDate}
-                        onChangeText={setDeadlineDate}
-                        placeholder="YYYY-MM-DD"
-                      />
-                    </View>
+              <View style={styles.dateRow}>
+                <View style={styles.flexOne}>
+                  <AppInput
+                    label="Deadline Date"
+                    value={deadlineDate}
+                    onChangeText={setDeadlineDate}
+                    placeholder="YYYY-MM-DD"
+                  />
+                </View>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Open deadline date picker"
+                  onPress={() => setDatePickerTarget('deadline')}
+                  style={[
+                    styles.calendarPickerButton,
+                    {
+                      borderColor: theme.colors.border,
+                      backgroundColor: theme.colors.surfaceRaised,
+                    },
+                  ]}
+                  hitSlop={6}
+                >
+                  <AppIcon
+                    name="calendar"
+                    size={20}
+                    color={theme.colors.primary}
+                  />
+                </Pressable>
+              </View>
+              <View style={styles.timeRow}>
+                <View style={styles.flexOne}>
+                  <AppInput
+                    label="Deadline Time (AM/PM MMT)"
+                    value={deadlineTime12}
+                    onChangeText={setDeadlineTime12}
+                    placeholder="06:00"
+                  />
+                </View>
+                <View style={styles.ampmCol}>
+                  <AppText variant="label" color={theme.colors.muted} style={styles.ampmLabel}>
+                    PERIOD
+                  </AppText>
+                  <View
+                    style={[
+                      styles.ampmContainer,
+                      {
+                        borderColor: theme.colors.border,
+                        backgroundColor: theme.colors.surfaceRaised,
+                      },
+                    ]}
+                  >
                     <Pressable
                       accessibilityRole="button"
-                      accessibilityLabel="Open deadline date picker"
-                      onPress={() => setDatePickerTarget('deadline')}
+                      accessibilityLabel="Deadline time AM"
+                      onPress={() => setDeadlinePeriod('AM')}
                       style={[
-                        styles.calendarPickerButton,
-                        {
-                          borderColor: theme.colors.border,
-                          backgroundColor: theme.colors.surfaceRaised,
+                        styles.ampmButton,
+                        deadlinePeriod === 'AM' && {
+                          backgroundColor: theme.colors.primary,
                         },
                       ]}
-                      hitSlop={6}
                     >
-                      <AppIcon
-                        name="calendar"
-                        size={18}
-                        color={theme.colors.primary}
-                      />
+                      <AppText
+                        variant="caption"
+                        weight="bold"
+                        color={deadlinePeriod === 'AM' ? '#FFFFFF' : theme.colors.textSecondary}
+                      >
+                        AM
+                      </AppText>
+                    </Pressable>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Deadline time PM"
+                      onPress={() => setDeadlinePeriod('PM')}
+                      style={[
+                        styles.ampmButton,
+                        deadlinePeriod === 'PM' && {
+                          backgroundColor: theme.colors.primary,
+                        },
+                      ]}
+                    >
+                      <AppText
+                        variant="caption"
+                        weight="bold"
+                        color={deadlinePeriod === 'PM' ? '#FFFFFF' : theme.colors.textSecondary}
+                      >
+                        PM
+                      </AppText>
                     </Pressable>
                   </View>
-                </View>
-
-                <View style={styles.timeCol}>
-                  <AppInput
-                    label="Deadline Time (24h MMT)"
-                    value={deadlineTime}
-                    onChangeText={setDeadlineTime}
-                    placeholder="18:00"
-                  />
                 </View>
               </View>
             </AppCard>
@@ -1309,38 +1514,79 @@ export function CreateEventWizardScreen({
             </AppCard>
           )}
 
-          {/* Stepper Buttons (Previous / Next / Save) */}
-          <View style={styles.actionButtonsRow}>
-            {currentStep > 1 ? (
-              <View style={styles.actionButtonWrap}>
-                <AppButton
-                  label="Previous"
-                  variant="outline"
-                  onPress={handlePrevious}
-                />
-              </View>
-            ) : null}
+          {/* Stepper Buttons (Previous / Next / Save / Publish) */}
+          {currentStep < TOTAL_STEPS ? (
+            <View style={styles.actionButtonsRow}>
+              {currentStep > 1 ? (
+                <View style={styles.actionButtonWrap}>
+                  <AppButton
+                    label="Previous"
+                    variant="outline"
+                    onPress={handlePrevious}
+                  />
+                </View>
+              ) : null}
 
-            <View style={styles.actionButtonWrap}>
-              {currentStep < TOTAL_STEPS ? (
+              <View style={styles.actionButtonWrap}>
                 <AppButton
                   label="Next"
                   variant="primary"
                   onPress={handleNext}
                 />
+              </View>
+            </View>
+          ) : (
+            <View style={styles.step7ButtonsCol}>
+              {isEditMode ? (
+                <View style={styles.actionButtonsRow}>
+                  <View style={styles.actionButtonWrap}>
+                    <AppButton
+                      label="Previous"
+                      variant="outline"
+                      onPress={handlePrevious}
+                    />
+                  </View>
+                  <View style={styles.actionButtonWrap}>
+                    <AppButton
+                      label={repositories.dataMode === 'mock' ? 'Save Changes (Template)' : 'Save Event Changes'}
+                      variant="primary"
+                      loading={isSubmitting || isLoadingExisting}
+                      disabled={isLoadingExisting || existingEventStatus === null}
+                      onPress={() => handleSaveDraft(false)}
+                    />
+                  </View>
+                </View>
               ) : (
-                <AppButton
-                  label={isEditMode
-                    ? repositories.dataMode === 'mock' ? 'Save Changes (Template)' : 'Save Event Changes'
-                    : repositories.dataMode === 'mock' ? 'Save Draft (Template)' : 'Create Draft Event'}
-                  variant="primary"
-                  loading={isSubmitting || isLoadingExisting}
-                  disabled={isLoadingExisting || (isEditMode && existingEventStatus === null)}
-                  onPress={handleSaveDraft}
-                />
+                <View style={styles.newActionsContainer}>
+                  <AppButton
+                    label={repositories.dataMode === 'mock' ? 'Publish Event (Template)' : 'Publish Event'}
+                    variant="primary"
+                    loading={isSubmitting}
+                    disabled={isLoadingExisting}
+                    onPress={() => handleSaveDraft(true)}
+                  />
+                  <View style={styles.actionButtonsRow}>
+                    <View style={styles.actionButtonWrap}>
+                      <AppButton
+                        label="Previous"
+                        variant="outline"
+                        onPress={handlePrevious}
+                      />
+                    </View>
+                    <View style={styles.actionButtonWrap}>
+                      <AppButton
+                        label={repositories.dataMode === 'mock' ? 'Save as Draft (Template)' : 'Save as Draft'}
+                        variant="outline"
+                        loading={isSubmitting}
+                        disabled={isLoadingExisting}
+                        onPress={() => handleSaveDraft(false)}
+                      />
+                    </View>
+                  </View>
+                </View>
               )}
             </View>
-          </View>
+          )}
         </ScreenContainer>
 
         {/* Date Picker Modal */}
@@ -1465,31 +1711,58 @@ const styles = StyleSheet.create({
   deadlineSubhint: {
     marginBottom: 6,
   },
-  dateTimePairRow: {
-    flexDirection: 'row',
-    gap: 10,
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  dateCol: {
-    flex: 1.2,
-  },
-  timeCol: {
-    flex: 0.8,
-  },
-  dateInputWithButton: {
+  dateRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    gap: 6,
+    gap: 8,
+    marginBottom: 10,
+  },
+  timeRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 8,
+    marginBottom: 14,
   },
   calendarPickerButton: {
-    width: 44,
-    height: 44,
+    width: 48,
+    height: 48,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderRadius: 8,
-    marginBottom: 12,
+    borderWidth: 1.5,
+    borderRadius: 12,
+    marginBottom: 0,
+  },
+  ampmCol: {
+    width: 104,
+  },
+  ampmLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    marginBottom: 6,
+  },
+  ampmContainer: {
+    height: 48,
+    flexDirection: 'row',
+    borderWidth: 1.5,
+    borderRadius: 12,
+    padding: 3,
+    alignItems: 'center',
+  },
+  ampmButton: {
+    flex: 1,
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 9,
+  },
+  step7ButtonsCol: {
+    marginTop: 8,
+    marginBottom: 24,
+  },
+  newActionsContainer: {
+    gap: 10,
   },
   flexOne: {
     flex: 1,

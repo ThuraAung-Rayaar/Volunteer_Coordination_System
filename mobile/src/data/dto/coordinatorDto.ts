@@ -124,6 +124,7 @@ export interface EventCreateRequestDto {
   require_onboarding_ack?: boolean;
   qr_registration_enabled?: boolean;
   charity_field_codes?: string[];
+  publish?: boolean;
 }
 
 /**

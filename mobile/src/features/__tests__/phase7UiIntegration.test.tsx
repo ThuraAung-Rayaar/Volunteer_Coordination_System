@@ -221,7 +221,6 @@ describe('Phase 7: Mobile UI Screen Integration & Verification Suite', () => {
       const rootInstance = root!.root;
       await act(async () => {
         rootInstance.findAllByType(AppInput)[0].props.onChangeText('+959111222333');
-        rootInstance.findAllByType(AppInput)[1].props.onChangeText('Volunteer One');
       });
 
       await act(async () => {
@@ -245,7 +244,6 @@ describe('Phase 7: Mobile UI Screen Integration & Verification Suite', () => {
       // Verify verifyTokenizedOtp was called without phone in payload
       expect(mockVerifyTokenizedOtp).toHaveBeenCalledWith({
         code: '123456',
-        displayName: 'Volunteer One',
       });
       expect(mockClearChallenge).toHaveBeenCalled();
       expect(onLoginSuccess).toHaveBeenCalled();

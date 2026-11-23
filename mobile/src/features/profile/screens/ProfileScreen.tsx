@@ -88,7 +88,11 @@ export function ProfileScreen({
 
   useEffect(() => {
     loadData();
-  }, [loadData]);
+    const unsubscribe = navigation?.addListener?.('focus', () => {
+      loadData();
+    });
+    return unsubscribe;
+  }, [loadData, navigation]);
 
   const handleApplyCoordinator = async () => {
     if (!eligibility) {
