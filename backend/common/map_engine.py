@@ -594,7 +594,8 @@ def build_region_mbtiles(
     if not database_path.exists() or database_path.stat().st_size == 0:
         raise ValueError(f"No map tile store exists for region: {region_code}")
 
-    with sqlite3.connect(str(database_path), timeout=30.0) as source:
+    source = sqlite3.connect(str(database_path), timeout=30.0)
+    try:
         rows = source.execute(
             """
             SELECT zoom_level, tile_column, tile_row, tile_data, updated_at
@@ -609,6 +610,8 @@ def build_region_mbtiles(
             ).fetchone()
         except sqlite3.DatabaseError:
             refresh_row = None
+    finally:
+        source.close()
 
     raster_rows = []
     formats = set()
@@ -643,10 +646,13 @@ def build_region_mbtiles(
 
     if pack_path.exists():
         try:
-            with sqlite3.connect(str(pack_path)) as cached:
+            cached = sqlite3.connect(str(pack_path))
+            try:
                 cached_revision = cached.execute(
                     "SELECT value FROM metadata WHERE name = 'source_revision'"
                 ).fetchone()
+            finally:
+                cached.close()
             if cached_revision and cached_revision[0] == revision:
                 return pack_path
         except sqlite3.DatabaseError:
@@ -677,7 +683,8 @@ def build_region_mbtiles(
             "attribution": str(getattr(settings, "MAP_TILE_ATTRIBUTION", "") or ""),
             "source_revision": revision,
         }
-        with sqlite3.connect(str(temp_path), timeout=30.0) as output:
+        output = sqlite3.connect(str(temp_path), timeout=30.0)
+        try:
             output.execute("CREATE TABLE metadata (name TEXT PRIMARY KEY, value TEXT NOT NULL)")
             output.execute(
                 """
@@ -704,6 +711,8 @@ def build_region_mbtiles(
                 ],
             )
             output.commit()
+        finally:
+            output.close()
         os.replace(temp_path, pack_path)
     except Exception:
         try:

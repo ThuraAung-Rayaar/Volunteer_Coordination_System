@@ -17,7 +17,8 @@ class RegionMbtilesExportTests(SimpleTestCase):
         self.output = self.root / "packs"
         png = b"\x89PNG\r\n\x1a\n" + b"raster"
         svg = b"<svg xmlns='http://www.w3.org/2000/svg'></svg>"
-        with sqlite3.connect(self.source) as conn:
+        conn = sqlite3.connect(self.source)
+        try:
             conn.execute("CREATE TABLE metadata (name TEXT PRIMARY KEY, value TEXT)")
             conn.execute(
                 """CREATE TABLE tiles (
@@ -39,6 +40,9 @@ class RegionMbtilesExportTests(SimpleTestCase):
                     (10, 830, 471, png, "mandalay", "2026-11-23T05:00:00+00:00"),
                 ],
             )
+            conn.commit()
+        finally:
+            conn.close()
 
     def tearDown(self):
         self.temp_dir.cleanup()
@@ -46,11 +50,14 @@ class RegionMbtilesExportTests(SimpleTestCase):
     @override_settings(MAP_TILE_OFFLINE_ALLOWED=True, MAP_TILE_ATTRIBUTION="Test attribution")
     def test_exports_region_only_rasters_and_converts_xyz_to_tms(self):
         path = build_region_mbtiles("yangon", source_path=self.source, output_dir=self.output)
-        with sqlite3.connect(path) as conn:
+        conn = sqlite3.connect(path)
+        try:
             rows = conn.execute(
                 "SELECT zoom_level, tile_column, tile_row, tile_data FROM tiles"
             ).fetchall()
             metadata = dict(conn.execute("SELECT name, value FROM metadata").fetchall())
+        finally:
+            conn.close()
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0][:3], (10, 830, (1 << 10) - 1 - 470))
         self.assertTrue(rows[0][3].startswith(b"\x89PNG"))
@@ -64,11 +71,15 @@ class RegionMbtilesExportTests(SimpleTestCase):
 
     @override_settings(MAP_TILE_OFFLINE_ALLOWED=True)
     def test_svg_only_region_is_not_published(self):
-        with sqlite3.connect(self.source) as conn:
+        conn = sqlite3.connect(self.source)
+        try:
             conn.execute("DELETE FROM tiles WHERE region_code='yangon'")
             conn.execute(
                 "INSERT INTO tiles VALUES (?, ?, ?, ?, ?, ?)",
                 (10, 830, 470, b"<svg></svg>", "yangon", "2026-11-23T05:00:00+00:00"),
             )
+            conn.commit()
+        finally:
+            conn.close()
         with self.assertRaisesRegex(ValueError, "No real raster tiles"):
             build_region_mbtiles("yangon", source_path=self.source, output_dir=self.output)
