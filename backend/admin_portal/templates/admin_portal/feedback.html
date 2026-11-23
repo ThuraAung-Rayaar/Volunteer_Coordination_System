@@ -9,7 +9,7 @@
     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl backdrop-blur">
         <div>
             <div class="flex items-center gap-2 mb-1">
-                <span class="p-2 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                <span class="p-2 rounded-xl bg-amber-500/10 text-amber-700 border border-amber-500/20">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
                     </svg>
@@ -32,23 +32,23 @@
         <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-lg backdrop-blur">
             <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Average Score</span>
             <div class="flex items-baseline gap-1.5">
-                <span class="text-2xl font-black text-amber-400">{{ analytics.avg_score }}</span>
+                <span class="text-2xl font-black text-amber-600">{{ analytics.avg_score }}</span>
                 <span class="text-xs text-slate-500 font-medium">/ 5.0</span>
             </div>
-            <span class="text-[10px] text-amber-400/80 block mt-1 font-mono">★★★★★</span>
+            <span class="text-[10px] text-amber-500 block mt-1 font-mono">★★★★★</span>
         </div>
 
         <!-- Metric 2: Active Reviews -->
         <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-lg backdrop-blur">
             <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Active Reviews</span>
-            <span class="text-2xl font-black text-emerald-400">{{ analytics.total_active }}</span>
+            <span class="text-2xl font-black text-emerald-700">{{ analytics.total_active }}</span>
             <span class="text-[10px] text-slate-500 block mt-1">Live in community</span>
         </div>
 
         <!-- Metric 3: Hidden Reviews -->
         <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-lg backdrop-blur">
             <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Hidden Reviews</span>
-            <span class="text-2xl font-black text-rose-400">{{ analytics.total_hidden }}</span>
+            <span class="text-2xl font-black text-rose-700">{{ analytics.total_hidden }}</span>
             <span class="text-[10px] text-slate-500 block mt-1">Suppressed by admin</span>
         </div>
 
@@ -56,15 +56,15 @@
         <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-lg backdrop-blur">
             <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Low-Score Alerts</span>
             <div class="flex items-baseline gap-1.5">
-                <span class="text-2xl font-black text-rose-400">{{ analytics.low_score_count }}</span>
-                <span class="text-[10px] font-mono text-rose-400/70">≤ 2★</span>
+                <span class="text-2xl font-black text-rose-700">{{ analytics.low_score_count }}</span>
+                <span class="text-[10px] font-mono text-rose-700/70">≤ 2★</span>
             </div>
             <span class="text-[10px] text-slate-500 block mt-1">Grievance alerts</span>
         </div>
 
         <!-- Direction 1: Volunteer -> Event -->
         <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-lg backdrop-blur">
-            <span class="text-[10px] font-bold uppercase tracking-wider text-blue-400 block mb-1">Vol → Event</span>
+            <span class="text-[10px] font-bold uppercase tracking-wider text-blue-600 block mb-1">Vol → Event</span>
             <div class="flex items-baseline gap-1.5">
                 <span class="text-xl font-black text-white">{{ analytics.by_direction.volunteer_to_event.avg_score }}</span>
                 <span class="text-[10px] text-slate-400 font-mono">({{ analytics.by_direction.volunteer_to_event.count }})</span>
@@ -74,7 +74,7 @@
 
         <!-- Direction 2: Volunteer -> Coordinator -->
         <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-lg backdrop-blur">
-            <span class="text-[10px] font-bold uppercase tracking-wider text-purple-400 block mb-1">Vol → Coord</span>
+            <span class="text-[10px] font-bold uppercase tracking-wider text-indigo-700 block mb-1">Vol → Coord</span>
             <div class="flex items-baseline gap-1.5">
                 <span class="text-xl font-black text-white">{{ analytics.by_direction.volunteer_to_coordinator.avg_score }}</span>
                 <span class="text-[10px] text-slate-400 font-mono">({{ analytics.by_direction.volunteer_to_coordinator.count }})</span>
@@ -84,7 +84,7 @@
 
         <!-- Direction 3: Coordinator -> Volunteer -->
         <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-lg backdrop-blur">
-            <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-400 block mb-1">Coord → Vol</span>
+            <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-700 block mb-1">Coord → Vol</span>
             <div class="flex items-baseline gap-1.5">
                 <span class="text-xl font-black text-white">{{ analytics.by_direction.coordinator_to_volunteer.avg_score }}</span>
                 <span class="text-[10px] text-slate-400 font-mono">({{ analytics.by_direction.coordinator_to_volunteer.count }})</span>
@@ -154,7 +154,7 @@
                 <button type="submit" class="flex-1 px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs rounded-xl transition shadow-md shadow-blue-900/20 cursor-pointer">
                     Filter
                 </button>
-                <a href="/api/v1/admin/ui/feedback/" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 rounded-xl text-xs font-semibold border border-slate-700 transition">
+                <a href="/api/v1/admin/ui/feedback/" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold border border-slate-700 transition">
                     Reset
                 </a>
             </div>
@@ -173,7 +173,7 @@
 
         <div class="overflow-x-auto">
             <table class="w-full text-left text-xs text-slate-300">
-                <thead class="bg-slate-950/80 text-[10px] uppercase font-bold text-slate-400 tracking-wider border-b border-slate-800">
+                <thead class="bg-slate-800/60 text-[10px] uppercase font-bold text-slate-400 tracking-wider border-b border-slate-700">
                     <tr>
                         <th class="px-5 py-3">ID & Event</th>
                         <th class="px-5 py-3">Direction</th>
@@ -197,9 +197,9 @@
                         <!-- Direction Badge -->
                         <td class="px-5 py-4">
                             <span class="inline-block px-2.5 py-1 rounded-full text-[10px] font-mono font-bold
-                                {% if fb.direction == 'volunteer_to_event' %}bg-blue-500/10 text-blue-400 border border-blue-500/20
-                                {% elif fb.direction == 'volunteer_to_coordinator' %}bg-purple-500/10 text-purple-400 border border-purple-500/20
-                                {% else %}bg-emerald-500/10 text-emerald-400 border border-emerald-500/20{% endif %}">
+                                {% if fb.direction == 'volunteer_to_event' %}bg-blue-500/10 text-blue-600 border border-blue-500/20
+                                {% elif fb.direction == 'volunteer_to_coordinator' %}bg-indigo-500/10 text-indigo-700 border border-indigo-500/20
+                                {% else %}bg-emerald-500/10 text-emerald-700 border border-emerald-500/20{% endif %}">
                                 {{ fb.direction }}
                             </span>
                         </td>
@@ -209,7 +209,7 @@
                             <div class="space-y-1">
                                 <div>
                                     <span class="text-[10px] uppercase text-slate-500 font-bold block">Rater:</span>
-                                    <a href="/api/v1/admin/ui/users/?user_id={{ fb.rater_user_id }}" class="text-white hover:text-blue-400 font-semibold hover:underline">
+                                    <a href="/api/v1/admin/ui/users/?user_id={{ fb.rater_user_id }}" class="text-white hover:text-blue-600 font-semibold hover:underline">
                                         {{ fb.rater_user.display_name }}
                                     </a>
                                     <span class="font-mono text-[10px] text-slate-500">#{{ fb.rater_user_id }}</span>
@@ -217,7 +217,7 @@
                                 {% if fb.target_user %}
                                 <div>
                                     <span class="text-[10px] uppercase text-slate-500 font-bold block">Target:</span>
-                                    <a href="/api/v1/admin/ui/users/?user_id={{ fb.target_user_id }}" class="text-slate-300 hover:text-blue-400 font-semibold hover:underline">
+                                    <a href="/api/v1/admin/ui/users/?user_id={{ fb.target_user_id }}" class="text-slate-300 hover:text-blue-600 font-semibold hover:underline">
                                         {{ fb.target_user.display_name }}
                                     </a>
                                     <span class="font-mono text-[10px] text-slate-500">#{{ fb.target_user_id }}</span>
@@ -231,11 +231,11 @@
                         <!-- Score & Visual Stars -->
                         <td class="px-5 py-4">
                             <div class="flex items-center gap-1 font-bold text-sm
-                                {% if fb.score >= 4 %}text-emerald-400{% elif fb.score == 3 %}text-amber-400{% else %}text-rose-400{% endif %}">
+                                {% if fb.score >= 4 %}text-emerald-700{% elif fb.score == 3 %}text-amber-700{% else %}text-rose-700{% endif %}">
                                 <span>★ {{ fb.score }}</span>
                                 <span class="text-[11px] text-slate-500 font-normal">/ 5</span>
                             </div>
-                            <div class="text-[10px] text-amber-400/90 font-mono tracking-widest mt-0.5">
+                            <div class="text-[10px] text-amber-500 font-mono tracking-widest mt-0.5">
                                 {% if fb.score == 5 %}★★★★★
                                 {% elif fb.score == 4 %}★★★★☆
                                 {% elif fb.score == 3 %}★★★☆☆
@@ -247,7 +247,7 @@
 
                         <!-- Comment & Tags -->
                         <td class="px-5 py-4 max-w-sm">
-                            <p class="text-xs text-slate-200 bg-slate-950/70 p-2.5 rounded-xl border border-slate-800/80 mb-2 italic">
+                            <p class="text-xs text-slate-200 bg-slate-800/40 p-2.5 rounded-xl border border-slate-700/60 mb-2 italic">
                                 "{{ fb.comment|default:"No comment text submitted." }}"
                             </p>
                             {% if fb.tags %}
@@ -264,8 +264,8 @@
                         <!-- Status & Date -->
                         <td class="px-5 py-4 font-mono text-[11px]">
                             <span class="px-2.5 py-1 rounded-full text-[10px] font-bold block w-fit
-                                {% if fb.status == 'active' %}bg-emerald-500/10 text-emerald-400 border border-emerald-500/30
-                                {% else %}bg-rose-500/10 text-rose-400 border border-rose-500/30{% endif %}">
+                                {% if fb.status == 'active' %}bg-emerald-500/10 text-emerald-700 border border-emerald-500/30
+                                {% else %}bg-rose-500/10 text-rose-700 border border-rose-500/30{% endif %}">
                                 {{ fb.status|upper }}
                             </span>
                             <span class="text-slate-400 block mt-1.5 text-[10px]">{{ fb.created_at|date:"Y-m-d H:i" }}</span>

@@ -1,5 +1,5 @@
 # Mobile Client Analysis — Volunteer HR Management System
-> **Generated:** 2026-11-15 | **Updated:** 2026-11-22 | **Target folder:** `python_stack/mobile/` | **Stack:** React Native 0.88.1 / React 19.3 / TypeScript 6.0 | **Version:** v0.12.0 Stabilization (Verified & Complete)
+> **Generated:** 2026-11-15 | **Updated:** 2026-11-23 | **Target folder:** `python_stack/mobile/` | **Stack:** React Native 0.88.1 / React 19.3 / TypeScript 6.0 | **Version:** v0.12.2 Stabilization (Session Signed Off & Verified)
 
 ---
 
@@ -49,7 +49,8 @@ As of version **v0.11.1**, the mobile application achieves **100% role capabilit
 - **Tokenization Authentication Integration:** Full architecture and migration specification established in [tokenization_login_architecture.md](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/docs/tokenization_login_architecture.md) for zero-cleartext phone transmission, ephemeral session-token approval, and sub-500ms latency compliance.
 - **Quality Assurance & Verification:** **100% Clean.**
   - **Static Typecheck (`npx tsc --noEmit`):** 0 errors.
-  - **Automated Test Suite (`jest`):** **36 test suites, 588 tests passing (100%)**, including the comprehensive 82-capability parity suite (`v0_11_0_capabilityParityE2E.test.ts`), location providers, domain use cases, Phase D2 mobile contracts (`phaseD2MobileContracts.test.ts`), and 14-scenario real-HTTP integration suite (`v0_12_0_realHttpIntegration.test.ts`).
+  - **Automated Test Suite (`jest`):** **39 test suites, 621 tests passing (100%)**, including the comprehensive 82-capability parity suite (`v0_11_0_capabilityParityE2E.test.ts`), location providers, domain use cases, Volunteer Workspace integration suite (`VolunteerWorkspace.test.tsx`), Phase D2 mobile contracts (`phaseD2MobileContracts.test.ts`), and 14-scenario real-HTTP integration suite (`v0_12_0_realHttpIntegration.test.ts`).
+  - **Hardware Testing & Verification:** Samsung Galaxy (`RFCR71P2BKE`) live verification via dual ADB reverse tunnels (`8000`/`8081`), front-camera selfie enforcement, and persistent side-menu drawer access across all tabs.
   - **Platform Build Verification:** Gradle 9.4.1 + Java 21 build scripts compile cleanly (`BUILD SUCCESSFUL in 21s`).
 
 ---
@@ -230,6 +231,9 @@ All primitives are located in `shared/components/` and previewable via `Componen
 | `RatingSummary` | Star indicator + count | Displays aggregate star rating averages while adhering to privacy rules. |
 | `DatePickerModal` | Date / Time picker | Modal sheet for selecting dates and time slots. |
 | `ScreenContainer` | `scroll?: boolean`, safe area insets | Screen wrapper handling status bar/notch padding and background color. |
+| `CoordinatorDynamicIsland` | `activeTab`, `pending`, `accepted`, `checkedIn` | Floating capsule navigation island at bottom of Coordinator screens with badge counters. |
+| `VolunteerDynamicIsland` | `activeTab`, `onTabPress` | Floating capsule navigation island at bottom of Volunteer Workspace with Applications & Assignments tabs. |
+| `CoordinatorSwipeWrapper` | `currentTab`, `navigation`, swipe gesture | Native pan responder enabling horizontal swiping between Coordinator operational tabs. |
 
 ---
 
@@ -321,8 +325,12 @@ The domain models in `src/domain/models/` enforce core architectural and privacy
   - Volunteer Application Modal allowing volunteers to write a note and submit an application for a specific post.
 
 ### 8.3 Volunteer Applications & Assignments (`features/events/`)
-- **My Applications Screen:** Filter tabs (*All*, *Pending*, *Accepted*, *Waitlisted*, *Rejected*). Allows volunteers to withdraw active applications.
-- **My Assignments Screen:** Shows scheduled and confirmed shifts, event details, attendance confirmation status, and past verified volunteer hours.
+- **Volunteer Workspace Screen (`VolunteerWorkspaceScreen.tsx`):**
+  - Unified volunteer hub integrating *My Applications* and *My Assignments* inside a smooth horizontal paging container (`ScrollView horizontal pagingEnabled`).
+  - **Volunteer Floating Dynamic Island (`VolunteerDynamicIsland.tsx`):** Bottom-anchored dark navy glass pill (`#0F172A`, radius 32, elevation 12) featuring `Applications` (icon: `check`) and `Assignments` (icon: `brief`) tabs. Tapping or swiping synchronizes active tab highlights with smooth scroll navigation.
+  - **Withdrawal Failure & Ineligible State Handling:** If an application withdrawal fails, the confirmation modal is dismissed immediately, surfacing clear error feedback. For ineligible applications or completed events, withdrawal buttons are cleanly greyed out (`disabled={!canWithdraw}`).
+  - **Ended Event State Rules:** If an event has ended/completed, the status badge reflects `ENDED`, all action/apply buttons are disabled, while preserving full read-only access to event details.
+  - **List View Padding Parity:** Child FlatLists in `MyApplicationsScreen` and `MyAssignmentsScreen` apply `paddingBottom: 88` so bottom-most cards are never covered by the floating dynamic island.
 
 ### 8.4 Profile, Availability & Verification (`features/profile/`)
 - **Profile Screen:**
@@ -335,13 +343,23 @@ The domain models in `src/domain/models/` enforce core architectural and privacy
 - **Availability Screen:**
   - **Weekly Recurring Schedule:** Monday through Sunday rule toggles with custom start/end time slots.
   - **Date Exceptions & Blackouts:** Add specific calendar blackout dates where the volunteer is unavailable.
-- **Verification & Coordinator Status Screen:**
-  - Document & Selfie upload slots (*Selfie*, *ID / License*, *Driver's License*).
+- **Verification & Coordinator Status Screen (`VerificationCoordinatorStatusScreen.tsx`):**
+  - **Strict Front-Camera Selfie Enforcement:** Verification selfie captures strictly invoke native front-facing camera optics via Android intent extras (`USE_FRONT_CAMERA: true`, `CAMERA_FACING: 1`, `LENS_FACING_FRONT: 1`). Gallery photo selection is disabled for selfie slots to prevent pre-recorded identity spoofing.
+  - Document & ID slots (*ID / License*, *Driver's License*) allow verified camera capture.
   - Live verification status pill (`None`, `Pending`, `Verified`, `Rejected`).
   - Coordinator application submission section with motivation/qualification note.
 
 ### 8.5 Coordinator Workspace & Operations (`features/coordinator/`)
 - **Coordinator Overview Screen:** Live metric cards (*Total Events*, *Active Events*, *Drafts*, *Pending Applications*, *Accepted Applicants*, *Checked In Today*).
+- **Coordinator Dynamic Island (`CoordinatorDynamicIsland.tsx`):** Bottom floating capsule navigation supporting *Dashboard*, *Applications*, *Assignments*, and *Attendance* tabs with live badge counters.
+- **Horizontal Swipe Navigation (`CoordinatorSwipeWrapper.tsx`):** Allows coordinators to swipe left/right across all operational tabs.
+- **Persistent Side Menu Accessibility (`AppHeader.tsx`):**
+  - Unconditionally renders `onMenuPress` (the `[ ☰ ]` side menu button) across all operational tabs so the side drawer remains 100% accessible.
+  - Only displays `<` (back) button alongside `[ ☰ ]` when inside an active event detail (`selectedEventId` is truthy). Swiping across tabs never replaces the hamburger menu with a back button.
+- **Multi-Event Card Selection Page:**
+  - Operational tabs (`CoordinatorApplicationsScreen`, `CoordinatorAssignmentsScreen`, `CoordinatorAttendanceScreen`) present an active event card picker view when `!selectedEventId`.
+  - Filters out ended, completed, and cancelled events from operational lists.
+  - Tapping an event enters its management view; tapping the header back button or `Switch Event` returns to the active event picker.
 - **Coordinator Events Screen:** Lists events with status pills (`draft`, `published`, `active`, `completed`, `cancelled`, `monitor`). Quick filter bar.
 - **Create Event Wizard Screen (`CreateEventWizardScreen.tsx` - 1,369 lines):**
   - **7-step guided workflow:**
@@ -524,6 +542,7 @@ The mobile test suite is located in `mobile/__tests__/` and `mobile/src/`:
 | `data/__tests__/v0_11_0_capabilityParityE2E.test.ts` | Capability E2E | Cross-role 82-capability parity verification |
 | `data/__tests__/v0_12_0_realHttpIntegration.test.ts` | Real-HTTP E2E | Live backend HTTP integration gate without mock stubs (14/14 scenarios passing) |
 | `domain/usecases/__tests__/capabilityUseCases.test.ts` | Domain / Use Cases | Pure domain action handlers (43 volunteer + 39 coordinator) |
+| `features/events/__tests__/VolunteerWorkspace.test.tsx` | Feature UI | Volunteer Dynamic Island tabs, tab press actions, workspace integration |
 
 ---
 
@@ -545,6 +564,7 @@ The integration between the mobile client and the Django BFF was executed across
 | **Phase 9** | Stabilization & Release Readiness | Dev diagnostics, session cache hygiene, 14-step E2E lifecycle test | ✅ COMPLETE |
 | **Phase 10 (v0.11.1)** | 82-Capability Role Parity & Use Cases | Domain Use Cases (`volunteerUseCases`, `coordinatorUseCases`), `locationProvider`, 32 test suites (511 tests) | ✅ COMPLETE |
 | **Phase 11 (v0.12.0)** | Tokenized Challenge Handshake & Real-HTTP Suite | Two-step tokenized OTP handshake (`auth_session_token`), canonical check-in routing, 36 test suites (588 tests), and live real HTTP integration suite (`v0_12_0_realHttpIntegration.test.ts` 14/14 passed) | ✅ COMPLETE |
+| **Phase 12 (v0.12.2)** | Mobile UX, Hardware Integration & Session Sign-Off | `VolunteerDynamicIsland` and `CoordinatorDynamicIsland`, permanent drawer menu access across tabs (`AppHeader`), front-camera selfie verification, multi-event card picker, ended event rules, 39 test suites (621 tests passing) | ✅ COMPLETE |
 
 ### ✅ Completed v0.12.0 Stabilization Milestones (Phases A–E)
 As specified in [V0_12_0_STABILIZATION_MASTER_PLAN.md](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/reference/V0_12_0_STABILIZATION_MASTER_PLAN.md) and verified on candidate Git SHA `99db25a7ba26d26ad5d803e028ce405b827e926d`:

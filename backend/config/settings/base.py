@@ -45,6 +45,15 @@ CARTO_API_KEY = os.getenv(
     'CARTO_API_KEY',
     'cb1_5490_1_395a9eafc491da9c508bf094'
 )
+MAP_TILE_URL_TEMPLATE = os.getenv(
+    'MAP_TILE_URL_TEMPLATE',
+    'https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png'
+)
+MAP_TILE_ATTRIBUTION = os.getenv(
+    'MAP_TILE_ATTRIBUTION',
+    '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+)
+MAP_TILE_OFFLINE_ALLOWED = os.getenv('MAP_TILE_OFFLINE_ALLOWED', 'true').lower() in ('true', '1')
 
 # External SMS / Network OTP Delivery Settings (Section 4.2)
 OTP_DELIVERY_PROVIDER = os.getenv('OTP_DELIVERY_PROVIDER', 'console')

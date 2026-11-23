@@ -9,16 +9,16 @@
     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
             <h1 class="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-                <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                 Real-Time Geofence Attendance Monitoring
             </h1>
             <p class="text-xs text-slate-400 mt-0.5">Live inspection of GPS check-in fixes, geofence breaches, and anti-spoofing flags</p>
         </div>
         <div class="flex items-center gap-2.5">
-            <span class="px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-400 text-xs font-mono font-semibold">
+            <span class="px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-600 text-xs font-mono font-semibold">
                 {{ geo_attempts|length }} attempts logged
             </span>
-            <span class="px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-mono font-semibold">
+            <span class="px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 text-xs font-mono font-semibold">
                 {{ active_events|length }} active events
             </span>
         </div>
@@ -28,16 +28,16 @@
     <section class="bg-slate-900/90 border border-slate-800 rounded-2xl shadow-xl overflow-hidden">
         <div class="px-5 py-3 border-b border-slate-800 flex items-center justify-between bg-slate-900">
             <div class="flex items-center gap-2">
-                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                 <h2 class="text-xs font-bold uppercase tracking-wider text-slate-300">Live GPS Fixes & Event Perimeter Telemetry</h2>
             </div>
             <div class="flex items-center gap-3 text-[11px] font-mono text-slate-400">
-                <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-emerald-400"></span>Accepted</span>
-                <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-rose-400"></span>Breach / Mock</span>
-                <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-amber-400"></span>Pending</span>
+                <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-emerald-500"></span>Accepted</span>
+                <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-rose-500"></span>Breach / Mock</span>
+                <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-amber-500"></span>Pending</span>
             </div>
         </div>
-        <div id="monitoring-map" class="h-80 w-full bg-slate-950"></div>
+        <div id="monitoring-map" class="h-80 w-full bg-slate-800/30"></div>
     </section>
 
     <!-- Geo Attempts Log Table -->
@@ -53,7 +53,7 @@
         </div>
         <div class="overflow-x-auto">
             <table class="w-full text-left text-xs text-slate-300">
-                <thead class="bg-slate-950/80 uppercase font-semibold text-slate-400 border-b border-slate-800 text-[10px]">
+                <thead class="bg-slate-800/60 uppercase font-semibold text-slate-400 border-b border-slate-700 text-[10px]">
                     <tr>
                         <th class="px-5 py-3">Volunteer</th>
                         <th class="px-5 py-3">Event</th>
@@ -80,26 +80,26 @@
                         </td>
                         <td class="px-5 py-3">
                             {% if att.result == 'accepted' %}
-                            <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                            <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-700 border border-emerald-500/30">
                                 Accepted
                             </span>
                             {% elif att.result == 'outside_geofence' %}
-                            <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/30">
+                            <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-rose-500/10 text-rose-700 border border-rose-500/30">
                                 Outside Fence
                             </span>
                             {% elif att.result == 'mock_location' %}
-                            <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/40">
+                            <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-rose-500/20 text-rose-700 border border-rose-500/40">
                                 Mock Location
                             </span>
                             {% else %}
-                            <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/30">
+                            <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-500/10 text-amber-700 border border-amber-500/30">
                                 {{ att.result }}
                             </span>
                             {% endif %}
                         </td>
                         <td class="px-5 py-3 text-center">
                             {% if att.device_mocked %}
-                            <span class="text-rose-400 font-bold text-xs" title="Mock Location Flagged">⚠️ MOCKED</span>
+                            <span class="text-rose-700 font-bold text-xs" title="Mock Location Flagged">⚠️ MOCKED</span>
                             {% else %}
                             <span class="text-slate-500 text-xs">Clean</span>
                             {% endif %}
@@ -155,7 +155,7 @@ document.addEventListener("DOMContentLoaded", function () {
             fillOpacity: isActive ? 0.25 : 0.15,
             weight: 2
         }).addTo(map).bindPopup(`
-            <div style="font-family: inherit; font-size: 12px; color: #0f172a;">
+            <div style="font-family: inherit; font-size: 12px; color: #0E1A33;">
                 <strong>${ev.title}</strong>
                 <div>⭕ Geofence: ${ev.geo_radius_m || 150}m</div>
             </div>
@@ -176,7 +176,7 @@ document.addEventListener("DOMContentLoaded", function () {
             fillOpacity: 0.9,
             weight: 2
         }).addTo(map).bindPopup(`
-            <div style="font-family: inherit; font-size: 11px; color: #0f172a;">
+            <div style="font-family: inherit; font-size: 11px; color: #0E1A33;">
                 <strong>${att.display_name}</strong>
                 <div>Result: ${att.result}</div>
                 <div>Distance: ${att.distance_m}m</div>
