@@ -124,7 +124,7 @@ export class NativeDeviceLocationProvider implements LocationProvider {
           return 'unavailable';
         }
       }
-      return 'granted';
+      return 'unavailable';
     }
 
     return 'unavailable';
@@ -148,15 +148,38 @@ export class NativeDeviceLocationProvider implements LocationProvider {
       geo.getCurrentPosition(
         (position: any) => {
           if (!position || !position.coords) {
-            reject(new Error('Invalid GPS fix received from device.'));
+            reject(new Error('Invalid GPS fix received from device: Missing coordinates.'));
             return;
           }
+          const lat = position.coords.latitude;
+          const lng = position.coords.longitude;
+          const acc = position.coords.accuracy ?? null;
+          const timestamp = position.timestamp || Date.now();
+
+          // Reject invalid coordinates
+          if (typeof lat !== 'number' || typeof lng !== 'number' || Number.isNaN(lat) || Number.isNaN(lng)) {
+            reject(new Error('Invalid GPS coordinates received from device.'));
+            return;
+          }
+          if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+            reject(new Error(`GPS coordinates out of geographical range: (${lat}, ${lng}).`));
+            return;
+          }
+
+          // Detect mocked location truthfully across Android and iOS
+          const isMocked =
+            typeof position.mocked === 'boolean'
+              ? position.mocked
+              : typeof position.coords.mocked === 'boolean'
+              ? position.coords.mocked
+              : false;
+
           resolve({
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-            accuracyM: position.coords.accuracy ?? null,
-            capturedAt: new Date(position.timestamp || Date.now()).toISOString(),
-            isMocked: Boolean(position.mocked),
+            latitude: lat,
+            longitude: lng,
+            accuracyM: acc,
+            capturedAt: new Date(timestamp).toISOString(),
+            isMocked,
           });
         },
         (error: any) => {
