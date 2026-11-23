@@ -7,30 +7,6 @@
 
     <!-- Tailwind CSS (CDN) -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        slate: {
-                            50: '#FAF4E8',
-                            100: '#FFFDF8',
-                            200: '#0E1A33',
-                            300: '#56607A',
-                            400: '#56607A',
-                            500: '#8E92A0',
-                            600: '#56607A',
-                            700: '#E7DCC4',
-                            800: '#E7DCC4',
-                            850: '#F3EAD8',
-                            900: '#FFFDF8',
-                            950: '#FAF4E8',
-                        }
-                    }
-                }
-            }
-        }
-    </script>
 
     <!-- Leaflet 1.9.4 CSS & JS (CDN) -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
@@ -55,6 +31,27 @@
             background: var(--vcs-bg) !important;
             color: var(--vcs-text) !important;
         }
+
+        .admin-shell .bg-slate-950 { background-color: var(--vcs-bg) !important; }
+        .admin-shell .bg-slate-900,
+        .admin-shell .bg-slate-900\/90,
+        .admin-shell .bg-slate-900\/80 { background-color: var(--vcs-surface) !important; }
+        .admin-shell .bg-slate-800,
+        .admin-shell .bg-slate-800\/60,
+        .admin-shell .bg-slate-800\/40 { background-color: var(--vcs-surface-raised) !important; }
+        .admin-shell .text-slate-100,
+        .admin-shell .text-slate-200 { color: var(--vcs-text) !important; }
+        .admin-shell .text-slate-300,
+        .admin-shell .text-slate-400 { color: var(--vcs-text-muted) !important; }
+        .admin-shell .text-slate-500,
+        .admin-shell .text-slate-600 { color: #737C91 !important; }
+        .admin-shell [class*="border-slate-700"],
+        .admin-shell [class*="border-slate-800"],
+        .admin-shell [class*="divide-slate-800"] > :not([hidden]) ~ :not([hidden]) {
+            border-color: var(--vcs-border) !important;
+        }
+        .admin-shell main .bg-slate-800.text-white,
+        .admin-shell main .hover\\:bg-slate-700:hover { color: var(--vcs-text) !important; }
         .admin-shell header {
             background: rgba(255, 253, 248, 0.96) !important;
             border-color: var(--vcs-border) !important;
