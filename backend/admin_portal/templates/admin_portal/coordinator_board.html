@@ -9,7 +9,7 @@
     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl backdrop-blur">
         <div>
             <div class="flex items-center gap-2 mb-1">
-                <span class="p-2 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                <span class="p-2 rounded-xl bg-indigo-500/10 text-indigo-600 border border-indigo-500/20">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                     </svg>
@@ -20,20 +20,20 @@
         </div>
 
         <div class="flex flex-wrap items-center gap-2.5">
-            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-semibold shadow-sm">
-                <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-700 text-xs font-semibold shadow-sm">
+                <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
                 {{ pending_coordinators|length }} Pending Review
             </span>
-            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold shadow-sm">
-                <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 text-xs font-semibold shadow-sm">
+                <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
                 {{ approved_coordinators|length }} Active Approved
             </span>
-            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-semibold shadow-sm">
-                <span class="w-2 h-2 rounded-full bg-rose-400"></span>
+            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-700 text-xs font-semibold shadow-sm">
+                <span class="w-2 h-2 rounded-full bg-rose-500"></span>
                 {{ suspended_coordinators|length }} Suspended / Revoked
             </span>
-            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-400 text-xs font-semibold shadow-sm">
-                <span class="w-2 h-2 rounded-full bg-purple-400"></span>
+            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-500/10 border border-purple-500/30 text-indigo-700 text-xs font-semibold shadow-sm">
+                <span class="w-2 h-2 rounded-full bg-indigo-500"></span>
                 {{ complaints_and_alerts|length }} Low-Score Alerts
             </span>
         </div>
@@ -43,19 +43,19 @@
     <section class="bg-slate-900/90 border border-slate-800 rounded-2xl shadow-xl overflow-hidden backdrop-blur">
         <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
             <div class="flex items-center gap-3">
-                <div class="w-2.5 h-2.5 rounded-full bg-amber-400"></div>
+                <div class="w-2.5 h-2.5 rounded-full bg-amber-500"></div>
                 <div>
                     <h2 class="text-sm font-bold text-white uppercase tracking-wider">Pending Coordinator Applications</h2>
                     <p class="text-xs text-slate-400">Candidates awaiting administrative evaluation and credential issuance</p>
                 </div>
             </div>
-            <span class="text-xs font-bold px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+            <span class="text-xs font-bold px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-700 border border-amber-500/20">
                 {{ pending_coordinators|length }} Pending
             </span>
         </div>
         <div class="overflow-x-auto">
             <table class="w-full text-left text-xs text-slate-300">
-                <thead class="bg-slate-950/80 text-[10px] uppercase font-bold text-slate-400 tracking-wider border-b border-slate-800">
+                <thead class="bg-slate-800/60 text-[10px] uppercase font-bold text-slate-400 tracking-wider border-b border-slate-700">
                     <tr>
                         <th class="px-6 py-3">Applicant Name & ID</th>
                         <th class="px-6 py-3">Verification Tier</th>
@@ -73,9 +73,9 @@
                         </td>
                         <td class="px-6 py-4">
                             {% if cand.user__verification_status == 'verified' %}
-                            <span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">Verified</span>
+                            <span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-700 border border-emerald-500/30">Verified</span>
                             {% else %}
-                            <span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30">{{ cand.user__verification_status|upper }}</span>
+                            <span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-700 border border-amber-500/30">{{ cand.user__verification_status|upper }}</span>
                             {% endif %}
                         </td>
                         <td class="px-6 py-4 text-slate-300 max-w-sm">{{ cand.notes|default:"No notes provided." }}</td>
@@ -115,19 +115,19 @@
     <section class="bg-slate-900/90 border border-slate-800 rounded-2xl shadow-xl overflow-hidden backdrop-blur">
         <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
             <div class="flex items-center gap-3">
-                <div class="w-2.5 h-2.5 rounded-full bg-emerald-400"></div>
+                <div class="w-2.5 h-2.5 rounded-full bg-emerald-500"></div>
                 <div>
                     <h2 class="text-sm font-bold text-white uppercase tracking-wider">Active & Approved Coordinators Roster</h2>
                     <p class="text-xs text-slate-400">Authorized personnel who can own, manage, and supervise operational charity events</p>
                 </div>
             </div>
-            <span class="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            <span class="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-700 border border-emerald-500/20">
                 {{ approved_coordinators|length }} Active
             </span>
         </div>
         <div class="overflow-x-auto">
             <table class="w-full text-left text-xs text-slate-300">
-                <thead class="bg-slate-950/80 text-[10px] uppercase font-bold text-slate-400 tracking-wider border-b border-slate-800">
+                <thead class="bg-slate-800/60 text-[10px] uppercase font-bold text-slate-400 tracking-wider border-b border-slate-700">
                     <tr>
                         <th class="px-6 py-3">Coordinator</th>
                         <th class="px-6 py-3">Verification Tier</th>
@@ -144,10 +144,10 @@
                             <span class="font-mono text-[11px] text-slate-400">User ID #{{ coord.user_id }}</span>
                         </td>
                         <td class="px-6 py-4">
-                            <span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">Verified</span>
+                            <span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-700 border border-emerald-500/30">Verified</span>
                         </td>
                         <td class="px-6 py-4">
-                            <span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Approved</span>
+                            <span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-700 border border-emerald-500/20">Approved</span>
                         </td>
                         <td class="px-6 py-4">
                             <span class="font-mono text-slate-300 block">Admin #{{ coord.approved_by_id|default:"1" }}</span>
@@ -155,14 +155,14 @@
                         </td>
                         <td class="px-6 py-4 text-right">
                             <div class="flex items-center justify-end gap-2">
-                                <a href="/api/v1/admin/ui/users/?user_id={{ coord.user_id }}" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold border border-slate-700 transition">
+                                <a href="/api/v1/admin/ui/users/?user_id={{ coord.user_id }}" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-semibold transition">
                                     Inspect Details
                                 </a>
                                 <form method="POST" action="" class="inline" onsubmit="return confirm('Suspend Coordinator #{{ coord.user_id }}?');">
                                     {% csrf_token %}
                                     <input type="hidden" name="action" value="suspend_coordinator">
                                     <input type="hidden" name="target_user_id" value="{{ coord.user_id }}">
-                                    <button type="submit" class="px-2.5 py-1.5 bg-amber-600/80 hover:bg-amber-500 text-white rounded-xl text-xs font-bold transition shadow-sm cursor-pointer">
+                                    <button type="submit" class="px-2.5 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold transition shadow-sm cursor-pointer">
                                         Suspend
                                     </button>
                                 </form>
@@ -170,7 +170,7 @@
                                     {% csrf_token %}
                                     <input type="hidden" name="action" value="revoke_coordinator">
                                     <input type="hidden" name="target_user_id" value="{{ coord.user_id }}">
-                                    <button type="submit" class="px-2.5 py-1.5 bg-rose-600/80 hover:bg-rose-500 text-white rounded-xl text-xs font-bold transition shadow-sm cursor-pointer">
+                                    <button type="submit" class="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold transition shadow-sm cursor-pointer">
                                         Revoke
                                     </button>
                                 </form>
@@ -198,13 +198,13 @@
                     <p class="text-xs text-slate-400">Coordinators currently prohibited from event ownership</p>
                 </div>
             </div>
-            <span class="text-xs font-bold px-2.5 py-1 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20">
+            <span class="text-xs font-bold px-2.5 py-1 rounded-full bg-rose-500/10 text-rose-700 border border-rose-500/20">
                 {{ suspended_coordinators|length }} Sanctioned
             </span>
         </div>
         <div class="overflow-x-auto">
             <table class="w-full text-left text-xs text-slate-300">
-                <thead class="bg-slate-950/80 text-[10px] uppercase font-bold text-slate-400 tracking-wider border-b border-slate-800">
+                <thead class="bg-slate-800/60 text-[10px] uppercase font-bold text-slate-400 tracking-wider border-b border-slate-700">
                     <tr>
                         <th class="px-6 py-3">Coordinator</th>
                         <th class="px-6 py-3">Status</th>
@@ -221,7 +221,7 @@
                             <span class="font-mono text-[11px] text-slate-400">User ID #{{ s.user_id }}</span>
                         </td>
                         <td class="px-6 py-4">
-                            <span class="px-2.5 py-1 rounded-full text-[10px] font-bold {% if s.status == 'suspended' %}bg-amber-500/10 text-amber-400 border border-amber-500/30{% else %}bg-rose-500/10 text-rose-400 border border-rose-500/30{% endif %}">
+                            <span class="px-2.5 py-1 rounded-full text-[10px] font-bold {% if s.status == 'suspended' %}bg-amber-500/10 text-amber-700 border border-amber-500/30{% else %}bg-rose-500/10 text-rose-700 border border-rose-500/30{% endif %}">
                                 {{ s.status|upper }}
                             </span>
                         </td>
@@ -229,7 +229,7 @@
                         <td class="px-6 py-4 font-mono text-[11px] text-slate-400">{{ s.updated_at|date:"Y-m-d H:i" }}</td>
                         <td class="px-6 py-4 text-right">
                             <div class="flex items-center justify-end gap-2">
-                                <a href="/api/v1/admin/ui/users/?user_id={{ s.user_id }}" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold border border-slate-700 transition">
+                                <a href="/api/v1/admin/ui/users/?user_id={{ s.user_id }}" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-semibold transition">
                                     Inspect Details
                                 </a>
                                 <form method="POST" action="" class="inline">
@@ -258,18 +258,18 @@
                 <div>
                     <h2 class="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
                         Complaints & Low-Score Review Escalations
-                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">★ ≤ 2 Stars</span>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-700 border border-rose-500/30">★ ≤ 2 Stars</span>
                     </h2>
                     <p class="text-xs text-slate-400">Direct feedback grievances requiring admin review, feedback suppression, or user sanctions</p>
                 </div>
             </div>
-            <a href="/api/v1/admin/ui/feedback/" class="text-xs text-blue-400 hover:text-blue-300 font-semibold hover:underline">
+            <a href="/api/v1/admin/ui/feedback/" class="text-xs text-blue-600 hover:text-blue-700 font-semibold hover:underline">
                 View All Feedback →
             </a>
         </div>
         <div class="overflow-x-auto">
             <table class="w-full text-left text-xs text-slate-300">
-                <thead class="bg-slate-950/80 text-[10px] uppercase font-bold text-slate-400 tracking-wider border-b border-slate-800">
+                <thead class="bg-slate-800/60 text-[10px] uppercase font-bold text-slate-400 tracking-wider border-b border-slate-700">
                     <tr>
                         <th class="px-6 py-3">Event & Direction</th>
                         <th class="px-6 py-3">Rater & Target User</th>
@@ -285,9 +285,9 @@
                             <span class="font-bold text-white block max-w-xs truncate">{{ fb.event.title }}</span>
                             <span class="font-mono text-[10px] text-slate-400">Event #{{ fb.event_id }}</span>
                             <span class="mt-1 inline-block px-2 py-0.5 rounded text-[10px] font-mono font-semibold
-                                {% if fb.direction == 'volunteer_to_coordinator' %}bg-amber-500/10 text-amber-400 border border-amber-500/20
-                                {% elif fb.direction == 'coordinator_to_volunteer' %}bg-purple-500/10 text-purple-400 border border-purple-500/20
-                                {% else %}bg-blue-500/10 text-blue-400 border border-blue-500/20{% endif %}">
+                                {% if fb.direction == 'volunteer_to_coordinator' %}bg-amber-500/10 text-amber-700 border border-amber-500/20
+                                {% elif fb.direction == 'coordinator_to_volunteer' %}bg-indigo-500/10 text-indigo-700 border border-indigo-500/20
+                                {% else %}bg-blue-500/10 text-blue-600 border border-blue-500/20{% endif %}">
                                 {{ fb.direction }}
                             </span>
                         </td>
@@ -300,15 +300,15 @@
                             {% endif %}
                         </td>
                         <td class="px-6 py-4 max-w-md">
-                            <div class="flex items-center gap-1 text-rose-400 font-bold mb-1">
+                            <div class="flex items-center gap-1 text-rose-700 font-bold mb-1">
                                 <span>★ {{ fb.score }}/5</span>
                             </div>
-                            <p class="text-xs text-slate-200 italic bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+                            <p class="text-xs text-slate-200 italic bg-slate-800/40 p-2.5 rounded-xl border border-slate-700/60">
                                 "{{ fb.comment|default:"No comment text provided." }}"
                             </p>
                         </td>
                         <td class="px-6 py-4 font-mono text-[11px]">
-                            <span class="px-2 py-0.5 rounded text-[10px] font-bold {% if fb.status == 'active' %}bg-emerald-500/10 text-emerald-400 border border-emerald-500/20{% else %}bg-slate-700 text-slate-300{% endif %}">
+                            <span class="px-2 py-0.5 rounded text-[10px] font-bold {% if fb.status == 'active' %}bg-emerald-500/10 text-emerald-700 border border-emerald-500/20{% else %}bg-slate-700 text-slate-300{% endif %}">
                                 {{ fb.status|upper }}
                             </span>
                             <span class="text-slate-500 block mt-1 text-[10px]">{{ fb.created_at|date:"Y-m-d H:i" }}</span>
@@ -320,7 +320,7 @@
                                     {% csrf_token %}
                                     <input type="hidden" name="action" value="hide_feedback">
                                     <input type="hidden" name="feedback_id" value="{{ fb.id }}">
-                                    <button type="submit" class="px-2.5 py-1 bg-rose-600/80 hover:bg-rose-500 text-white rounded-lg text-[11px] font-bold transition shadow-sm cursor-pointer">
+                                    <button type="submit" class="px-2.5 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-[11px] font-bold transition shadow-sm cursor-pointer">
                                         Hide Feedback
                                     </button>
                                 </form>
@@ -331,7 +331,7 @@
                                     {% csrf_token %}
                                     <input type="hidden" name="action" value="warn_user">
                                     <input type="hidden" name="target_user_id" value="{{ fb.target_user_id }}">
-                                    <button type="submit" class="px-2.5 py-1 bg-amber-600/80 hover:bg-amber-500 text-white rounded-lg text-[11px] font-semibold transition cursor-pointer">
+                                    <button type="submit" class="px-2.5 py-1 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-[11px] font-semibold transition cursor-pointer">
                                         Warn Target
                                     </button>
                                 </form>
@@ -362,7 +362,7 @@
     <section class="bg-slate-900/90 border border-slate-800 rounded-2xl shadow-xl overflow-hidden backdrop-blur">
         <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
             <div class="flex items-center gap-3">
-                <div class="w-2.5 h-2.5 rounded-full bg-blue-400"></div>
+                <div class="w-2.5 h-2.5 rounded-full bg-blue-500"></div>
                 <div>
                     <h2 class="text-sm font-bold text-white uppercase tracking-wider">Event Coordinator Handover History</h2>
                     <p class="text-xs text-slate-400">Audit trail of coordinator transfers, reassignments, and operational delegations</p>
@@ -372,7 +372,7 @@
         </div>
         <div class="overflow-x-auto">
             <table class="w-full text-left text-xs text-slate-300">
-                <thead class="bg-slate-950/80 text-[10px] uppercase font-bold text-slate-400 tracking-wider border-b border-slate-800">
+                <thead class="bg-slate-800/60 text-[10px] uppercase font-bold text-slate-400 tracking-wider border-b border-slate-700">
                     <tr>
                         <th class="px-6 py-3">Event</th>
                         <th class="px-6 py-3">From Coordinator</th>
@@ -390,7 +390,7 @@
                             <span class="text-slate-500 font-mono text-[10px]">#{{ log.event_id }}</span>
                         </td>
                         <td class="px-6 py-4 font-mono text-slate-300">{{ log.from_name|default:"Initial Creation" }}</td>
-                        <td class="px-6 py-4 font-mono font-bold text-blue-400">{{ log.to_name|default:log.to_coordinator_id }}</td>
+                        <td class="px-6 py-4 font-mono font-bold text-blue-600">{{ log.to_name|default:log.to_coordinator_id }}</td>
                         <td class="px-6 py-4 font-mono text-slate-400">{{ log.changed_by_name|default:log.changed_by_user_id }}</td>
                         <td class="px-6 py-4 text-slate-300 max-w-xs truncate">{{ log.reason|default:"—" }}</td>
                         <td class="px-6 py-4 font-mono text-[11px] text-slate-400">{{ log.changed_at|date:"Y-m-d H:i" }}</td>

@@ -9,7 +9,7 @@
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
             <h1 class="text-xl font-bold text-white flex items-center gap-2.5">
-                <span class="w-8 h-8 rounded-xl bg-blue-600/20 text-blue-400 flex items-center justify-center">
+                <span class="w-8 h-8 rounded-xl bg-blue-500/10 text-blue-600 border border-blue-500/20 flex items-center justify-center">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                 </span>
                 Event Provisioning & Dispatch Workspace
@@ -17,7 +17,7 @@
             <p class="text-xs text-slate-400 mt-0.5">Authoritative event creation with GPS geofence boundary picker and live event catalog</p>
         </div>
         <div class="flex items-center gap-2">
-            <span class="px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/30">
+            <span class="px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-700 border border-amber-500/30">
                 Super Admin Exclusive
             </span>
         </div>
@@ -33,7 +33,7 @@
                     <h2 class="text-sm font-bold text-white">Event Specification & Geofence Form</h2>
                     <p class="text-[11px] text-slate-400">Creates canonical event adhering to PostgreSQL trigger constraints</p>
                 </div>
-                <span class="text-[10px] font-mono text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded">
+                <span class="text-[10px] font-mono text-blue-600 bg-blue-500/10 border border-blue-500/30 px-2 py-0.5 rounded">
                     Draft &bull; Verified
                 </span>
             </div>
@@ -142,14 +142,14 @@
                 <div class="pt-4 border-t border-slate-800 space-y-3">
                     <div class="flex items-center justify-between">
                         <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">Interactive Venue & Geofence Picker</h3>
-                        <span class="text-[11px] text-blue-400 font-mono">Click map to set GPS coordinates</span>
+                        <span class="text-[11px] text-blue-600 font-mono">Click map to set GPS coordinates</span>
                     </div>
 
                     <!-- Leaflet Geofence Picker Map -->
                     <div class="relative rounded-xl overflow-hidden border border-slate-700 shadow-inner">
-                        <div id="picker-map" class="h-60 w-full bg-slate-950"></div>
+                        <div id="picker-map" class="h-60 w-full bg-slate-800/30"></div>
                         <div class="absolute bottom-2 left-2 bg-slate-900/90 backdrop-blur px-2.5 py-1 rounded-lg border border-slate-700 text-[10px] text-slate-300 pointer-events-none z-[1000]">
-                            📍 Selected: <span id="lbl-coords" class="font-mono text-sky-400">16.80528, 96.15611</span>
+                            📍 Selected: <span id="lbl-coords" class="font-mono text-blue-600">16.80528, 96.15611</span>
                         </div>
                     </div>
 
@@ -163,7 +163,7 @@
                             <input type="text" name="venue_address" placeholder="e.g. Near Parami Road Gate 2" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:border-blue-500" />
                         </div>
                         <div>
-                            <label class="block text-[11px] font-semibold text-slate-300 mb-1">Geofence Radius: <span id="lbl-radius" class="font-mono text-blue-400">150m</span></label>
+                            <label class="block text-[11px] font-semibold text-slate-300 mb-1">Geofence Radius: <span id="lbl-radius" class="font-mono text-blue-600">150m</span></label>
                             <input type="range" min="50" max="2000" step="25" value="150" name="geofence_radius_m" id="input-radius" class="w-full accent-blue-500 cursor-pointer mt-1.5" />
                         </div>
                     </div>
@@ -188,7 +188,7 @@
                     <p class="text-[11px] text-slate-400 mb-2.5">PostgreSQL database trigger enforces between 1 and 3 linked causes.</p>
                     <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                         {% for cf in charity_fields %}
-                        <label class="flex items-center gap-2 p-2.5 rounded-xl border border-slate-800 bg-slate-950/60 hover:bg-slate-800/40 cursor-pointer text-xs transition">
+                        <label class="flex items-center gap-2 p-2.5 rounded-xl border border-slate-700 bg-slate-800/40 hover:bg-slate-800/70 cursor-pointer text-xs transition">
                             <input type="checkbox" name="charity_field_ids" value="{{ cf.code }}" class="rounded text-blue-600 focus:ring-blue-500" />
                             <span class="font-medium text-slate-200">{{ cf.label }}</span>
                         </label>
@@ -215,15 +215,15 @@
                 <div class="pt-4 border-t border-slate-800 space-y-2.5">
                     <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">Support & Volunteer Provisions</h3>
                     <div class="grid grid-cols-3 gap-3">
-                        <label class="flex items-center gap-2 p-2 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-300 cursor-pointer">
+                        <label class="flex items-center gap-2 p-2 rounded-lg bg-slate-800/40 border border-slate-700 text-xs text-slate-300 cursor-pointer hover:bg-slate-800/70 transition">
                             <input type="checkbox" name="meals_provided" class="rounded text-blue-600 focus:ring-blue-500" />
                             <span>Meals Provided</span>
                         </label>
-                        <label class="flex items-center gap-2 p-2 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-300 cursor-pointer">
+                        <label class="flex items-center gap-2 p-2 rounded-lg bg-slate-800/40 border border-slate-700 text-xs text-slate-300 cursor-pointer hover:bg-slate-800/70 transition">
                             <input type="checkbox" name="lodging_provided" class="rounded text-blue-600 focus:ring-blue-500" />
                             <span>Lodging Provided</span>
                         </label>
-                        <label class="flex items-center gap-2 p-2 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-300 cursor-pointer">
+                        <label class="flex items-center gap-2 p-2 rounded-lg bg-slate-800/40 border border-slate-700 text-xs text-slate-300 cursor-pointer hover:bg-slate-800/70 transition">
                             <input type="checkbox" name="travel_support_provided" class="rounded text-blue-600 focus:ring-blue-500" />
                             <span>Travel Support</span>
                         </label>
@@ -253,7 +253,7 @@
             <div class="bg-slate-900/90 border border-slate-800 rounded-2xl shadow-xl p-5">
                 <div class="flex items-center justify-between mb-3">
                     <h2 class="text-sm font-bold text-white flex items-center gap-2">
-                        <svg class="w-4 h-4 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                        <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
                         Browsable Event Catalog
                     </h2>
                     <span class="text-xs font-mono text-slate-400">{{ all_events|length }} events</span>
@@ -272,7 +272,7 @@
                 <!-- Event Cards List -->
                 <div class="space-y-2.5 max-h-[680px] overflow-y-auto pr-1" id="catalog-list">
                     {% for ev in all_events %}
-                    <div class="catalog-item bg-slate-950/70 border border-slate-800/80 p-3.5 rounded-xl hover:border-slate-700 transition" data-title="{{ ev.title|lower }}" data-id="{{ ev.event_id }}">
+                    <div class="catalog-item bg-slate-800/40 border border-slate-700/60 p-3.5 rounded-xl hover:border-slate-600 transition" data-title="{{ ev.title|lower }}" data-id="{{ ev.event_id }}">
                         <div class="flex items-start justify-between gap-2 mb-1.5">
                             <span class="font-bold text-white text-xs truncate max-w-[220px]" title="{{ ev.title }}">
                                 {{ ev.title }}
@@ -283,13 +283,13 @@
                         <div class="flex items-center justify-between text-[11px] mb-2">
                             <div>
                                 {% if ev.status == 'active' %}
-                                <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">Active</span>
+                                <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-700 border border-emerald-500/30">Active</span>
                                 {% elif ev.status == 'published' %}
-                                <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/30">Published</span>
+                                <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-500/10 text-blue-700 border border-blue-500/30">Published</span>
                                 {% elif ev.status == 'draft' %}
-                                <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/30">Draft</span>
+                                <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-500/10 text-amber-700 border border-amber-500/30">Draft</span>
                                 {% else %}
-                                <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-800 text-slate-400">{{ ev.status }}</span>
+                                <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-800/60 text-slate-500 border border-slate-700/60">{{ ev.status }}</span>
                                 {% endif %}
                             </div>
                             <span class="font-mono text-[10px] text-slate-400">
@@ -299,7 +299,7 @@
 
                         <div class="flex items-center justify-between pt-2 border-t border-slate-800/60 text-[11px] text-slate-400">
                             <span>Assigned: <strong class="text-white">{{ ev.assignment_count|default:0 }}</strong></span>
-                            <a href="/api/v1/admin/ui/events/?event_id={{ ev.event_id }}" class="text-xs text-blue-400 hover:text-blue-300 font-medium hover:underline flex items-center gap-1">
+                            <a href="/api/v1/admin/ui/events/?event_id={{ ev.event_id }}" class="text-xs text-blue-600 hover:text-blue-700 font-medium hover:underline flex items-center gap-1">
                                 <span>Inspect</span>
                                 <span>→</span>
                             </a>
