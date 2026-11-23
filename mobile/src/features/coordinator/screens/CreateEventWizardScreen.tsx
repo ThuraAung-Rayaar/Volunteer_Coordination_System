@@ -43,6 +43,7 @@ import {
 } from '../../../shared/utils/dateTimeUtils';
 import { hexToRgba, useAppTheme } from '../../../theme';
 import { CoordinatorGuard } from '../components';
+import { MapLocationPickerModal } from '../components/MapLocationPickerModal';
 
 export interface CreateEventWizardScreenProps
   extends Partial<MainDrawerScreenProps<'CreateEventWizard'>> {
@@ -160,6 +161,7 @@ export function CreateEventWizardScreen({
   const [geoOpensBeforeMin, setGeoOpensBeforeMin] = useState('30');
   const [requireConfirmation, setRequireConfirmation] = useState(true);
   const [mapProvider, setMapProvider] = useState<'openstreetmap' | 'google'>('openstreetmap');
+  const [isMapPickerOpen, setIsMapPickerOpen] = useState(false);
 
   // Step 3: Schedule & Deadlines (Separated date and 12h AM/PM MMT time)
   const [startDate, setStartDate] = useState('2026-12-10');
@@ -838,6 +840,14 @@ export function CreateEventWizardScreen({
                   label="Google Maps"
                   selected={mapProvider === 'google'}
                   onPress={() => setMapProvider('google')}
+                />
+              </View>
+
+              <View style={{ marginVertical: 8 }}>
+                <AppButton
+                  label="Pick Pin on Map"
+                  variant="primary"
+                  onPress={() => setIsMapPickerOpen(true)}
                 />
               </View>
 
@@ -1596,6 +1606,19 @@ export function CreateEventWizardScreen({
           title={`Select ${datePickerTarget === 'start' ? 'Start' : datePickerTarget === 'end' ? 'End' : 'Deadline'} Date`}
           onSelectDate={handleDatePickerSelect}
           onClose={() => setDatePickerTarget(null)}
+        />
+
+        {/* Map Location Picker Modal */}
+        <MapLocationPickerModal
+          visible={isMapPickerOpen}
+          onClose={() => setIsMapPickerOpen(false)}
+          initialLatitude={Number(latitude) || 16.8}
+          initialLongitude={Number(longitude) || 96.15}
+          venueName={locationName}
+          onConfirm={(newLat, newLng) => {
+            setLatitude(newLat.toFixed(4));
+            setLongitude(newLng.toFixed(4));
+          }}
         />
       </View>
     </CoordinatorGuard>
