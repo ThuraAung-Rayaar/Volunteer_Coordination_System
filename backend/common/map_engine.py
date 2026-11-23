@@ -729,6 +729,7 @@ def get_map_catalog_status() -> dict[str, Any]:
     last_refreshed_at = None
     zoom_distribution: dict[str, int] = {}
     region_distribution: dict[str, int] = {}
+    region_tile_stats: dict[str, dict[str, int | None]] = {}
 
     try:
         conn = _get_db_connection()
@@ -740,8 +741,37 @@ def get_map_catalog_status() -> dict[str, Any]:
             cur.execute("SELECT zoom_level, COUNT(*) FROM tiles GROUP BY zoom_level")
             zoom_distribution = {str(z): count for z, count in cur.fetchall()}
 
-            cur.execute("SELECT region_code, COUNT(*) FROM tiles GROUP BY region_code")
-            region_distribution = {r: count for r, count in cur.fetchall() if r}
+            cur.execute(
+                """
+                SELECT
+                    region_code,
+                    COUNT(*),
+                    SUM(
+                        CASE
+                            WHEN substr(tile_data, 1, 8) = X'89504E470D0A1A0A'
+                              OR substr(tile_data, 1, 3) = X'FFD8FF'
+                            THEN 1 ELSE 0
+                        END
+                    ),
+                    MIN(zoom_level),
+                    MAX(zoom_level)
+                FROM tiles
+                GROUP BY region_code
+                """
+            )
+            for region, count, real_count, min_zoom, max_zoom in cur.fetchall():
+                if not region:
+                    continue
+                total_for_region = int(count or 0)
+                real_for_region = int(real_count or 0)
+                region_distribution[region] = total_for_region
+                region_tile_stats[region] = {
+                    "tile_count": total_for_region,
+                    "real_raster_tile_count": real_for_region,
+                    "placeholder_tile_count": total_for_region - real_for_region,
+                    "min_zoom": int(min_zoom) if min_zoom is not None else None,
+                    "max_zoom": int(max_zoom) if max_zoom is not None else None,
+                }
 
             cur.execute("SELECT value FROM metadata WHERE name = 'last_refreshed_at'")
             row = cur.fetchone()
@@ -765,6 +795,7 @@ def get_map_catalog_status() -> dict[str, Any]:
         "regions": MYANMAR_MICRO_REGIONS,
         "zoom_distribution": zoom_distribution,
         "region_distribution": region_distribution,
+        "region_tile_stats": region_tile_stats,
         "tile_provider_configured": bool(
             getattr(settings, "MAP_TILE_URL_TEMPLATE", "")
             or os.getenv("MAP_TILE_URL_TEMPLATE", "")
