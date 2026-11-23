@@ -169,7 +169,7 @@ describe('Phase 4: Authentication & Session Integration', () => {
   });
 
   describe('OtpLoginScreen Component UI & Step Flow', () => {
-    it('renders Step 1 with phone input, optional display name, and send code button', async () => {
+    it('renders Step 1 with phone input and send code button', async () => {
       await act(async () => {
         root = ReactTestRenderer.create(
           renderWithTheme(<OtpLoginScreen />),
@@ -178,7 +178,7 @@ describe('Phase 4: Authentication & Session Integration', () => {
 
       const rootInstance = root!.root;
       const inputs = rootInstance.findAllByType(AppInput);
-      expect(inputs.length).toBe(2);
+      expect(inputs.length).toBe(1);
 
       const header = rootInstance.findByType(AppHeader);
       expect(header.props.title).toBe('Workshift Sign In');
@@ -220,6 +220,64 @@ describe('Phase 4: Authentication & Session Integration', () => {
         t.props.children?.toString().includes('Please enter your mobile phone number.'),
       );
       expect(errorTextEmpty).toBeDefined();
+    });
+
+    it('distinguishes between Returning User and New User on login screen', async () => {
+      await act(async () => {
+        root = ReactTestRenderer.create(
+          renderWithTheme(<OtpLoginScreen />),
+        );
+      });
+
+      const rootInstance = root!.root;
+
+      // Returning User (default): only 1 input (phone), no name input
+      expect(rootInstance.findAllByType(AppInput).length).toBe(1);
+
+      // Switch to New User tab
+      const newUserTab = rootInstance
+        .findAllByProps({ accessibilityRole: 'tab' })
+        .find(t => t.props.accessibilityLabel === 'New User tab');
+      expect(newUserTab).toBeDefined();
+
+      await act(async () => {
+        newUserTab!.props.onPress();
+      });
+
+      // Now 2 inputs: display name and phone number
+      const inputs = rootInstance.findAllByType(AppInput);
+      expect(inputs.length).toBe(2);
+
+      // Submitting without entering name shows validation error
+      const submitButton = rootInstance.findByType(AppButton);
+      expect(submitButton.props.label).toBe('Register & Send Code');
+
+      await act(async () => {
+        await submitButton.props.onPress();
+      });
+
+      const nameErrorText = rootInstance.findAllByType(AppText).find(t =>
+        t.props.children?.toString().includes('Please enter your name.'),
+      );
+      expect(nameErrorText).toBeDefined();
+
+      // If an existing (old) user tries to enter as new user, shows error
+      const nameInput = rootInstance.findByProps({ placeholder: 'e.g. Alex Morgan' });
+      const phoneInput = rootInstance.findByProps({ placeholder: '+95912345678' });
+
+      await act(async () => {
+        nameInput.props.onChangeText('Alex Morgan');
+        phoneInput.props.onChangeText('+959111111111');
+      });
+
+      await act(async () => {
+        await submitButton.props.onPress();
+      });
+
+      const alreadyRegisteredError = rootInstance.findAllByType(AppText).find(t =>
+        t.props.children?.toString().includes('This phone number is already registered. Please switch to Returning User to sign in.'),
+      );
+      expect(alreadyRegisteredError).toBeDefined();
     });
 
     it('submits phone to requestOtp and transitions to Step 2 with dev code banner', async () => {
@@ -354,11 +412,9 @@ describe('Phase 4: Authentication & Session Integration', () => {
 
       const rootInstance = root!.root;
       const phoneInput = rootInstance.findAllByType(AppInput)[0];
-      const displayNameInput = rootInstance.findAllByType(AppInput)[1];
 
       await act(async () => {
         phoneInput.props.onChangeText('+95912345678');
-        displayNameInput.props.onChangeText('Aung Ko');
       });
 
       await act(async () => {
@@ -379,7 +435,7 @@ describe('Phase 4: Authentication & Session Integration', () => {
         await verifyButton.props.onPress();
       });
 
-      expect(mockVerifyOtp).toHaveBeenCalledWith('+95912345678', '654321', 'Aung Ko');
+      expect(mockVerifyOtp).toHaveBeenCalledWith('+95912345678', '654321');
       expect(onLoginSuccess).toHaveBeenCalled();
     });
 

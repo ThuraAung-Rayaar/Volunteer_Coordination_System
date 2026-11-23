@@ -9,4 +9,6 @@ export * from './CoordinatorEventHeader';
 export * from './ApplicationReviewCard';
 export * from './AssignmentRow';
 export * from './AttendanceRow';
+export * from './CoordinatorDynamicIsland';
+export * from './CoordinatorSwipeWrapper';
 

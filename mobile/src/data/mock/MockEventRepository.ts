@@ -388,7 +388,13 @@ export class MockEventRepository implements EventRepository {
   }
 
   public async getUserAssignments(): Promise<VolunteerAssignmentItem[]> {
-    return deepClone(this.assignments);
+    return deepClone(
+      this.assignments.filter(a => {
+        if (a.status === 'cancelled') return false;
+        const ev = this.events.find(e => e.id === a.eventId);
+        return !ev || (ev.status as string) !== 'cancelled';
+      }),
+    );
   }
 
   public async confirmAssignment(

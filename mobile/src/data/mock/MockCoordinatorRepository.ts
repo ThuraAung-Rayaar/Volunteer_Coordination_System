@@ -243,12 +243,14 @@ export class MockCoordinatorRepository implements CoordinatorRepository {
       };
     }
 
-    // 4. Create draft event using dynamic coordinator fixture identity
+    // 4. Create draft/published event using dynamic coordinator fixture identity
+    const isPublished = Boolean(draft.publish);
+    const generatedEventId = this.idGenerator(isPublished ? 'evt-pub' : 'evt-draft');
     const newEvent: CoordinatorEventDetail = {
-      id: this.idGenerator('evt-draft'),
+      id: generatedEventId,
       title: draft.title.trim(),
       description: draft.description?.trim() ?? '',
-      status: 'draft', // Forced to draft
+      status: isPublished ? 'published' : 'draft',
       purposeType: draft.purposeType,
       startAt: draft.startAt,
       endAt: draft.endAt,
@@ -285,12 +287,33 @@ export class MockCoordinatorRepository implements CoordinatorRepository {
       onboardingVersion: 1, // Forced to 1
       requireOnboardingAck: draft.requireOnboardingAck,
       qrRegistrationEnabled: draft.qrRegistrationEnabled,
-      posts: [],
+      posts: isPublished
+        ? [
+            {
+              id: this.idGenerator('post'),
+              eventId: generatedEventId,
+              title: 'General Volunteer',
+              description: draft.description?.trim() || 'General volunteer support role',
+              requiredHeadcount: draft.maxParticipants || 10,
+              filledHeadcount: 0,
+              remainingCapacity: draft.maxParticipants || 10,
+              physicalLevel: 'light',
+              requiredSkills: [],
+              leaderNeeded: false,
+              newVolunteersAllowed: true,
+              status: 'open',
+            },
+          ]
+        : [],
     };
 
     this.events.unshift(newEvent);
     this.metrics.totalEventsCount += 1;
-    this.metrics.draftEventsCount += 1;
+    if (isPublished) {
+      this.metrics.activeEventsCount += 1;
+    } else {
+      this.metrics.draftEventsCount += 1;
+    }
 
     return {
       success: true,

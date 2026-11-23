@@ -34,8 +34,10 @@ import {
 import { useAppTheme } from '../../../theme';
 import {
   AssignmentRow,
+  CoordinatorDynamicIsland,
   CoordinatorEventHeader,
   CoordinatorGuard,
+  CoordinatorSwipeWrapper,
 } from '../components';
 
 export interface CoordinatorAssignmentsScreenProps
@@ -78,13 +80,16 @@ export function CoordinatorAssignmentsScreen({
       setIsLoading(true);
       try {
         const evList = await repo.getMyEvents();
-        setEvents(evList);
+        const operationalEvents = evList.filter(
+          e => e.status !== 'cancelled' && e.status !== 'completed',
+        );
+        setEvents(operationalEvents);
 
         const eventIdToUse =
           targetId ||
           selectedEventIdRef.current ||
           route?.params?.eventId ||
-          evList[0]?.id ||
+          operationalEvents[0]?.id ||
           'evt-coord-001';
 
         if (selectedEventIdRef.current !== eventIdToUse) {
@@ -368,7 +373,8 @@ export function CoordinatorAssignmentsScreen({
 
   return (
     <CoordinatorGuard navigation={navigation}>
-      <View style={[styles.root, { backgroundColor: theme.colors.background }]}>
+      <CoordinatorSwipeWrapper currentTab="assignments" navigation={navigation}>
+        <View style={[styles.root, { backgroundColor: theme.colors.background }]}>
         <AppHeader
           title="Shift Assignments"
           subtitle={selectedEvent?.title}
@@ -400,8 +406,15 @@ export function CoordinatorAssignmentsScreen({
             }
           />
         )}
+
+        <CoordinatorDynamicIsland
+          activeTab="assignments"
+          navigation={navigation}
+          acceptedApplicantsCount={assignments.filter(a => a.status === 'assigned').length}
+        />
       </View>
-    </CoordinatorGuard>
+    </CoordinatorSwipeWrapper>
+  </CoordinatorGuard>
   );
 }
 
@@ -411,7 +424,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     padding: 16,
-    paddingBottom: 40,
+    paddingBottom: 88,
   },
   headerContainer: {
     marginBottom: 8,

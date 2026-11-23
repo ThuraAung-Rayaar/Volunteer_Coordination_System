@@ -263,6 +263,7 @@ def request_tokenized_login_otp(
     purpose: str = "login",
     request_id: Optional[str] = None,
     client_nonce: Optional[str] = None,
+    is_new_user: bool = False,
 ) -> dict:
     """
     Request a tokenized OTP challenge for authentication (v0.12.0 handshake).
@@ -284,6 +285,12 @@ def request_tokenized_login_otp(
     # Check account status for existing users or provision new user with encrypted phone
     user = Users.objects.filter(phone_hash=phone_hash).first()
     if user is not None:
+        if is_new_user:
+            raise DomainError(
+                code="user_already_exists",
+                message="This phone number is already registered. Please sign in as an existing user.",
+                status_code=409,
+            )
         if user.account_status == "closed":
             raise DomainError(
                 code="account_closed",

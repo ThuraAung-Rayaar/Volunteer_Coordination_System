@@ -112,6 +112,19 @@ describe('dashboardMapper', () => {
     expect(summary.upcomingCommitments[1].status).toBe('assigned');
   });
 
+  it('excludes assignments whose scheduled end is in the past', () => {
+    const summary = mapDashboardSummary(
+      sampleAssignments,
+      sampleAttendance,
+      sampleFeedback,
+      new Date('2026-12-11T00:00:00+06:30'),
+    );
+
+    expect(summary.upcomingCommitmentCount).toBe(1);
+    expect(summary.upcomingCommitments).toHaveLength(1);
+    expect(summary.upcomingCommitments[0].eventTitle).toBe('Blood Drive Reception');
+  });
+
   it('filters strictly status === "completed" attendance records for completed activities', () => {
     const summary = mapDashboardSummary(sampleAssignments, sampleAttendance, sampleFeedback);
 

@@ -86,6 +86,7 @@ class EventCreateSerializer(AllowListSerializerMixin, serializers.Serializer):
     charity_field_codes = serializers.ListField(
         child=serializers.CharField(max_length=50), required=False, allow_empty=True
     )
+    publish = serializers.BooleanField(required=False, default=False)
 
     def validate(self, attrs):
         if attrs["end_at"] <= attrs["start_at"]:
@@ -135,6 +136,7 @@ class EventUpdateSerializer(AllowListSerializerMixin, serializers.Serializer):
     charity_field_codes = serializers.ListField(
         child=serializers.CharField(max_length=50), required=False, allow_empty=True
     )
+    publish = serializers.BooleanField(required=False, default=False)
 
 
 class EventListSerializer(serializers.Serializer):

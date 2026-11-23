@@ -10,6 +10,7 @@ import type {
 export type MainDrawerParamList = {
   Dashboard: undefined;
   Events: undefined;
+  Notifications: undefined;
   Friends: undefined;
   MyApplications: undefined;
   MyAssignments: undefined;
@@ -18,10 +19,16 @@ export type MainDrawerParamList = {
   Availability: undefined;
   VerificationCoordinatorStatus: undefined;
   CoordinatorWorkspace: undefined;
+  VolunteerWorkspace: { initialTab?: 'applications' | 'assignments' } | undefined;
   Settings: undefined;
   EventDetail: {
     eventId: string;
-    returnTo?: 'Dashboard' | 'Events' | 'MyApplications' | 'MyAssignments';
+    returnTo?:
+      | 'Dashboard'
+      | 'Events'
+      | 'MyApplications'
+      | 'MyAssignments'
+      | 'VolunteerWorkspace';
   };
   CoordinatorEvents: undefined;
   CreateEventWizard: { eventId?: string } | undefined;

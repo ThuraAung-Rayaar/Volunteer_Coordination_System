@@ -91,6 +91,9 @@ export interface CreateEventWizardDraft {
   onboardingText?: string | null;
   requireOnboardingAck: boolean;
   qrRegistrationEnabled: boolean;
+
+  // Publishing intent
+  publish?: boolean;
 }
 
 export interface CoordinatorEventDetail extends CoordinatorEventSummary {

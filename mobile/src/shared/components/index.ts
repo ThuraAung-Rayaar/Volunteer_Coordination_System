@@ -17,4 +17,5 @@ export * from './EmptyState';
 export * from './ErrorState';
 export * from './LoadingState';
 export * from './DatePickerModal';
+export * from './TimePickerModal';
 export * from './ComponentGalleryScreen';

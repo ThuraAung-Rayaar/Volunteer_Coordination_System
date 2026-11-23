@@ -48,6 +48,7 @@ class TokenizedOtpRequestSerializer(serializers.Serializer):
         default="login",
     )
     request_id = serializers.CharField(max_length=64, required=False, allow_blank=True)
+    is_new_user = serializers.BooleanField(required=False, default=False)
 
     def validate(self, attrs):
         identity_token = attrs.get("identity_token")

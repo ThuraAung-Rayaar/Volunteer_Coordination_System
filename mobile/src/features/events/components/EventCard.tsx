@@ -54,9 +54,17 @@ export function EventCard({
 }: EventCardProps): React.JSX.Element {
   const { theme } = useAppTheme();
 
-  const isLive = event.status === 'active';
-  const statusBadgeType = isLive ? 'info' : 'success';
-  const statusLabel = isLive ? 'Live / Active' : 'Published';
+  const isEnded = Boolean(
+    (event.status as string) === 'completed' ||
+      (event.status as string) === 'cancelled' ||
+      (event.endAt && new Date(event.endAt).getTime() < Date.now()),
+  );
+  const isLive = !isEnded && event.status === 'active';
+  const statusLabel = isEnded
+    ? 'Ended'
+    : isLive
+    ? 'Live / Active'
+    : 'Published';
 
   return (
     <Pressable
@@ -74,7 +82,7 @@ export function EventCard({
         {/* Header row: Status badge + Date */}
         <View style={styles.headerRow}>
           <StatusBadge
-            status={isLive ? 'sky' : 'emerald'}
+            status={isEnded ? 'muted' : isLive ? 'sky' : 'emerald'}
             label={statusLabel}
           />
           <AppText variant="caption" color={theme.colors.textSecondary}>

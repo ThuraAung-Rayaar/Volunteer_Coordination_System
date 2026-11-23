@@ -89,10 +89,18 @@ export function DashboardScreen({
     setIsCancelling(true);
     try {
       const result = await cancelParticipation(commitmentToCancel.id);
-      setFeedbackBanner(
-        `Participation in "${commitmentToCancel.eventTitle}" cancelled (${result.message})`,
-      );
-      setCommitmentToCancel(null);
+      if (result.success) {
+        setFeedbackBanner(
+          `Participation in "${commitmentToCancel.eventTitle}" cancelled. ${result.message}`,
+        );
+        setCommitmentToCancel(null);
+      } else {
+        setFeedbackBanner(`Cancellation was not completed: ${result.message}`);
+      }
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Unable to cancel participation.";
+      setFeedbackBanner(`Cancellation failed: ${message}`);
     } finally {
       setIsCancelling(false);
     }

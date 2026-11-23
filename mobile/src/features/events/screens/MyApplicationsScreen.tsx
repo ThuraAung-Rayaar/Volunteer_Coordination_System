@@ -64,6 +64,7 @@ export function getApplicationsCache(): ApplicationsStateCache {
 export interface MyApplicationsScreenProps
   extends Partial<MainDrawerScreenProps<'MyApplications'>> {
   repository?: EventRepository;
+  hideHeader?: boolean;
 }
 
 function formatDate(isoString?: string): string {
@@ -107,6 +108,7 @@ function getBadgeConfig(status: EventApplicationStatus): {
 export function MyApplicationsScreen({
   navigation,
   repository: propRepository,
+  hideHeader = false,
 }: MyApplicationsScreenProps): React.JSX.Element {
   const { theme } = useAppTheme();
   const repositories = useRepositories();
@@ -230,11 +232,13 @@ export function MyApplicationsScreen({
 
   return (
     <View style={[styles.root, { backgroundColor: theme.colors.background }]}>
-      <AppHeader
-        title="My Applications"
-        subtitle="Submitted volunteer requests"
-        onMenuPress={navigation ? () => navigation.openDrawer() : undefined}
-      />
+      {!hideHeader && (
+        <AppHeader
+          title="My Applications"
+          subtitle="Submitted volunteer requests"
+          onMenuPress={navigation ? () => navigation.openDrawer() : undefined}
+        />
+      )}
 
       {/* Status Filter Chip Row */}
       <View

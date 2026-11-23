@@ -60,7 +60,33 @@ class CoordinatorEventListCreateView(APIView):
         serializer.is_valid(raise_exception=True)
         data = dict(serializer.validated_data)
         charity_codes = data.pop("charity_field_codes", None)
+        should_publish = (
+            data.pop("publish", False)
+            or request.data.get("publish", False)
+            or request.data.get("auto_publish", False)
+        )
         event = event_service.create_event(request.user, data, charity_codes)
+
+        if should_publish:
+            from django.utils import timezone
+            from apps.events.models import EventPosts
+
+            if not EventPosts.objects.filter(event_id=event.id, status="open").exists():
+                headcount = event.max_participants or 10
+                EventPosts.objects.create(
+                    event=event,
+                    title="General Volunteer",
+                    description=event.description or "General volunteer support role",
+                    required_headcount=headcount,
+                    physical_level="light",
+                    required_skills=[],
+                    leader_needed=False,
+                    new_volunteers_allowed=True,
+                    status="open",
+                )
+            if event.start_at and event.start_at > timezone.now():
+                event = event_service.publish_event(request.user, event.id)
+
         return Response({"id": event.id, "status": event.status}, status=status.HTTP_201_CREATED)
 
 

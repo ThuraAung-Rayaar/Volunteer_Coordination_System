@@ -78,13 +78,17 @@ export function CoordinatorEventsScreen({
   };
 
   const filteredEvents = useMemo(() => {
+    // Cancelled events must not appear in any tab
+    const validEvents = events.filter(e => e.status !== 'cancelled');
+
     if (selectedFilter === 'all') {
-      return events;
+      // Completed events only appear under completed filter (history), not in general active/published list
+      return validEvents.filter(e => e.status !== 'completed');
     }
     if (selectedFilter === 'monitor') {
-      return events.filter(e => e.isOwnerAsMonitor);
+      return validEvents.filter(e => e.isOwnerAsMonitor && e.status !== 'completed');
     }
-    return events.filter(e => e.status === selectedFilter);
+    return validEvents.filter(e => e.status === selectedFilter);
   }, [events, selectedFilter]);
 
   const handleEventPress = (eventId: string) => {

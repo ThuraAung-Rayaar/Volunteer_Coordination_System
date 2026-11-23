@@ -79,6 +79,7 @@ export interface RequestTokenizedOtpParams {
   phone: string;
   purpose?: 'login' | 'qr_registration';
   requestId?: string;
+  isNewUser?: boolean;
 }
 
 export interface VerifyTokenizedOtpParams {
@@ -382,6 +383,7 @@ export function UserProvider({
         phone: params.phone.trim(),
         purpose: params.purpose || 'login',
         request_id: params.requestId,
+        is_new_user: params.isNewUser,
       });
 
       if (!res.ok) {

@@ -384,6 +384,64 @@ class ApplicationAssignmentServicePhase6Tests(TestCase):
             assignment_service.confirm_assignment(self.vol2, res["assignment_id"])
         self.assertEqual(ctx.exception.code, "permission_denied")
 
+    def test_volunteer_cannot_cancel_assignment_within_48_hours(self):
+        """Volunteer self-cancellation is blocked inside the 48-hour window."""
+        app = application_service.apply_to_event(self.vol1, self.event.id)
+        application_service.accept_application(self.coord1, app.id)
+        result = assignment_service.assign_volunteer_manually(
+            self.coord1, app.id, post_id=self.post1.id
+        )
+        assignment = Assignments.objects.get(id=result["assignment_id"])
+        simulated_now = timezone.now() + timedelta(days=4)
+
+        with patch("services.cancellation_policy.timezone.now", return_value=simulated_now):
+            with self.assertRaises(DomainError) as ctx:
+                assignment_service.cancel_assignment(self.vol1, assignment.id)
+
+        self.assertEqual(ctx.exception.code, "cancellation_window_closed")
+        assignment.refresh_from_db()
+        self.assertIn(assignment.status, ("assigned", "confirmed"))
+
+    def test_volunteer_cannot_withdraw_accepted_application_within_48_hours(self):
+        """Accepted-application withdrawal cannot bypass the assignment cutoff."""
+        app = application_service.apply_to_event(
+            self.vol1, self.event.id, post_id=self.post1.id
+        )
+        application_service.accept_application(self.coord1, app.id)
+        result = assignment_service.assign_volunteer_manually(
+            self.coord1, app.id, post_id=self.post1.id
+        )
+        assignment = Assignments.objects.get(id=result["assignment_id"])
+        simulated_now = timezone.now() + timedelta(days=4)
+
+        with patch("services.cancellation_policy.timezone.now", return_value=simulated_now):
+            with self.assertRaises(DomainError) as ctx:
+                application_service.withdraw_application(self.vol1, app.id)
+
+        self.assertEqual(ctx.exception.code, "cancellation_window_closed")
+        app.refresh_from_db()
+        assignment.refresh_from_db()
+        self.assertEqual(app.status, "accepted")
+        self.assertIn(assignment.status, ("assigned", "confirmed"))
+
+    def test_event_manager_can_cancel_assignment_inside_48_hours(self):
+        """The event manager retains the operational cancellation override."""
+        app = application_service.apply_to_event(self.vol1, self.event.id)
+        application_service.accept_application(self.coord1, app.id)
+        result = assignment_service.assign_volunteer_manually(
+            self.coord1, app.id, post_id=self.post1.id
+        )
+        assignment = Assignments.objects.get(id=result["assignment_id"])
+        simulated_now = timezone.now() + timedelta(days=4)
+
+        with patch("services.cancellation_policy.timezone.now", return_value=simulated_now):
+            cancelled = assignment_service.cancel_assignment(
+                self.coord1, assignment.id, reason="Operational change"
+            )
+
+        self.assertEqual(cancelled.status, "cancelled")
+        self.assertEqual(cancelled.cancel_reason, "Operational change")
+
     def test_cancel_assignment_by_volunteer(self):
         """W93: Volunteer cancels their own assignment."""
         app = application_service.apply_to_event(self.vol1, self.event.id)

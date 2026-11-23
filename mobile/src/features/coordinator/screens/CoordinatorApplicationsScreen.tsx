@@ -34,8 +34,10 @@ import {
 import { useAppTheme } from '../../../theme';
 import {
   ApplicationReviewCard,
+  CoordinatorDynamicIsland,
   CoordinatorEventHeader,
   CoordinatorGuard,
+  CoordinatorSwipeWrapper,
 } from '../components';
 
 export interface CoordinatorApplicationsScreenProps
@@ -77,13 +79,16 @@ export function CoordinatorApplicationsScreen({
       setIsLoading(true);
       try {
         const evList = await repo.getMyEvents();
-        setEvents(evList);
+        const operationalEvents = evList.filter(
+          e => e.status !== 'cancelled' && e.status !== 'completed',
+        );
+        setEvents(operationalEvents);
 
         const eventIdToUse =
           targetId ||
           selectedEventIdRef.current ||
           route?.params?.eventId ||
-          evList[0]?.id ||
+          operationalEvents[0]?.id ||
           'evt-coord-001';
 
         if (selectedEventIdRef.current !== eventIdToUse) {
@@ -361,7 +366,8 @@ export function CoordinatorApplicationsScreen({
 
   return (
     <CoordinatorGuard navigation={navigation}>
-      <View style={[styles.root, { backgroundColor: theme.colors.background }]}>
+      <CoordinatorSwipeWrapper currentTab="applications" navigation={navigation}>
+        <View style={[styles.root, { backgroundColor: theme.colors.background }]}>
         <AppHeader
           title="Volunteer Applications"
           subtitle={selectedEvent?.title}
@@ -393,8 +399,15 @@ export function CoordinatorApplicationsScreen({
             }
           />
         )}
+
+        <CoordinatorDynamicIsland
+          activeTab="applications"
+          navigation={navigation}
+          pendingApplicationsCount={applications.filter(a => a.status === 'pending').length}
+        />
       </View>
-    </CoordinatorGuard>
+    </CoordinatorSwipeWrapper>
+  </CoordinatorGuard>
   );
 }
 
@@ -404,7 +417,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     padding: 16,
-    paddingBottom: 40,
+    paddingBottom: 88,
   },
   listHeaderContainer: {
     marginBottom: 8,

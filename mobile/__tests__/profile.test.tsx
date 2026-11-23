@@ -586,6 +586,75 @@ describe('ProfileEditScreen', () => {
 
     const json = safeStringify(renderer.toJSON());
     expect(json).toContain('Profile saved in local mock state');
+    expect(nav.navigate).toHaveBeenCalledWith('Profile');
+  });
+
+  it('prevents contradictory choices from being selected simultaneously in suitability preferences', async () => {
+    const nav = createMockNavigation();
+    const repo = new MockProfileRepository();
+
+    let renderer!: ReactTestRenderer.ReactTestRenderer;
+    await ReactTestRenderer.act(async () => {
+      renderer = ReactTestRenderer.create(
+        renderWithTheme(
+          <ProfileEditScreen navigation={nav} repository={repo} />,
+        ),
+      );
+    });
+
+    // Find Good Eyesight and Needs Glasses chips
+    const checkboxes = renderer.root.findAllByProps({
+      accessibilityRole: 'checkbox',
+    });
+    const goodEyesightChip = checkboxes.find(
+      b => b.props.accessibilityLabel === 'Good Eyesight',
+    );
+    const needsGlassesChip = checkboxes.find(
+      b => b.props.accessibilityLabel === 'Needs Glasses',
+    );
+    const leaderChip = checkboxes.find(
+      b => b.props.accessibilityLabel === 'Team Leader Experience',
+    );
+    const newVolunteerChip = checkboxes.find(
+      b => b.props.accessibilityLabel === 'New to Volunteering',
+    );
+
+    expect(goodEyesightChip).toBeDefined();
+    expect(needsGlassesChip).toBeDefined();
+    expect(leaderChip).toBeDefined();
+    expect(newVolunteerChip).toBeDefined();
+
+    // Selecting Needs Glasses turns off Good Eyesight
+    await ReactTestRenderer.act(async () => {
+      needsGlassesChip!.props.onPress();
+    });
+
+    expect(needsGlassesChip!.props.accessibilityState.checked).toBe(true);
+    expect(goodEyesightChip!.props.accessibilityState.checked).toBe(false);
+
+    // Selecting Good Eyesight turns off Needs Glasses
+    await ReactTestRenderer.act(async () => {
+      goodEyesightChip!.props.onPress();
+    });
+
+    expect(goodEyesightChip!.props.accessibilityState.checked).toBe(true);
+    expect(needsGlassesChip!.props.accessibilityState.checked).toBe(false);
+
+    // Selecting Leader Experience turns off New to Volunteering
+    await ReactTestRenderer.act(async () => {
+      leaderChip!.props.onPress();
+    });
+
+    expect(leaderChip!.props.accessibilityState.checked).toBe(true);
+    expect(newVolunteerChip!.props.accessibilityState.checked).toBe(false);
+
+    // Selecting New to Volunteering turns off Leader Experience
+    await ReactTestRenderer.act(async () => {
+      newVolunteerChip!.props.onPress();
+    });
+
+    expect(newVolunteerChip!.props.accessibilityState.checked).toBe(true);
+    expect(leaderChip!.props.accessibilityState.checked).toBe(false);
   });
 });
 
@@ -702,6 +771,33 @@ describe('AvailabilityScreen', () => {
 
     json = safeStringify(renderer.toJSON());
     expect(json).toContain('Weekly schedule rule saved');
+  });
+
+  it('allows multi-weekday selection and AM/PM selection in weekly rule modal', async () => {
+    const nav = createMockNavigation();
+    const repo = new MockProfileRepository();
+
+    let renderer!: ReactTestRenderer.ReactTestRenderer;
+    await ReactTestRenderer.act(async () => {
+      renderer = ReactTestRenderer.create(
+        renderWithTheme(
+          <AvailabilityScreen navigation={nav} repository={repo} />,
+        ),
+      );
+    });
+
+    const addRuleButton = renderer.root
+      .findAllByProps({ accessibilityRole: 'button' })
+      .find(b => b.props.accessibilityLabel === '+ Add Rule');
+
+    await ReactTestRenderer.act(async () => {
+      addRuleButton!.props.onPress();
+    });
+
+    const json = safeStringify(renderer.toJSON());
+    expect(json).toContain('DAYS OF WEEK (SELECT ONE OR MORE)');
+    expect(json).toContain('AM');
+    expect(json).toContain('PM');
   });
 
   it('validates date input close to control in date exception modal', async () => {

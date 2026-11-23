@@ -5,6 +5,7 @@
 export const RouteNames = {
   Dashboard: 'Dashboard',
   Events: 'Events',
+  Notifications: 'Notifications',
   Friends: 'Friends',
   MyApplications: 'MyApplications',
   MyAssignments: 'MyAssignments',
@@ -12,6 +13,7 @@ export const RouteNames = {
   Availability: 'Availability',
   VerificationCoordinatorStatus: 'VerificationCoordinatorStatus',
   CoordinatorWorkspace: 'CoordinatorWorkspace',
+  VolunteerWorkspace: 'VolunteerWorkspace',
   Settings: 'Settings',
   EventDetail: 'EventDetail',
   CoordinatorEvents: 'CoordinatorEvents',
