@@ -181,7 +181,7 @@ def execute_tool(actor: Any, tool_name: str, arguments: Dict[str, Any]) -> Dict[
     if tool_name == "get_my_assignments":
         assignments = Assignments.objects.filter(
             user_id=actor.id
-        ).order_by("-assigned_at")[:10]
+        ).order_by("-created_at")[:10]
         return sanitize_ai_data({
             "assignments": [
                 {
@@ -190,7 +190,7 @@ def execute_tool(actor: Any, tool_name: str, arguments: Dict[str, Any]) -> Dict[
                     "post_id": item.post_id,
                     "status": item.status,
                     "is_group_leader": item.is_group_leader,
-                    "assigned_at": item.assigned_at.isoformat() if item.assigned_at else None,
+                    "assigned_at": item.created_at.isoformat() if item.created_at else None,
                 }
                 for item in assignments
             ]

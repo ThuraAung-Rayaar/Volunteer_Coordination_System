@@ -8,6 +8,7 @@ class SqlFileTestRunner(DiscoverRunner):
         from django.db import connection
 
         candidates = [
+            Path(settings.BASE_DIR).parent / "postgres_sql" / "VCS_db.sql",
             Path(settings.BASE_DIR).parent / "postgres_sql" / "updated_volunteer_coordination_system_Database.sql",
             Path(settings.BASE_DIR).parent / "postgres sql" / "updated_volunteer_coordination_system_Database.sql",
             Path(settings.BASE_DIR).parent / "prompt code" / "spec" / "updated_volunteer_coordination_system_Database.sql",
@@ -54,8 +55,6 @@ class SqlFileTestRunner(DiscoverRunner):
                     if not row or row[0] is None:
                         with open(sql_file, "r", encoding="utf-8") as f:
                             sql = f.read()
-                        import re
-                        sql = re.sub(r'AND NOT EXISTS \(\s*\.\.\.+', 'AND NOT EXISTS (', sql)
                         cur.execute(sql)
             finally:
                 conn.close()

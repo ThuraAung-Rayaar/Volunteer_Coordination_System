@@ -17,7 +17,7 @@ class GeminiProvider(BaseAIProvider):
     def __init__(
         self,
         api_key: str,
-        model: str = "gemini-3.6-flash",
+        model: str = "gemini-3.5-flash-lite",
         timeout_seconds: int = 15,
     ):
         self.api_key = api_key
@@ -123,8 +123,21 @@ class GeminiProvider(BaseAIProvider):
                 raw_body = resp.read().decode("utf-8")
                 resp_json = json.loads(raw_body)
         except urllib.error.HTTPError as e:
-            logger.warning("Gemini API HTTP error: status=%s", e.code)
-            raise RuntimeError(f"Gemini API returned HTTP {e.code}.") from None
+            try:
+                err_body = e.read().decode("utf-8")
+                err_json = json.loads(err_body)
+                err_msg = err_json.get("error", {}).get("message", err_body)
+            except Exception:
+                err_msg = ""
+            logger.warning("Gemini API HTTP error: status=%s detail=%s", e.code, err_msg)
+            if e.code == 429:
+                raise RuntimeError("Gemini API rate limit or quota exceeded.") from None
+            if e.code >= 500:
+                raise RuntimeError(f"Gemini API service temporarily unavailable (HTTP {e.code}).") from None
+            raise RuntimeError(f"Gemini API returned HTTP {e.code}: {err_msg}") from None
+        except (TimeoutError, urllib.error.URLError) as e:
+            logger.warning("Gemini API network/timeout error: %s", type(e).__name__)
+            raise RuntimeError("Gemini API request timed out or connection failed.") from None
         except Exception as e:
             logger.warning("Gemini API connection error: %s", type(e).__name__)
             raise RuntimeError("Failed to communicate with Gemini API.") from None

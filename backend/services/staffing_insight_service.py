@@ -44,7 +44,7 @@ def get_staffing_insight(event_id: int) -> Dict[str, Any]:
     assigned_app_ids = set(
         Assignments.objects.filter(
             event_id=event_id,
-            status__in=["assigned", "confirmed"],
+            status__in=["assigned", "confirmed", "completed"],
         ).values_list("application_id", flat=True)
     )
     accepted_apps_count = EventApplications.objects.filter(
@@ -76,11 +76,10 @@ def get_staffing_insight(event_id: int) -> Dict[str, Any]:
             "assigned_count": p.assigned_count,
             "remaining": p.remaining,
         })
-        if p.status == "open":
-            if p.remaining == 0:
-                has_full_post = True
-            elif p.remaining > 0:
-                has_remaining_post = True
+        if p.status == "full" or (p.status == "open" and p.remaining == 0):
+            has_full_post = True
+        elif p.status == "open" and p.remaining > 0:
+            has_remaining_post = True
 
     # Compute deterministic signals
     now = timezone.now()

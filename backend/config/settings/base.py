@@ -75,7 +75,7 @@ ALLOW_DEV_CODE_IN_AUTH_RESPONSE = os.getenv(
 # AI Assistant Settings (Section 8)
 AI_ENABLED = os.getenv('AI_ENABLED', 'true').lower() in ('true', '1')
 AI_PROVIDER = os.getenv('AI_PROVIDER', 'mock' if not os.getenv('AI_API_KEY') and not os.getenv('GEMINI_API_KEY') else 'gemini')
-AI_MODEL = os.getenv('AI_MODEL', 'qwen3.5:4b' if os.getenv('AI_PROVIDER', '').lower() == 'ollama' else 'gemini-3.6-flash')
+AI_MODEL = os.getenv('AI_MODEL', 'qwen3.5:4b' if os.getenv('AI_PROVIDER', '').lower() == 'ollama' else 'gemini-3.5-flash-lite')
 AI_API_KEY = os.getenv('AI_API_KEY', os.getenv('GEMINI_API_KEY', ''))
 AI_TIMEOUT_SECONDS = int(os.getenv('AI_TIMEOUT_SECONDS', '45'))
 AI_OLLAMA_BASE_URL = os.getenv('AI_OLLAMA_BASE_URL', 'http://127.0.0.1:11434')

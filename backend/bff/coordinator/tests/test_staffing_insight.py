@@ -146,3 +146,44 @@ class StaffingInsightTests(TestCase):
         self.assertIn("Staffing Health & Coverage Insights", content)
         self.assertIn("Overall Coverage", content)
         self.assertIn("Open Slots", content)
+
+    def test_completed_assignments_not_miscounted_as_accepted_unassigned(self):
+        """DB-FIX-002: Completed assignments must NOT be counted as accepted-unassigned backlog."""
+        from apps.events.models import EventApplications
+        from apps.coordination.models import Assignments
+        from services.staffing_insight_service import get_staffing_insight
+
+        vol2 = _make_user("Volunteer Participant")
+        app = EventApplications.objects.create(
+            event=self.event,
+            user=vol2,
+        )
+        EventApplications.objects.filter(id=app.id).update(status="accepted")
+        # In VCS, assignments complete when the event completes (published -> active -> completed)
+        Events.objects.filter(id=self.event.id).update(status="active")
+        Events.objects.filter(id=self.event.id).update(status="completed")
+        Assignments.objects.filter(application_id=app.id).update(status="completed")
+
+        insight = get_staffing_insight(self.event.id)
+        signals = [s["code"] for s in insight["signals"]]
+        self.assertNotIn("ACCEPTED_UNASSIGNED", signals)
+
+    def test_full_status_post_triggers_coverage_imbalance(self):
+        """DB-FIX-003: When a post is full and another has open slots, trigger POST_COVERAGE_IMBALANCE."""
+        from apps.events.models import EventApplications
+        from services.staffing_insight_service import get_staffing_insight
+
+        EventPosts.objects.filter(id=self.post_2.id).update(required_headcount=1)
+        self.post_2.refresh_from_db()
+
+        vol3 = _make_user("Volunteer Marshall")
+        app3 = EventApplications.objects.create(
+            event=self.event,
+            user=vol3,
+            post=self.post_2,
+        )
+        EventApplications.objects.filter(id=app3.id).update(status="accepted")
+
+        insight = get_staffing_insight(self.event.id)
+        signals = [s["code"] for s in insight["signals"]]
+        self.assertIn("POST_COVERAGE_IMBALANCE", signals)

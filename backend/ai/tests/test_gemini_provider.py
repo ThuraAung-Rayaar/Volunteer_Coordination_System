@@ -85,3 +85,100 @@ class GeminiProviderTests(SimpleTestCase):
             function_response["response"]["output"]["events"][0]["event_id"],
             7,
         )
+
+    def test_missing_api_key_fails_closed(self):
+        """Missing key must fail closed with ValueError."""
+        provider = GeminiProvider(api_key="")
+        with self.assertRaises(ValueError) as ctx:
+            provider.generate_chat_response(
+                messages=[{"role": "user", "content": "Hello"}],
+                system_instruction="Policy",
+            )
+        self.assertIn("not configured", str(ctx.exception))
+
+    def test_get_configured_provider_fails_closed_when_key_missing(self):
+        """get_configured_ai_provider must raise RuntimeError when AI_PROVIDER=gemini and key is missing."""
+        from ai.services.chat_service import get_configured_ai_provider
+        from django.test import override_settings
+
+        with override_settings(AI_PROVIDER="gemini", AI_API_KEY="", GEMINI_API_KEY=""):
+            with self.assertRaises(RuntimeError) as ctx:
+                get_configured_ai_provider()
+            self.assertIn("AI_API_KEY is not configured", str(ctx.exception))
+
+    def test_mock_and_ollama_do_not_require_gemini_key(self):
+        """Mock and Ollama providers must instantiate without requiring a Gemini key."""
+        from ai.services.chat_service import get_configured_ai_provider
+        from django.test import override_settings
+
+        with override_settings(AI_PROVIDER="mock", AI_API_KEY="", GEMINI_API_KEY=""):
+            provider = get_configured_ai_provider()
+            self.assertIsNotNone(provider)
+
+        with override_settings(AI_PROVIDER="ollama", AI_API_KEY="", GEMINI_API_KEY=""):
+            provider = get_configured_ai_provider()
+            self.assertIsNotNone(provider)
+
+    @patch("ai.providers.gemini_provider.urllib.request.urlopen")
+    def test_http_429_rate_limit_handled_safely(self, urlopen):
+        """HTTP 429 returns safe rate limit message without leaking secret or payload."""
+        import urllib.error
+        err = urllib.error.HTTPError("https://api.url", 429, "Too Many Requests", {}, None)
+        urlopen.side_effect = err
+
+        provider = GeminiProvider(api_key="super-secret-key-12345")
+        with self.assertRaises(RuntimeError) as ctx:
+            provider.generate_chat_response(
+                messages=[{"role": "user", "content": "Sensitive query"}],
+                system_instruction="System",
+            )
+        self.assertIn("rate limit or quota exceeded", str(ctx.exception))
+        self.assertNotIn("super-secret-key-12345", str(ctx.exception))
+        self.assertNotIn("Sensitive query", str(ctx.exception))
+
+    @patch("ai.providers.gemini_provider.urllib.request.urlopen")
+    def test_http_500_handled_safely(self, urlopen):
+        """HTTP 5xx returns safe service unavailable message without leaking secrets."""
+        import urllib.error
+        err = urllib.error.HTTPError("https://api.url", 503, "Service Unavailable", {}, None)
+        urlopen.side_effect = err
+
+        provider = GeminiProvider(api_key="super-secret-key-12345")
+        with self.assertRaises(RuntimeError) as ctx:
+            provider.generate_chat_response(
+                messages=[{"role": "user", "content": "Sensitive query"}],
+                system_instruction="System",
+            )
+        self.assertIn("temporarily unavailable", str(ctx.exception))
+        self.assertNotIn("super-secret-key-12345", str(ctx.exception))
+
+    @patch("ai.providers.gemini_provider.urllib.request.urlopen")
+    def test_timeout_handled_safely(self, urlopen):
+        """TimeoutError returns safe message without leaking secret or payload."""
+        urlopen.side_effect = TimeoutError("Connection timed out")
+
+        provider = GeminiProvider(api_key="super-secret-key-12345")
+        with self.assertRaises(RuntimeError) as ctx:
+            provider.generate_chat_response(
+                messages=[{"role": "user", "content": "Sensitive query"}],
+                system_instruction="System",
+            )
+        self.assertIn("timed out or connection failed", str(ctx.exception))
+        self.assertNotIn("super-secret-key-12345", str(ctx.exception))
+
+    @patch("ai.providers.gemini_provider.urllib.request.urlopen")
+    def test_malformed_response_handled_safely(self, urlopen):
+        """Malformed JSON response returns safe failure message."""
+        response = MagicMock()
+        response.__enter__.return_value = response
+        response.read.return_value = b"<!DOCTYPE html><html>Gateway error</html>"
+        urlopen.return_value = response
+
+        provider = GeminiProvider(api_key="super-secret-key-12345")
+        with self.assertRaises(RuntimeError) as ctx:
+            provider.generate_chat_response(
+                messages=[{"role": "user", "content": "Test"}],
+                system_instruction="System",
+            )
+        self.assertIn("Failed to communicate with Gemini API", str(ctx.exception))
+        self.assertNotIn("super-secret-key-12345", str(ctx.exception))

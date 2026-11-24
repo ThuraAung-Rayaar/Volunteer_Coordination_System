@@ -20,8 +20,10 @@ from ai.security.scope_policy import determine_actor_scope, ACTOR_SCOPE_VOLUNTEE
 from ai.security.redaction import sanitize_ai_data
 from ai.services.chat_service import process_chat_message
 from rest_framework.exceptions import ValidationError, PermissionDenied
+from django.test import override_settings
 
 
+@override_settings(AI_PROVIDER="mock")
 class AIAssistantBackendTests(TestCase):
     def setUp(self):
         self.client = APIClient()
