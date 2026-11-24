@@ -79,7 +79,7 @@ export interface EventRepository {
   /**
    * Fetches the list of published/active events matching optional filter criteria.
    */
-  getEvents(filters?: EventFilters): Promise<EventSummary[]>;
+  getEvents(filters?: EventFilters, forceRefresh?: boolean): Promise<EventSummary[]>;
 
   /**
    * Fetches a paginated slice of published/active events (P1-13).

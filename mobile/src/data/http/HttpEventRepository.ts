@@ -56,48 +56,13 @@ export class HttpEventRepository implements EventRepository {
     this.client = client;
   }
 
-  public async getEvents(filters?: EventFilters): Promise<EventSummary[]> {
-    const params: EventQueryParams = {};
-
-    if (filters) {
-      if (filters.query && filters.query.trim().length > 0) {
-        params.search = filters.query.trim();
-      }
-      if (filters.charityFieldCodes && filters.charityFieldCodes.length > 0) {
-        params.charity_field = filters.charityFieldCodes.join(',');
-      }
-      if (filters.statuses && filters.statuses.length === 1) {
-        params.status = filters.statuses[0];
-      }
-      if (filters.mealsProvided === true) {
-        params.meals_provided = 'true';
-      }
-      if (filters.lodgingProvided === true) {
-        params.lodging_provided = 'true';
-      }
-      if (filters.travelSupportProvided === true) {
-        params.travel_support_provided = 'true';
-      }
-      if (filters.startAfter) {
-        params.starts_after = filters.startAfter;
-      }
-      if (filters.endBefore) {
-        params.starts_before = filters.endBefore;
-      }
-    }
-
-    const res = await eventApi.getEvents(params, this.client);
-    if (!res.ok) {
-      throw new Error(`Failed to load events: ${res.error.message}`);
-    }
-
-    const events: PublicEventDto[] = Array.isArray(res.data)
-      ? res.data
-      : 'results' in res.data
-      ? res.data.results
-      : [];
-
-    return events.map(mapPublicEventSummary);
+  public async getEvents(
+    filters?: EventFilters,
+    forceRefresh?: boolean,
+  ): Promise<EventSummary[]> {
+    // Discovery uses this convenience method; keep it on the bounded query cache.
+    const page = await this.getEventsPage(filters, 1, 50, forceRefresh);
+    return page.results;
   }
 
   public async getEventsPage(

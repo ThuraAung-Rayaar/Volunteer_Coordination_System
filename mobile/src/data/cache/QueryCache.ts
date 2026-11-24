@@ -1,7 +1,8 @@
 /**
  * @format
- * Bounded in-memory Query Cache with TTL, single-flight deduplication,
- * tag-based invalidation, and account scope isolation.
+ *
+ * Bounded in-memory query cache with TTL, single-flight requests, tag
+ * invalidation, and protection against stale requests repopulating cleared data.
  */
 
 import { CACHE_SCOPE, CacheScope } from './cachePolicy';
@@ -27,48 +28,53 @@ export interface CacheOptions {
   forceRefresh?: boolean;
 }
 
+interface InFlightEntry<T> {
+  promise: Promise<T>;
+  tags: string[];
+  scope: CacheScope;
+  keyVersion: number;
+  cacheEpoch: number;
+}
+
 export class QueryCache {
-  private entries: Map<string, CacheEntry<any>> = new Map();
-  private inFlight: Map<string, Promise<any>> = new Map();
+  private entries: Map<string, CacheEntry<unknown>> = new Map();
+  private inFlight: Map<string, InFlightEntry<unknown>> = new Map();
+  private keyVersions: Map<string, number> = new Map();
+  private cacheEpoch = 0;
   private maxEntries: number;
 
   constructor(maxEntries: number = 150) {
-    this.maxEntries = maxEntries;
+    this.maxEntries = Math.max(1, maxEntries);
   }
 
-  /**
-   * Reads a cached item. Returns undefined if not present.
-   */
   public get<T>(key: string): GetResult<T> | undefined {
     const entry = this.entries.get(key);
     if (!entry) return undefined;
 
-    // Refresh insertion order so accessed key becomes most recently used
+    // Refresh insertion order so an accessed key becomes most recently used.
     this.entries.delete(key);
     this.entries.set(key, entry);
-
-    const now = Date.now();
-    const isFresh = now - entry.fetchedAt <= entry.ttlMs;
 
     return {
       value: entry.value as T,
       fetchedAt: entry.fetchedAt,
-      isFresh,
+      isFresh: Date.now() - entry.fetchedAt <= entry.ttlMs,
     };
   }
 
-  /**
-   * Sets a value directly in the cache. Evicts LRU item if capacity is exceeded.
-   */
   public set<T>(key: string, value: T, options?: CacheOptions): void {
+    // A direct write supersedes any older loader for the same key.
+    this.bumpKeyVersion(key);
+    this.inFlight.delete(key);
+    this.store(key, value, options);
+  }
+
+  private store<T>(key: string, value: T, options?: CacheOptions): void {
     if (this.entries.has(key)) {
       this.entries.delete(key);
     } else if (this.entries.size >= this.maxEntries) {
-      // Evict oldest entry (first key in Map insertion order)
       const oldestKey = this.entries.keys().next().value;
-      if (oldestKey) {
-        this.entries.delete(oldestKey);
-      }
+      if (oldestKey !== undefined) this.entries.delete(oldestKey);
     }
 
     this.entries.set(key, {
@@ -80,101 +86,128 @@ export class QueryCache {
     });
   }
 
-  /**
-   * Gets a cached item if fresh; otherwise fetches via loader with deduplication.
-   * If forceRefresh is true, bypasses the fresh cache check.
-   */
   public async getOrFetch<T>(
     key: string,
     loader: () => Promise<T>,
     options?: CacheOptions,
   ): Promise<T> {
-    if (!options?.forceRefresh) {
+    if (options?.forceRefresh) {
+      // A forced refresh supersedes an older in-flight request. Its result may
+      // still be returned to its original caller, but cannot overwrite the cache.
+      this.bumpKeyVersion(key);
+      this.inFlight.delete(key);
+    } else {
       const cached = this.get<T>(key);
-      if (cached && cached.isFresh) {
-        return cached.value;
-      }
+      if (cached?.isFresh) return cached.value;
+
+      const ongoing = this.inFlight.get(key);
+      if (ongoing) return ongoing.promise as Promise<T>;
     }
 
-    // Single-flight deduplication: reuse ongoing promise for this exact key
-    const ongoing = this.inFlight.get(key);
-    if (ongoing) {
-      return ongoing as Promise<T>;
-    }
+    const cacheEpoch = this.cacheEpoch;
+    const keyVersion = this.getKeyVersion(key);
+    let entry!: InFlightEntry<T>;
 
-    const fetchPromise = (async () => {
+    const promise = (async (): Promise<T> => {
       try {
         const result = await loader();
-        // Do not cache null/undefined if considered an error or missing data
-        this.set(key, result, options);
+        const stillCurrent =
+          this.cacheEpoch === cacheEpoch &&
+          this.getKeyVersion(key) === keyVersion &&
+          this.inFlight.get(key) === entry;
+
+        // Missing results are not cached. A request invalidated while running
+        // cannot repopulate a cleared account, tag, prefix, or key.
+        if (stillCurrent && result !== null && result !== undefined) {
+          this.store(key, result, options);
+        }
         return result;
       } finally {
-        this.inFlight.delete(key);
+        if (this.inFlight.get(key) === entry) {
+          this.inFlight.delete(key);
+        }
       }
     })();
 
-    this.inFlight.set(key, fetchPromise);
-    return fetchPromise;
+    entry = {
+      promise,
+      tags: options?.tags ?? [],
+      scope: options?.scope ?? CACHE_SCOPE.PUBLIC,
+      keyVersion,
+      cacheEpoch,
+    };
+    this.inFlight.set(key, entry);
+    return promise;
   }
 
-  /**
-   * Invalidates a single cache key.
-   */
   public invalidate(key: string): void {
     this.entries.delete(key);
+    this.bumpKeyVersion(key);
+    this.inFlight.delete(key);
   }
 
-  /**
-   * Invalidates all cache entries carrying the specified tag.
-   */
   public invalidateTag(tag: string): void {
+    const affected = new Set<string>();
     for (const [key, entry] of this.entries.entries()) {
-      if (entry.tags.includes(tag)) {
-        this.entries.delete(key);
-      }
+      if (entry.tags.includes(tag)) affected.add(key);
     }
+    for (const [key, entry] of this.inFlight.entries()) {
+      if (entry.tags.includes(tag)) affected.add(key);
+    }
+    this.invalidateKeys(affected);
   }
 
-  /**
-   * Invalidates all cache entries whose key starts with the given prefix.
-   */
   public invalidatePrefix(prefix: string): void {
+    const affected = new Set<string>();
     for (const key of this.entries.keys()) {
-      if (key.startsWith(prefix)) {
-        this.entries.delete(key);
-      }
+      if (key.startsWith(prefix)) affected.add(key);
     }
+    for (const key of this.inFlight.keys()) {
+      if (key.startsWith(prefix)) affected.add(key);
+    }
+    this.invalidateKeys(affected);
   }
 
-  /**
-   * Clears all cache entries across all scopes.
-   */
   public clear(): void {
+    // Epoch invalidates every request started before this clear, including
+    // private requests whose promises settle after logout/account switching.
+    this.cacheEpoch += 1;
     this.entries.clear();
     this.inFlight.clear();
+    this.keyVersions.clear();
   }
 
-  /**
-   * Clears only entries matching the specified scope (e.g. 'account').
-   */
   public clearScope(scope: CacheScope): void {
+    const affected = new Set<string>();
     for (const [key, entry] of this.entries.entries()) {
-      if (entry.scope === scope) {
-        this.entries.delete(key);
-      }
+      if (entry.scope === scope) affected.add(key);
     }
+    for (const [key, entry] of this.inFlight.entries()) {
+      if (entry.scope === scope) affected.add(key);
+    }
+    this.invalidateKeys(affected);
   }
 
-  /**
-   * Convenience helper to wipe all private/account-scoped cached data on logout or 401.
-   */
   public clearAccountScope(): void {
     this.clearScope(CACHE_SCOPE.ACCOUNT);
   }
 
-  /**
-   * Inspection helper for test assertions.
-   */
+  private invalidateKeys(keys: Set<string>): void {
+    for (const key of keys) {
+      this.entries.delete(key);
+      this.bumpKeyVersion(key);
+      this.inFlight.delete(key);
+    }
+  }
+
+  private getKeyVersion(key: string): number {
+    return this.keyVersions.get(key) ?? 0;
+  }
+
+  private bumpKeyVersion(key: string): void {
+    this.keyVersions.set(key, this.getKeyVersion(key) + 1);
+  }
+
   public get size(): number {
     return this.entries.size;
   }

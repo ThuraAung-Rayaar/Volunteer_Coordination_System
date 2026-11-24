@@ -8,6 +8,7 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import { defaultCoordinatorRepository } from '../data/mock/MockCoordinatorRepository';
@@ -159,6 +160,7 @@ export function UserProvider({
   initialAuthenticated,
 }: UserProviderProps): React.JSX.Element {
   const [dataMode, setDataModeState] = useState<DataMode>(() => getDataMode());
+  const previousAccountIdRef = useRef<string | null>(null);
   const [currentUser, setCurrentUser] =
     useState<UserProfileSnapshot>(initialUser);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
@@ -187,6 +189,21 @@ export function UserProvider({
     });
     return unsubscribe;
   }, []);
+
+  // Account-scoped cache entries must never cross a signed-in identity change.
+  // This also invalidates in-flight private requests from the previous account.
+  useEffect(() => {
+    const nextAccountId = isAuthenticated ? String(currentUser.id) : null;
+    const previousAccountId = previousAccountIdRef.current;
+    if (
+      previousAccountId &&
+      nextAccountId &&
+      previousAccountId !== nextAccountId
+    ) {
+      queryCache.clearAccountScope();
+    }
+    previousAccountIdRef.current = nextAccountId;
+  }, [currentUser.id, isAuthenticated]);
 
   // Update mock coordinator repository whenever identity changes
   useEffect(() => {

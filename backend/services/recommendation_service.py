@@ -1,28 +1,38 @@
 """
 services/recommendation_service.py
 
-Feature 1: Volunteer-to-event recommendations engine.
-Deterministic, explainable rule-based scoring with hard eligibility filters.
+Feature 1: Explainable volunteer-to-event recommendations.
+Eligibility remains deterministic and database-authoritative. Ranking is advisory
+only and never creates applications or assignments.
 Policy version: recommendation-v1
 """
-
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
-from django.utils import timezone
-from django.db.models import Q
+from typing import Any, Dict, List
 
-from apps.accounts.models import Users, UserCharityInterests
-from apps.events.models import VPublicEvents, EventPosts, VEventPostCapacity, EventApplications
+from django.db.models import Q
+from django.utils import timezone
+
+from apps.accounts.models import (
+    Users,
+    UserCharityInterests,
+    VolunteerAvailabilityExceptions,
+    VolunteerAvailabilityRules,
+)
+from apps.events.models import (
+    EventApplications,
+    EventPosts,
+    VEventPostCapacity,
+    VPublicEvents,
+)
 from apps.coordination.models import Assignments
 from services.application_service import check_user_availability_for_event
 
 logger = logging.getLogger(__name__)
-
 POLICY_VERSION = "recommendation-v1"
 
-# Versioned scoring weights (sum to 100)
+# Versioned weights; all five signals sum to 100.
 WEIGHTS = {
     "skill_match": 35,
     "charity_interest": 25,
@@ -32,29 +42,40 @@ WEIGHTS = {
 }
 
 
-def get_recommendations_for_user(
-    user: Users,
-    limit: int = 10,
-) -> Dict[str, Any]:
-    """
-    Computes explainable, deterministic recommendations for the authenticated volunteer.
-    Hard filters remove any ineligible events before ranking.
-    """
-    now = timezone.now()
+def _normalise(values: Any) -> set[str]:
+    return {
+        str(value).strip().casefold()
+        for value in (values or [])
+        if str(value).strip()
+    }
 
-    # 1. Hard Filter: Public upcoming events with open capacity and active deadlines
-    candidate_events = VPublicEvents.objects.filter(
+
+def get_recommendations_for_user(user: Users, limit: int = 10) -> Dict[str, Any]:
+    """Return eligible events ranked by deterministic, explainable profile fit."""
+    try:
+        result_limit = max(1, min(int(limit), 10))
+    except (TypeError, ValueError):
+        result_limit = 10
+
+    empty_result = {"results": [], "policy_version": POLICY_VERSION}
+    if (
+        not getattr(user, "is_authenticated", False)
+        or not getattr(user, "is_active", False)
+        or getattr(user, "account_status", "") != "active"
+    ):
+        return empty_result
+
+    now = timezone.now()
+    candidates = VPublicEvents.objects.filter(
         status__in=["published", "active"],
         end_at__gt=now,
         spots_remaining__gt=0,
     ).filter(
         Q(application_deadline__isnull=True) | Q(application_deadline__gt=now)
-    ).order_by("start_at")[:100]
+    ).order_by("start_at", "event_id")[:100]
+    if not candidates:
+        return empty_result
 
-    if not candidate_events:
-        return {"results": [], "policy_version": POLICY_VERSION}
-
-    # 2. Hard Filter: Exclude events user already applied to or is assigned to
     applied_event_ids = set(
         EventApplications.objects.filter(
             user_id=user.id,
@@ -69,125 +90,191 @@ def get_recommendations_for_user(
     )
     excluded_event_ids = applied_event_ids | assigned_event_ids
 
-    # 3. Load volunteer preferences and profile signals
-    user_skills = set(
-        s.strip().lower() for s in getattr(user, "skills", []) or [] if s
-    )
-    user_interests = set(
+    user_skills = _normalise(getattr(user, "skills", []))
+    user_interests = _normalise(
         UserCharityInterests.objects.filter(user=user).values_list("field_code_id", flat=True)
     )
-    user_home_area = (getattr(user, "home_area", "") or "").strip().lower()
-    user_is_new = getattr(user, "new_to_volunteer", False)
-    user_has_leader_exp = getattr(user, "has_leader_experience", False)
+    user_home_area = (getattr(user, "home_area", "") or "").strip().casefold()
+    user_is_new = bool(getattr(user, "new_to_volunteer", False))
+    user_has_leader_experience = bool(getattr(user, "has_leader_experience", False))
 
-    scored_results = []
-
-    for ev in candidate_events:
-        if ev.event_id in excluded_event_ids:
+    results: List[Dict[str, Any]] = []
+    for event in candidates:
+        if event.event_id in excluded_event_ids:
             continue
 
-        # 4. Hard Filter: Availability & schedule conflict check via PostgreSQL function
+        # The PostgreSQL availability and conflict functions decide eligibility.
+        # A database error is not interpreted as evidence that the volunteer fits.
         try:
-            avail_check = check_user_availability_for_event(user, ev.event_id)
-            if not avail_check.get("available", True) or avail_check.get("schedule_conflict", False):
-                continue
+            availability = check_user_availability_for_event(user, event.event_id)
         except Exception:
-            # If availability check encounters an error, proceed conservatively
-            pass
-
-        # 5. Get open posts for this event
-        open_posts = EventPosts.objects.filter(
-            event_id=ev.event_id,
-            status="open",
-        )
-        if not open_posts.exists():
+            logger.exception(
+                "Recommendation availability check failed: user_id=%s event_id=%s",
+                user.id,
+                event.event_id,
+            )
             continue
 
-        best_score = 0
+        if not availability.get("available", False) or availability.get("schedule_conflict", True):
+            continue
+
+        # A post must be open and have positive remaining capacity in the
+        # database view, not merely have a stale/open model status.
+        capacity_rows = {
+            row.post_id: row
+            for row in VEventPostCapacity.objects.filter(
+                event_id=event.event_id,
+                status="open",
+                remaining__gt=0,
+            )
+        }
+        if not capacity_rows:
+            continue
+
+        posts = list(
+            EventPosts.objects.filter(
+                event_id=event.event_id,
+                status="open",
+                id__in=list(capacity_rows.keys()),
+            ).order_by("priority", "id")
+        )
+        if not posts:
+            continue
+
+        event_charities = _normalise(event.charity_fields)
+        interest_overlap = user_interests.intersection(event_charities)
+        interest_score = WEIGHTS["charity_interest"] if interest_overlap else 0
+
+        event_location = (event.location_name or "").strip().casefold()
+        region_match = bool(
+            user_home_area
+            and event_location
+            and (
+                user_home_area in event_location
+                or event_location in user_home_area
+            )
+        )
+        region_score = WEIGHTS["region_fit"] if region_match else 0
+
+        # The SQL routine permits a user with no availability rules, but that
+        # is not a positive preference signal and receives no ranking points.
+        event_date = event.start_at.date()
+        event_start_time = event.start_at.time()
+        event_end_time = event.end_at.time() if event.end_at else event_start_time
+        exception = VolunteerAvailabilityExceptions.objects.filter(
+            user=user, date=event_date
+        ).first()
+        availability_match = False
+        if exception is not None:
+            if exception.is_available:
+                availability_match = (
+                    exception.start_time is None
+                    or (
+                        exception.end_time is not None
+                        and event_start_time >= exception.start_time
+                        and event_end_time <= exception.end_time
+                    )
+                )
+            else:
+                availability_match = bool(
+                    exception.start_time
+                    and exception.end_time
+                    and not (
+                        event_start_time < exception.end_time
+                        and event_end_time > exception.start_time
+                    )
+                )
+        else:
+            availability_match = VolunteerAvailabilityRules.objects.filter(
+                user=user,
+                weekday=event.start_at.isoweekday(),
+            ).filter(
+                Q(valid_from__isnull=True) | Q(valid_from__lte=event_date)
+            ).filter(
+                Q(valid_to__isnull=True) | Q(valid_to__gte=event_date)
+            ).filter(
+                start_time__lte=event_start_time,
+                end_time__gte=event_end_time,
+            ).exists()
+        availability_score = WEIGHTS["availability"] if availability_match else 0
+
+        shared_reasons: List[str] = []
+        if interest_overlap:
+            shared_reasons.append(
+                "Matches your interests in " + ", ".join(sorted(interest_overlap))
+            )
+        if region_match:
+            shared_reasons.append("Matches your preferred area")
+        if availability_match:
+            shared_reasons.append("Your saved availability covers this event")
+        else:
+            shared_reasons.append("No schedule conflict was found for this event")
+
+        best_score = -1
         best_post_id = None
         best_reasons: List[str] = []
+        for post in posts:
+            score = interest_score + region_score + availability_score
+            reasons = list(shared_reasons)
 
-        # Check charity category match (shared across posts in the event)
-        ev_charities = set(ev.charity_fields or [])
-        charity_overlap = user_interests.intersection(ev_charities)
-        charity_score = 0
-        if charity_overlap:
-            charity_score = WEIGHTS["charity_interest"]
-            best_reasons.append(f"Matches your interest in {', '.join(charity_overlap)}")
+            required_skills = _normalise(post.required_skills)
+            if required_skills:
+                skill_overlap = user_skills.intersection(required_skills)
+                if skill_overlap:
+                    score += int(
+                        len(skill_overlap) / len(required_skills)
+                        * WEIGHTS["skill_match"]
+                    )
+                    reasons.append(
+                        "Skills match: " + ", ".join(sorted(skill_overlap))
+                    )
+            else:
+                score += int(WEIGHTS["skill_match"] * 0.7)
+                reasons.append("No specialised skills are required")
 
-        # Region/location fit
-        region_score = 0
-        ev_location = (ev.location_name or "").lower()
-        if user_home_area and (user_home_area in ev_location or ev_location in user_home_area):
-            region_score = WEIGHTS["region_fit"]
-            best_reasons.append("Close to your preferred home area")
-
-        # Availability score (already passed hard check)
-        availability_score = WEIGHTS["availability"]
-        best_reasons.append("Your saved availability covers this event")
-
-        # Evaluate best post fit
-        for post in open_posts:
-            post_score = charity_score + region_score + availability_score
-            post_reasons = list(best_reasons)
-
-            # Skill overlap
-            post_skills = set(s.strip().lower() for s in getattr(post, "required_skills", []) or [] if s)
-            if post_skills and user_skills:
-                matching_skills = user_skills.intersection(post_skills)
-                if matching_skills:
-                    ratio = len(matching_skills) / len(post_skills)
-                    skill_points = int(ratio * WEIGHTS["skill_match"])
-                    post_score += skill_points
-                    post_reasons.append(f"Skills match: {', '.join(matching_skills)}")
-            elif not post_skills:
-                # No special skills required
-                post_score += int(WEIGHTS["skill_match"] * 0.7)
-                post_reasons.append("No specialized prerequisites required")
-
-            # Role / experience fit
             if post.new_volunteers_allowed and user_is_new:
-                post_score += WEIGHTS["role_fit"]
-                post_reasons.append("Welcomes new volunteers")
-            elif post.leader_needed and user_has_leader_exp:
-                post_score += WEIGHTS["role_fit"]
-                post_reasons.append("Leadership opportunity matching your experience")
+                score += WEIGHTS["role_fit"]
+                reasons.append("Welcomes new volunteers")
+            elif post.leader_needed and user_has_leader_experience:
+                score += WEIGHTS["role_fit"]
+                reasons.append("Leadership experience fits this role")
 
-            if post_score > best_score:
-                best_score = post_score
+            if score > best_score:
+                best_score = score
                 best_post_id = post.id
-                best_reasons = post_reasons
+                best_reasons = reasons
 
-        # Bound score between 0 and 100
-        best_score = min(max(best_score, 0), 100)
+        if best_post_id is None:
+            continue
 
+        score = min(max(best_score, 0), 100)
         match_label = (
-            "strong" if best_score >= 75
-            else "moderate" if best_score >= 50
+            "strong" if score >= 75
+            else "moderate" if score >= 50
             else "exploratory"
         )
-
-        scored_results.append({
+        results.append({
             "event": {
-                "event_id": ev.event_id,
-                "title": ev.title,
-                "start_at": ev.start_at.isoformat() if ev.start_at else None,
-                "end_at": ev.end_at.isoformat() if ev.end_at else None,
-                "location_name": ev.location_name or "",
-                "charity_fields": ev.charity_fields or [],
-                "spots_remaining": ev.spots_remaining,
+                "event_id": event.event_id,
+                "title": event.title,
+                "start_at": event.start_at.isoformat() if event.start_at else None,
+                "end_at": event.end_at.isoformat() if event.end_at else None,
+                "location_name": event.location_name or "",
+                "charity_fields": event.charity_fields or [],
+                "spots_remaining": int(event.spots_remaining or 0),
             },
-            "match_score": best_score,
+            "match_score": score,
             "match_label": match_label,
-            "reasons": best_reasons[:4],
-            "matched_post_ids": [best_post_id] if best_post_id else [],
+            "reasons": best_reasons[:5],
+            "matched_post_ids": [best_post_id],
             "policy_version": POLICY_VERSION,
         })
 
-    # Sort descending by match_score
-    scored_results.sort(key=lambda x: x["match_score"], reverse=True)
-
-    return {
-        "results": scored_results[:limit],
-        "policy_version": POLICY_VERSION,
-    }
+    results.sort(
+        key=lambda item: (
+            -item["match_score"],
+            item["event"]["start_at"] or "",
+            item["event"]["event_id"],
+        )
+    )
+    return {"results": results[:result_limit], "policy_version": POLICY_VERSION}

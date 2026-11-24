@@ -95,7 +95,8 @@ export function AssistantScreen(): React.JSX.Element {
       setIsLoading(true);
 
       try {
-        const resp = await assistantRepo.sendMessage(text, updatedHistory);
+        // Send only completed turns as context; the backend appends the current prompt.
+        const resp = await assistantRepo.sendMessage(text, messages);
         const assistantMsg: ChatMessage = {
           id: resp.requestId || 'asst-' + Date.now(),
           role: 'assistant',

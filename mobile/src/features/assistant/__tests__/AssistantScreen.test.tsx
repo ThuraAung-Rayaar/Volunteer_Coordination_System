@@ -80,6 +80,8 @@ describe('Phase 4: AssistantScreen Integration', () => {
       'Recommend events',
       expect.any(Array),
     );
+    const submittedHistory = mockRepo.sendMessage.mock.calls[0][1];
+    expect(submittedHistory.some(item => item.role === 'user' && item.content === 'Recommend events')).toBe(false);
 
     await act(async () => {
       renderer.unmount();

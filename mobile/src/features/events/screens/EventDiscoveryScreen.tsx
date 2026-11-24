@@ -154,7 +154,7 @@ export function EventDiscoveryScreen({
       try {
         setErrorMessage(null);
         const [data] = await Promise.all([
-          repository.getEvents(effectiveFilters),
+          repository.getEvents(effectiveFilters, forceRefresh),
           fetchRecommendations(forceRefresh),
         ]);
         setEvents(data);

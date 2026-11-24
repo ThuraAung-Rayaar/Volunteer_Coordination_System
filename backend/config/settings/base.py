@@ -75,9 +75,11 @@ ALLOW_DEV_CODE_IN_AUTH_RESPONSE = os.getenv(
 # AI Assistant Settings (Section 8)
 AI_ENABLED = os.getenv('AI_ENABLED', 'true').lower() in ('true', '1')
 AI_PROVIDER = os.getenv('AI_PROVIDER', 'mock' if not os.getenv('AI_API_KEY') and not os.getenv('GEMINI_API_KEY') else 'gemini')
-AI_MODEL = os.getenv('AI_MODEL', 'gemini-1.5-flash')
+AI_MODEL = os.getenv('AI_MODEL', 'qwen3.5:4b' if os.getenv('AI_PROVIDER', '').lower() == 'ollama' else 'gemini-3.6-flash')
 AI_API_KEY = os.getenv('AI_API_KEY', os.getenv('GEMINI_API_KEY', ''))
-AI_TIMEOUT_SECONDS = int(os.getenv('AI_TIMEOUT_SECONDS', '15'))
+AI_TIMEOUT_SECONDS = int(os.getenv('AI_TIMEOUT_SECONDS', '45'))
+AI_OLLAMA_BASE_URL = os.getenv('AI_OLLAMA_BASE_URL', 'http://127.0.0.1:11434')
+AI_OLLAMA_KEEP_ALIVE = os.getenv('AI_OLLAMA_KEEP_ALIVE', '5m')
 AI_MAX_OUTPUT_TOKENS = int(os.getenv('AI_MAX_OUTPUT_TOKENS', '800'))
 AI_MAX_HISTORY_MESSAGES = int(os.getenv('AI_MAX_HISTORY_MESSAGES', '4'))
 AI_RATE_LIMIT_PER_MINUTE = int(os.getenv('AI_RATE_LIMIT_PER_MINUTE', '20'))
@@ -186,6 +188,7 @@ REST_FRAMEWORK = {
     'DEFAULT_THROTTLE_RATES': {
         'anon': '60/min',
         'user': '300/min',
+        'assistant': f'{AI_RATE_LIMIT_PER_MINUTE}/min',
     },
     'EXCEPTION_HANDLER': 'common.exceptions.custom_exception_handler',
     'DEFAULT_SCHEMA_CLASS': 'common.schema.CleanAutoSchema',

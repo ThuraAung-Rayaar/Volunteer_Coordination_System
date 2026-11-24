@@ -17,7 +17,7 @@ class GeminiProvider(BaseAIProvider):
     def __init__(
         self,
         api_key: str,
-        model: str = "gemini-1.5-flash",
+        model: str = "gemini-3.6-flash",
         timeout_seconds: int = 15,
     ):
         self.api_key = api_key
@@ -46,17 +46,32 @@ class GeminiProvider(BaseAIProvider):
                 "parts": [{"text": msg.get("content", "")}],
             })
 
-        # If previous turn had tool calls and now has tool results
+        # Reconstruct the provider's required function-call turn before sending
+        # matching function responses. Tool execution has already been
+        # authorized and performed by the backend service.
         if tool_results:
-            parts = []
-            for tr in tool_results:
-                parts.append({
-                    "functionResponse": {
-                        "name": tr.get("name"),
-                        "response": {"output": tr.get("result")},
+            call_parts = []
+            response_parts = []
+            for result in tool_results:
+                name = result.get("name")
+                if not name:
+                    continue
+                arguments = result.get("arguments")
+                call_parts.append({
+                    "functionCall": {
+                        "name": name,
+                        "args": arguments if isinstance(arguments, dict) else {},
                     }
                 })
-            contents.append({"role": "function", "parts": parts})
+                response_parts.append({
+                    "functionResponse": {
+                        "name": name,
+                        "response": {"output": result.get("result", {})},
+                    }
+                })
+            if call_parts:
+                contents.append({"role": "model", "parts": call_parts})
+                contents.append({"role": "function", "parts": response_parts})
 
         payload: Dict[str, Any] = {
             "contents": contents,
@@ -93,12 +108,11 @@ class GeminiProvider(BaseAIProvider):
                 raw_body = resp.read().decode("utf-8")
                 resp_json = json.loads(raw_body)
         except urllib.error.HTTPError as e:
-            err_body = e.read().decode("utf-8", errors="replace")
-            logger.error("Gemini API HTTP Error %s: %s", e.code, err_body)
-            raise RuntimeError(f"Gemini API returned status {e.code}: {err_body}")
+            logger.warning("Gemini API HTTP error: status=%s", e.code)
+            raise RuntimeError(f"Gemini API returned HTTP {e.code}.") from None
         except Exception as e:
-            logger.error("Gemini API connection error: %s", str(e))
-            raise RuntimeError(f"Failed to communicate with Gemini API: {str(e)}")
+            logger.warning("Gemini API connection error: %s", type(e).__name__)
+            raise RuntimeError("Failed to communicate with Gemini API.") from None
 
         candidates = resp_json.get("candidates", [])
         if not candidates:

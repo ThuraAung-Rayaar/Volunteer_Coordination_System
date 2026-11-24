@@ -170,7 +170,7 @@ export class MockEventRepository implements EventRepository {
     this.clock = clock;
   }
 
-  public async getEvents(filters?: EventFilters): Promise<EventSummary[]> {
+  public async getEvents(filters?: EventFilters, _forceRefresh?: boolean): Promise<EventSummary[]> {
     let result = [...this.events];
 
     if (!filters) {

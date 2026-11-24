@@ -292,6 +292,7 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
     }
 
     queryCache.invalidateTag(cacheTags.coordinator);
+    queryCache.invalidateTag(cacheTags.events);
     const created = await this.getEventDetail(String(res.data.id), true);
     return {
       success: true,
@@ -314,6 +315,8 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
     }
     queryCache.invalidateTag(cacheTags.coordinator);
     queryCache.invalidateTag(cacheTags.event(eventId));
+    queryCache.invalidateTag(cacheTags.events);
+    queryCache.invalidatePrefix('account:me:staffing:');
     const updated = await this.getEventDetail(eventId, true);
     return {
       success: true,
@@ -371,6 +374,7 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
     queryCache.invalidateTag(cacheTags.coordinator);
     queryCache.invalidateTag(cacheTags.event(eventId));
     queryCache.invalidateTag(cacheTags.events);
+    queryCache.invalidatePrefix('account:me:staffing:');
 
     appEventBus.emit(AppEvents.EVENT_STATUS_CHANGED, {
       eventId,
@@ -458,6 +462,8 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
     }
     queryCache.invalidateTag(cacheTags.coordinator);
     queryCache.invalidateTag(cacheTags.event(eventId));
+    queryCache.invalidateTag(cacheTags.events);
+    queryCache.invalidatePrefix('account:me:staffing:');
     return {
       success: true,
       message: 'Post created successfully',
@@ -498,6 +504,8 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
       return { success: false, message: res.error.message };
     }
     queryCache.invalidateTag(cacheTags.coordinator);
+    queryCache.invalidateTag(cacheTags.events);
+    queryCache.invalidatePrefix('account:me:staffing:');
     return {
       success: true,
       message: 'Post updated successfully',
@@ -516,6 +524,8 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
       };
     }
     queryCache.invalidateTag(cacheTags.coordinator);
+    queryCache.invalidateTag(cacheTags.events);
+    queryCache.invalidatePrefix('account:me:staffing:');
     return {
       success: true,
       message: 'Post closed successfully',
@@ -644,6 +654,7 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
     if (linkedEventId) {
       queryCache.invalidateTag(cacheTags.eventApplications(linkedEventId));
       queryCache.invalidateTag(cacheTags.event(linkedEventId));
+      queryCache.invalidateTag(cacheTags.staffing(linkedEventId));
     }
 
     return {
@@ -693,6 +704,7 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
 
     queryCache.invalidateTag(cacheTags.coordinator);
     queryCache.invalidateTag(cacheTags.eventApplications(eventId));
+    queryCache.invalidateTag(cacheTags.staffing(eventId));
 
     return {
       success: true,
@@ -763,6 +775,7 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
     queryCache.invalidateTag(cacheTags.coordinator);
     queryCache.invalidateTag(cacheTags.assignments);
     queryCache.invalidateTag(cacheTags.event(eventId));
+    queryCache.invalidateTag(cacheTags.staffing(eventId));
 
     const assignments = await this.getAssignments(eventId);
     return {
@@ -812,6 +825,7 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
     queryCache.invalidateTag(cacheTags.coordinator);
     queryCache.invalidateTag(cacheTags.assignments);
     queryCache.invalidateTag(cacheTags.event(eventId));
+    queryCache.invalidateTag(cacheTags.staffing(eventId));
 
     // P1-03: Deterministically refetch assignments from server; do not fabricate fake assignment fallback
     const assignments = await this.getAssignments(eventId);
@@ -859,6 +873,7 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
 
     queryCache.invalidateTag(cacheTags.coordinator);
     queryCache.invalidateTag(cacheTags.assignments);
+    queryCache.invalidatePrefix('account:me:staffing:');
 
     return {
       success: true,

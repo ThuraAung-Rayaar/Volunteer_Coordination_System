@@ -164,4 +164,37 @@ describe('QueryCache', () => {
     expect(smallCache.has('k3')).toBe(true);
     expect(smallCache.has('k4')).toBe(true);
   });
+  it('does not let an invalidated in-flight request repopulate the cache', async () => {
+    let resolveLoader!: (value: string) => void;
+    const loader = jest.fn(
+      () => new Promise<string>(resolve => { resolveLoader = resolve; }),
+    );
+
+    const pending = cache.getOrFetch('stale-key', loader, {
+      ttlMs: 5000,
+      scope: CACHE_SCOPE.ACCOUNT,
+      tags: ['private:profile'],
+    });
+    cache.invalidateTag('private:profile');
+    resolveLoader('old-account-data');
+    await pending;
+
+    expect(cache.has('stale-key')).toBe(false);
+  });
+
+  it('does not let a cleared account request repopulate private data', async () => {
+    let resolveLoader!: (value: string) => void;
+    const pending = cache.getOrFetch(
+      'private:profile',
+      () => new Promise<string>(resolve => { resolveLoader = resolve; }),
+      { scope: CACHE_SCOPE.ACCOUNT },
+    );
+
+    cache.clearAccountScope();
+    resolveLoader('previous-user');
+    await pending;
+
+    expect(cache.has('private:profile')).toBe(false);
+  });
+
 });
