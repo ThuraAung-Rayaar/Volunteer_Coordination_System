@@ -242,6 +242,23 @@
 
         <!-- Leaflet Map Container -->
         <div id="dashboard-map" class="h-80 w-full transition-all duration-300 ease-in-out relative z-10 bg-slate-800/30"></div>
+        <script>
+            (function() {
+                try {
+                    if (localStorage.getItem("vcs_dashboard_map_expanded") === "true") {
+                        const dmc = document.getElementById("dashboard-map");
+                        if (dmc) {
+                            dmc.classList.remove("h-80");
+                            dmc.classList.add("h-[600px]");
+                        }
+                        const dlbl = document.getElementById("map-expand-label");
+                        if (dlbl) {
+                            dlbl.textContent = "Contract Map ⤡";
+                        }
+                    }
+                } catch (e) {}
+            })();
+        </script>
     </section>
 
     <!-- SECTION 4: Past Events Detail Summary Table & Summary Feedback Dashboard (2-column split) -->
@@ -689,8 +706,27 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // Expand / Contract Map Toggle
     let isExpanded = false;
+    try {
+        isExpanded = localStorage.getItem("vcs_dashboard_map_expanded") === "true";
+    } catch (e) {}
+
+    if (isExpanded) {
+        mapContainer.classList.remove("h-80");
+        mapContainer.classList.add("h-[600px]");
+        if (labelToggle) labelToggle.textContent = "Contract Map ⤡";
+        setTimeout(() => {
+            map.invalidateSize();
+            if (allBounds.length > 0) {
+                map.fitBounds(allBounds, { padding: [40, 40], maxZoom: 14 });
+            }
+        }, 150);
+    }
+
     btnToggle.addEventListener("click", function () {
         isExpanded = !isExpanded;
+        try {
+            localStorage.setItem("vcs_dashboard_map_expanded", isExpanded ? "true" : "false");
+        } catch (e) {}
         if (isExpanded) {
             mapContainer.classList.remove("h-80");
             mapContainer.classList.add("h-[600px]");

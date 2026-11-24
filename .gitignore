@@ -29,11 +29,13 @@ ENV/
 # Environment Variables & Secrets
 .env
 .env.local
+.local/
 
 # Django Media & Static
 media/
 staticfiles/
 *.sqlite3
+*.dump
 backend/private_media/
 private_media/
 
