@@ -99,7 +99,7 @@ These changes are a foundation, not proof that the feature is complete. Verify e
 
 ### Recommended local starting point
 
-Use **Ollama + \`qwen3.5:4b\`** as the preferred free-to-run local prototype model. The current Ollama library lists this variant at approximately 3.3–4.0 GB model download size and advertises tool support. Actual runtime RAM/VRAM use is higher than the weight-file size and depends on quantization, context length, parallel requests, and hardware.
+Use **Ollama + \`qwen3.5:4b\`** as the preferred free-to-run local prototype model. The current Ollama library lists this variant at approximately 3.4 GB for the current Q4_K_M tag and advertises tool support. Actual runtime RAM/VRAM use is higher than the weight-file size and depends on quantization, context length, parallel requests, and hardware.
 
 On the machine hosting Ollama:
 
