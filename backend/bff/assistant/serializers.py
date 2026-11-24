@@ -9,7 +9,7 @@ class ChatMessageItemSerializer(serializers.Serializer):
 class AssistantChatRequestSerializer(serializers.Serializer):
     message = serializers.CharField(max_length=2000, required=True)
     conversation = serializers.ListField(
-        child=serializers.DictField(),
+        child=ChatMessageItemSerializer(),
         required=False,
         default=list,
     )

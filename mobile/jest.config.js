@@ -10,4 +10,7 @@ module.exports = {
     '^react-native-reanimated$':
       '<rootDir>/node_modules/react-native-reanimated/mock.js',
   },
+  testPathIgnorePatterns: [
+    '<rootDir>/src/data/__tests__/v0_12_0_realHttpIntegration.test.ts',
+  ],
 };

@@ -7,6 +7,7 @@ import {
   Alert,
   Modal,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   View,
@@ -58,6 +59,7 @@ export function CoordinatorEventDetailScreen({
   const [event, setEvent] = useState<CoordinatorEventDetail | null>(null);
   const [staffingInsight, setStaffingInsight] = useState<EventStaffingInsight | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [feedbackBanner, setFeedbackBanner] = useState<string | null>(null);
 
@@ -80,7 +82,7 @@ export function CoordinatorEventDetailScreen({
   const [postStatus, setPostStatus] = useState<PostStatus>('open');
   const [isSavingPost, setIsSavingPost] = useState(false);
 
-  const loadDetail = useCallback(async () => {
+  const loadDetail = useCallback(async (forceRefresh = false) => {
     if (!eventId) {
       setErrorMessage('No event ID provided');
       setIsLoading(false);
@@ -90,9 +92,9 @@ export function CoordinatorEventDetailScreen({
     try {
       setErrorMessage(null);
       const [data, insightData] = await Promise.all([
-        repository.getEventDetail(eventId),
+        repository.getEventDetail(eventId, forceRefresh),
         repository.getStaffingInsight
-          ? repository.getStaffingInsight(eventId).catch(() => null)
+          ? repository.getStaffingInsight(eventId, forceRefresh).catch(() => null)
           : null,
       ]);
       if (!data) {
@@ -112,6 +114,12 @@ export function CoordinatorEventDetailScreen({
 
   useEffect(() => {
     loadDetail();
+  }, [loadDetail]);
+
+  const onRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    await loadDetail(true);
+    setIsRefreshing(false);
   }, [loadDetail]);
 
   const isMonitorMode = event?.isOwnerAsMonitor ?? false;
@@ -294,6 +302,13 @@ export function CoordinatorEventDetailScreen({
         />
 
         <ScrollView
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={onRefresh}
+              colors={[theme.colors.primary]}
+            />
+          }
           contentContainerStyle={[
             styles.scrollContent,
             { padding: theme.spacing.md },

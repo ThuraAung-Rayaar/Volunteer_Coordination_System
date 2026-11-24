@@ -60,9 +60,59 @@ export class HttpEventRepository implements EventRepository {
     filters?: EventFilters,
     forceRefresh?: boolean,
   ): Promise<EventSummary[]> {
-    // Discovery uses this convenience method; keep it on the bounded query cache.
-    const page = await this.getEventsPage(filters, 1, 50, forceRefresh);
-    return page.results;
+    const key = cacheKeys.publicEvents(filters as Record<string, any>);
+    return queryCache.getOrFetch(
+      key,
+      async () => {
+        const params: EventQueryParams = {};
+
+        if (filters) {
+          if (filters.query && filters.query.trim().length > 0) {
+            params.search = filters.query.trim();
+          }
+          if (filters.charityFieldCodes && filters.charityFieldCodes.length > 0) {
+            params.charity_field = filters.charityFieldCodes.join(',');
+          }
+          if (filters.statuses && filters.statuses.length === 1) {
+            params.status = filters.statuses[0];
+          }
+          if (filters.mealsProvided === true) {
+            params.meals_provided = 'true';
+          }
+          if (filters.lodgingProvided === true) {
+            params.lodging_provided = 'true';
+          }
+          if (filters.travelSupportProvided === true) {
+            params.travel_support_provided = 'true';
+          }
+          if (filters.startAfter) {
+            params.starts_after = filters.startAfter;
+          }
+          if (filters.endBefore) {
+            params.starts_before = filters.endBefore;
+          }
+        }
+
+        const res = await eventApi.getEvents(params, this.client);
+        if (!res.ok) {
+          throw new Error(`Failed to load events: ${res.error.message}`);
+        }
+
+        const events: PublicEventDto[] = Array.isArray(res.data)
+          ? res.data
+          : 'results' in res.data
+          ? res.data.results
+          : [];
+
+        return events.map(mapPublicEventSummary);
+      },
+      {
+        ttlMs: CACHE_TTL.PUBLIC_EVENTS_PAGE,
+        tags: [cacheTags.events],
+        scope: CACHE_SCOPE.PUBLIC,
+        forceRefresh,
+      },
+    );
   }
 
   public async getEventsPage(
@@ -109,7 +159,7 @@ export class HttpEventRepository implements EventRepository {
 
         const res = await eventApi.getEvents(params, this.client);
         if (!res.ok) {
-          throw new Error(`Failed to load paginated events: ${res.error.message}`);
+          throw new Error(`Failed to load events: ${res.error.message}`);
         }
 
         const count =
@@ -319,6 +369,13 @@ export class HttpEventRepository implements EventRepository {
         applicationId,
       };
     }
+
+    queryCache.invalidateTag(cacheTags.applications);
+    queryCache.invalidateTag(cacheTags.assignments);
+    queryCache.invalidateTag(cacheTags.dashboard);
+    queryCache.invalidateTag(cacheTags.recommendations);
+    queryCache.invalidateTag(cacheTags.events);
+
     return {
       success: true,
       message: 'Invitation accepted successfully',
@@ -342,6 +399,12 @@ export class HttpEventRepository implements EventRepository {
         applicationId,
       };
     }
+
+    queryCache.invalidateTag(cacheTags.applications);
+    queryCache.invalidateTag(cacheTags.dashboard);
+    queryCache.invalidateTag(cacheTags.recommendations);
+    queryCache.invalidateTag(cacheTags.events);
+
     return {
       success: true,
       message: 'Invitation declined successfully',
@@ -389,6 +452,8 @@ export class HttpEventRepository implements EventRepository {
 
     queryCache.invalidateTag(cacheTags.assignments);
     queryCache.invalidateTag(cacheTags.dashboard);
+    queryCache.invalidateTag(cacheTags.recommendations);
+    queryCache.invalidateTag(cacheTags.events);
 
     return {
       success: true,
@@ -413,6 +478,8 @@ export class HttpEventRepository implements EventRepository {
 
     queryCache.invalidateTag(cacheTags.assignments);
     queryCache.invalidateTag(cacheTags.dashboard);
+    queryCache.invalidateTag(cacheTags.recommendations);
+    queryCache.invalidateTag(cacheTags.events);
 
     return {
       success: true,
@@ -513,6 +580,11 @@ export class HttpEventRepository implements EventRepository {
     );
 
     if (res.ok) {
+      queryCache.invalidateTag(cacheTags.dashboard);
+      queryCache.invalidateTag(cacheTags.assignments);
+      queryCache.invalidateTag(cacheTags.event(eventId));
+      queryCache.invalidateTag(cacheTags.staffing(eventId));
+
       return {
         success: res.data.success ?? true,
         message: res.data.message || 'Geo check-in verified successfully.',
@@ -558,6 +630,13 @@ export class HttpEventRepository implements EventRepository {
       };
     }
 
+    queryCache.invalidateTag(cacheTags.dashboard);
+    queryCache.invalidateTag(cacheTags.assignments);
+    if (res.data.event_id) {
+      queryCache.invalidateTag(cacheTags.event(String(res.data.event_id)));
+      queryCache.invalidateTag(cacheTags.staffing(String(res.data.event_id)));
+    }
+
     return {
       success: true,
       message: 'QR token redeemed successfully.',
@@ -582,6 +661,9 @@ export class HttpEventRepository implements EventRepository {
         message: res.error.message,
       };
     }
+
+    queryCache.invalidateTag(cacheTags.dashboard);
+    queryCache.invalidateTag(cacheTags.assignments);
 
     return {
       success: true,
@@ -618,6 +700,9 @@ export class HttpEventRepository implements EventRepository {
       };
     }
 
+    queryCache.invalidateTag(cacheTags.dashboard);
+    queryCache.invalidateTag(cacheTags.event(eventId));
+
     return {
       success: true,
       message: 'Feedback submitted successfully.',
@@ -647,6 +732,13 @@ export class HttpEventRepository implements EventRepository {
         result: 'code' in res.error ? res.error.code : undefined,
       };
     }
+    queryCache.invalidateTag(cacheTags.dashboard);
+    queryCache.invalidateTag(cacheTags.assignments);
+    if (res.data.event_id) {
+      queryCache.invalidateTag(cacheTags.event(String(res.data.event_id)));
+      queryCache.invalidateTag(cacheTags.staffing(String(res.data.event_id)));
+    }
+
     return {
       success: true,
       message: 'QR check-in completed successfully.',

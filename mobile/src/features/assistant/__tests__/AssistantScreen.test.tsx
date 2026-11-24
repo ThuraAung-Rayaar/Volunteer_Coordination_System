@@ -35,7 +35,7 @@ describe('Phase 4: AssistantScreen Integration', () => {
   it('renders greeting and handles sending messages', async () => {
     const mockRepo = new MockAssistantRepository();
     // Override with immediate resolution for testing
-    jest.spyOn(mockRepo, 'sendMessage').mockResolvedValue({
+    const sendSpy = jest.spyOn(mockRepo, 'sendMessage').mockResolvedValue({
       answer: 'Here are matching events.',
       sources: [],
       suggestedActions: [{ type: 'open_event', eventId: 10, label: 'Test Event' }],
@@ -76,12 +76,17 @@ describe('Phase 4: AssistantScreen Integration', () => {
       sendButton.props.onPress();
     });
 
-    expect(mockRepo.sendMessage).toHaveBeenCalledWith(
+    expect(sendSpy).toHaveBeenCalledWith(
       'Recommend events',
       expect.any(Array),
     );
-    const submittedHistory = mockRepo.sendMessage.mock.calls[0][1];
-    expect(submittedHistory.some(item => item.role === 'user' && item.content === 'Recommend events')).toBe(false);
+    const submittedHistory = sendSpy.mock.calls[0][1];
+    expect(
+      submittedHistory.some(
+        (item: { role: string; content: string }) =>
+          item.role === 'user' && item.content === 'Recommend events',
+      ),
+    ).toBe(false);
 
     await act(async () => {
       renderer.unmount();

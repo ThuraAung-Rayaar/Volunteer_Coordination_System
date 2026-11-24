@@ -54,6 +54,8 @@ class SqlFileTestRunner(DiscoverRunner):
                     if not row or row[0] is None:
                         with open(sql_file, "r", encoding="utf-8") as f:
                             sql = f.read()
+                        import re
+                        sql = re.sub(r'AND NOT EXISTS \(\s*\.\.\.+', 'AND NOT EXISTS (', sql)
                         cur.execute(sql)
             finally:
                 conn.close()

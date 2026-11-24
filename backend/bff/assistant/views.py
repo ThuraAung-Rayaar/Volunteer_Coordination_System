@@ -1,4 +1,5 @@
 from rest_framework import status
+from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.throttling import ScopedRateThrottle
 from common.permissions import IsActiveUser
@@ -45,6 +46,8 @@ class AssistantChatView(APIView):
                 conversation_history=data.get("conversation"),
                 language=data.get("language", "en"),
             )
+        except ValidationError:
+            raise
         except Exception:
             # Never return provider URLs, SQL errors, prompts, or configuration.
             import logging
