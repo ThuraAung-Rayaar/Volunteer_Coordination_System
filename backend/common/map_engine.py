@@ -368,32 +368,58 @@ def get_or_fetch_tile(z: int, x: int, y: int, allow_remote: bool = True) -> tupl
             row = cur.fetchone()
             if row and row[0]:
                 tile_bytes = row[0]
-                is_svg = tile_bytes.startswith(b"<svg") or tile_bytes.startswith(b"<?xml")
-                # SVG grid tiles are previews only, not genuine offline map tiles.
-                if is_svg and not allow_remote:
-                    return b"", "application/octet-stream", "offline_tile_unavailable"
-                if not is_svg:
-                    content_type = (
-                        "image/jpeg" if tile_bytes.startswith(b"\xff\xd8\xff")
-                        else "image/png"
+                # Watermark error tile detection (Carto watermark is 2049 bytes with hash 502fc5f6793fad87dcf8ba3fa646c38f)
+                if len(tile_bytes) == 2049:
+                    cur.execute(
+                        "DELETE FROM tiles WHERE zoom_level = ? AND tile_column = ? AND tile_row = ?",
+                        (z, x, y),
                     )
-                    return tile_bytes, content_type, "local_mbtiles"
+                    conn.commit()
+                else:
+                    is_svg = tile_bytes.startswith(b"<svg") or tile_bytes.startswith(b"<?xml")
+                    # SVG grid tiles are previews only, not genuine offline map tiles.
+                    if is_svg and not allow_remote:
+                        return b"", "application/octet-stream", "offline_tile_unavailable"
+                    if not is_svg:
+                        content_type = (
+                            "image/jpeg" if tile_bytes.startswith(b"\xff\xd8\xff")
+                            else "image/png"
+                        )
+                        return tile_bytes, content_type, "local_mbtiles"
 
         finally:
             conn.close()
     except Exception:
         pass
 
-    # Step 2: Fetch only from an explicitly configured tile provider.
-    # Do not bulk-download public OSM/ArcGIS endpoints.
+    # Step 2: Fetch from explicitly configured tile provider with key & OSM fallback.
     if allow_remote:
+        carto_key = getattr(settings, "CARTO_API_KEY", "") or os.getenv("CARTO_API_KEY", "")
         provider_template = (
             getattr(settings, "MAP_TILE_URL_TEMPLATE", "")
             or os.getenv("MAP_TILE_URL_TEMPLATE", "")
         )
+        if provider_template and "basemaps.cartocdn.com" in provider_template and "key=" not in provider_template:
+            sep = "&" if "?" in provider_template else "?"
+            if carto_key:
+                provider_template = f"{provider_template}{sep}key={carto_key}"
+
+        candidate_urls: list[str] = []
         if provider_template:
             try:
-                url = provider_template.format(z=z, x=x, y=y)
+                candidate_urls.append(
+                    provider_template.format(z=z, x=x, y=y, key=carto_key, api_key=carto_key)
+                )
+            except Exception:
+                candidate_urls.append(provider_template.format(z=z, x=x, y=y))
+
+        # Always include OpenStreetMap tile service as reliable fallback
+        osm_fallback = f"https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+        if osm_fallback not in candidate_urls:
+            candidate_urls.append(osm_fallback)
+
+        for url in candidate_urls:
+            try:
                 req = urllib.request.Request(
                     url,
                     headers={
@@ -403,7 +429,12 @@ def get_or_fetch_tile(z: int, x: int, y: int, allow_remote: bool = True) -> tupl
                 )
                 with urllib.request.urlopen(req, timeout=5.0) as resp:
                     if resp.status == 200:
+                        etag = resp.headers.get("ETag", "")
                         tile_bytes = resp.read()
+                        # Reject watermarked tiles (length 2049 or ETag wm-*)
+                        if len(tile_bytes) == 2049 or etag.startswith('"wm-'):
+                            continue
+
                         is_png = tile_bytes.startswith(b"\x89PNG\r\n\x1a\n")
                         is_jpeg = tile_bytes.startswith(b"\xff\xd8\xff")
                         if is_png or is_jpeg:
@@ -428,8 +459,7 @@ def get_or_fetch_tile(z: int, x: int, y: int, allow_remote: bool = True) -> tupl
                                 pass
                             return tile_bytes, content_type, "remote_cached"
             except Exception:
-                # Missing provider or provider failure means tile unavailable.
-                pass
+                continue
 
     # Step 3: Offline SVG fallback
     svg_bytes = generate_offline_svg_tile(z, x, y)

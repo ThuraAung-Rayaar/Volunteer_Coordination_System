@@ -35,6 +35,23 @@
         </div>
 
         <div id="events-geomap" class="h-80 w-full bg-slate-800/30 relative z-10 transition-all duration-300"></div>
+        <script>
+            (function() {
+                try {
+                    if (localStorage.getItem("vcs_events_geomap_expanded") === "true") {
+                        const mc = document.getElementById("events-geomap");
+                        if (mc) {
+                            mc.classList.remove("h-80");
+                            mc.classList.add("h-[600px]");
+                        }
+                        const lbl = document.getElementById("geomap-expand-label");
+                        if (lbl) {
+                            lbl.textContent = "Contract Map ⤡";
+                        }
+                    }
+                } catch (e) {}
+            })();
+        </script>
     </section>
 
     <!-- Master-Detail Inspector Layout -->
@@ -435,9 +452,29 @@ document.addEventListener("DOMContentLoaded", function () {
     const mapContainer = document.getElementById("events-geomap");
     const expandLabel = document.getElementById("geomap-expand-label");
     let isExpanded = false;
+    try {
+        isExpanded = localStorage.getItem("vcs_events_geomap_expanded") === "true";
+    } catch (e) {}
+
+    if (isExpanded) {
+        mapContainer.classList.remove("h-80");
+        mapContainer.classList.add("h-[600px]");
+        if (expandLabel) expandLabel.textContent = "Contract Map ⤡";
+        setTimeout(() => {
+            map.invalidateSize();
+            if (geoData.selected_event_lat && geoData.selected_event_lng) {
+                map.setView([geoData.selected_event_lat, geoData.selected_event_lng], 15);
+            } else if (bounds.length > 0) {
+                map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 });
+            }
+        }, 150);
+    }
 
     btnToggle.addEventListener("click", function () {
         isExpanded = !isExpanded;
+        try {
+            localStorage.setItem("vcs_events_geomap_expanded", isExpanded ? "true" : "false");
+        } catch (e) {}
         if (isExpanded) {
             mapContainer.classList.remove("h-80");
             mapContainer.classList.add("h-[600px]");
@@ -449,7 +486,11 @@ document.addEventListener("DOMContentLoaded", function () {
         }
         setTimeout(() => {
             map.invalidateSize();
-            if (bounds.length > 0) map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 });
+            if (geoData.selected_event_lat && geoData.selected_event_lng) {
+                map.setView([geoData.selected_event_lat, geoData.selected_event_lng], 15);
+            } else if (bounds.length > 0) {
+                map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 });
+            }
         }, 310);
     });
 

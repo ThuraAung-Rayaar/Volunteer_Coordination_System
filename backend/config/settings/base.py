@@ -47,7 +47,7 @@ CARTO_API_KEY = os.getenv(
 )
 MAP_TILE_URL_TEMPLATE = os.getenv(
     'MAP_TILE_URL_TEMPLATE',
-    'https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png'
+    f'https://basemaps.cartocdn.com/rastertiles/voyager/{{z}}/{{x}}/{{y}}.png?key={CARTO_API_KEY}'
 )
 MAP_TILE_ATTRIBUTION = os.getenv(
     'MAP_TILE_ATTRIBUTION',

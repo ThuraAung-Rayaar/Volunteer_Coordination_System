@@ -78,7 +78,7 @@ def map_style_api_view(request) -> JsonResponse:
 
 
 @extend_schema(exclude=True)
-@api_view(["GET"])
+@api_view(["GET", "HEAD"])
 @permission_classes([AllowAny])
 def map_tile_proxy_view(request, z: int, x: int, y: int) -> HttpResponse:
     """
@@ -112,7 +112,12 @@ def map_tile_proxy_view(request, z: int, x: int, y: int) -> HttpResponse:
         tile_bytes = generate_offline_svg_tile(z, x, y)
         content_type = "image/svg+xml"
 
-    response = HttpResponse(tile_bytes, content_type=content_type)
+    if request.method == "HEAD":
+        response = HttpResponse(b"", content_type=content_type)
+        response["Content-Length"] = str(len(tile_bytes))
+    else:
+        response = HttpResponse(tile_bytes, content_type=content_type)
+
     response["Cache-Control"] = "public, max-age=2592000"
     response["X-Map-Tile-Source"] = source_status
     return response
