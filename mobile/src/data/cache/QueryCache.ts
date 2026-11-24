@@ -32,14 +32,12 @@ interface InFlightEntry<T> {
   promise: Promise<T>;
   tags: string[];
   scope: CacheScope;
-  keyVersion: number;
   cacheEpoch: number;
 }
 
 export class QueryCache {
   private entries: Map<string, CacheEntry<unknown>> = new Map();
   private inFlight: Map<string, InFlightEntry<unknown>> = new Map();
-  private keyVersions: Map<string, number> = new Map();
   private cacheEpoch = 0;
   private maxEntries: number;
 
@@ -64,7 +62,6 @@ export class QueryCache {
 
   public set<T>(key: string, value: T, options?: CacheOptions): void {
     // A direct write supersedes any older loader for the same key.
-    this.bumpKeyVersion(key);
     this.inFlight.delete(key);
     this.store(key, value, options);
   }
@@ -94,8 +91,7 @@ export class QueryCache {
     if (options?.forceRefresh) {
       // A forced refresh supersedes an older in-flight request. Its result may
       // still be returned to its original caller, but cannot overwrite the cache.
-      this.bumpKeyVersion(key);
-      this.inFlight.delete(key);
+        this.inFlight.delete(key);
     } else {
       const cached = this.get<T>(key);
       if (cached?.isFresh) return cached.value;
@@ -105,7 +101,6 @@ export class QueryCache {
     }
 
     const cacheEpoch = this.cacheEpoch;
-    const keyVersion = this.getKeyVersion(key);
     let entry!: InFlightEntry<T>;
 
     const promise = (async (): Promise<T> => {
@@ -113,7 +108,6 @@ export class QueryCache {
         const result = await loader();
         const stillCurrent =
           this.cacheEpoch === cacheEpoch &&
-          this.getKeyVersion(key) === keyVersion &&
           this.inFlight.get(key) === entry;
 
         // Missing results are not cached. A request invalidated while running
@@ -133,7 +127,6 @@ export class QueryCache {
       promise,
       tags: options?.tags ?? [],
       scope: options?.scope ?? CACHE_SCOPE.PUBLIC,
-      keyVersion,
       cacheEpoch,
     };
     this.inFlight.set(key, entry);
@@ -142,7 +135,6 @@ export class QueryCache {
 
   public invalidate(key: string): void {
     this.entries.delete(key);
-    this.bumpKeyVersion(key);
     this.inFlight.delete(key);
   }
 
@@ -174,7 +166,6 @@ export class QueryCache {
     this.cacheEpoch += 1;
     this.entries.clear();
     this.inFlight.clear();
-    this.keyVersions.clear();
   }
 
   public clearScope(scope: CacheScope): void {
@@ -195,17 +186,8 @@ export class QueryCache {
   private invalidateKeys(keys: Set<string>): void {
     for (const key of keys) {
       this.entries.delete(key);
-      this.bumpKeyVersion(key);
-      this.inFlight.delete(key);
+        this.inFlight.delete(key);
     }
-  }
-
-  private getKeyVersion(key: string): number {
-    return this.keyVersions.get(key) ?? 0;
-  }
-
-  private bumpKeyVersion(key: string): void {
-    this.keyVersions.set(key, this.getKeyVersion(key) + 1);
   }
 
   public get size(): number {

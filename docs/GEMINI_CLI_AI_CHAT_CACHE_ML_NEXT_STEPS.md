@@ -118,7 +118,6 @@ AI_OLLAMA_BASE_URL=http://127.0.0.1:11434
 AI_OLLAMA_KEEP_ALIVE=5m
 AI_TIMEOUT_SECONDS=45
 AI_MAX_OUTPUT_TOKENS=600
-AI_MAX_HISTORY_MESSAGES=4
 AI_RATE_LIMIT_PER_MINUTE=20
 \`\`\`
 
@@ -428,3 +427,16 @@ When work is finished, return:
 - unresolved decisions and concrete blockers.
 
 Do not claim production readiness. The target is a believable, demonstrable, safe prototype that can be reviewed before the owner decides whether to merge.
+
+
+## 10. Runtime audit refinements added after the first foundation commit
+
+The follow-up runtime audit tightened a few details before Gemini CLI continues:
+
+- The Ollama tool exchange follows the official assistant tool-call shape (type=function, indexed function name/arguments) and appends matching role=tool messages.
+- The Gemini adapter preserves the exact model content turn returned with function calls (including opaque provider metadata and call IDs) and sends function responses in the following user turn. It also uses the x-goog-api-key header instead of putting the API key in the request URL.
+- If a provider returns more than three parallel tool calls, the service rejects the oversized batch and asks the user to narrow the question. It must not partially answer a provider turn when the provider expects a result for every call in that turn.
+- The mobile cache uses in-flight entry identity plus a cache-wide epoch to prevent stale repopulation. Per-key generation counters were removed because they could grow without bound on long-lived clients.
+- The history limit is a fixed maximum of four prior messages; it is not a tunable setting in this prototype.
+
+Gemini CLI must still execute the focused and full suites, then validate both providers against real local/configured provider instances. These source-level changes are not evidence of a passing runtime integration.

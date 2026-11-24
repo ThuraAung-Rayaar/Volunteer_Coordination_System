@@ -36,7 +36,7 @@ class GeminiProvider(BaseAIProvider):
         if not self.api_key:
             raise ValueError("GEMINI_API_KEY is not configured.")
 
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent?key={self.api_key}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent"
 
         contents = []
         for msg in messages:
@@ -50,28 +50,43 @@ class GeminiProvider(BaseAIProvider):
         # matching function responses. Tool execution has already been
         # authorized and performed by the backend service.
         if tool_results:
-            call_parts = []
             response_parts = []
+            provider_turn = next(
+                (
+                    result.get("provider_turn")
+                    for result in tool_results
+                    if isinstance(result.get("provider_turn"), dict)
+                ),
+                None,
+            )
             for result in tool_results:
                 name = result.get("name")
                 if not name:
                     continue
-                arguments = result.get("arguments")
-                call_parts.append({
-                    "functionCall": {
-                        "name": name,
-                        "args": arguments if isinstance(arguments, dict) else {},
-                    }
-                })
-                response_parts.append({
-                    "functionResponse": {
-                        "name": name,
-                        "response": {"output": result.get("result", {})},
-                    }
-                })
-            if call_parts:
-                contents.append({"role": "model", "parts": call_parts})
-                contents.append({"role": "function", "parts": response_parts})
+                function_response = {
+                    "name": name,
+                    "response": {"output": result.get("result", {})},
+                }
+                if result.get("id"):
+                    function_response["id"] = result["id"]
+                response_parts.append({"functionResponse": function_response})
+
+            if response_parts:
+                if provider_turn:
+                    contents.append(provider_turn)
+                else:
+                    call_parts = [
+                        {
+                            "functionCall": {
+                                "name": result["name"],
+                                "args": result.get("arguments") or {},
+                            }
+                        }
+                        for result in tool_results
+                        if result.get("name")
+                    ]
+                    contents.append({"role": "model", "parts": call_parts})
+                contents.append({"role": "user", "parts": response_parts})
 
         payload: Dict[str, Any] = {
             "contents": contents,
@@ -99,7 +114,7 @@ class GeminiProvider(BaseAIProvider):
         req = urllib.request.Request(
             url,
             data=data_bytes,
-            headers={"Content-Type": "application/json"},
+            headers={"Content-Type": "application/json", "x-goog-api-key": self.api_key},
             method="POST",
         )
 
@@ -136,6 +151,7 @@ class GeminiProvider(BaseAIProvider):
                 tool_calls.append({
                     "name": fc.get("name"),
                     "arguments": fc.get("args", {}),
+                    "id": fc.get("id"),
                 })
 
         usage_meta = resp_json.get("usageMetadata", {})
@@ -149,4 +165,5 @@ class GeminiProvider(BaseAIProvider):
             "tool_calls": tool_calls,
             "usage": usage,
             "model": self.model,
+            "provider_turn": candidate.get("content"),
         }

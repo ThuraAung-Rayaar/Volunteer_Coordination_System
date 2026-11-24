@@ -89,6 +89,14 @@ def process_chat_message(
     )
 
     tool_calls = first_response.get("tool_calls") or []
+    too_many_tool_calls = len(tool_calls) > 3
+    if too_many_tool_calls:
+        # Reject the entire oversized batch. Sending only a subset of a
+        # provider's original parallel function-call turn can break its
+        # required call/result pairing.
+        logger.warning("Assistant provider requested too many tools: count=%s", len(tool_calls))
+        tool_calls = []
+
     sources: List[Dict[str, Any]] = []
     suggested_actions: List[Dict[str, Any]] = []
 
@@ -184,7 +192,12 @@ def process_chat_message(
         )
         answer = final_response.get("content", "")
     else:
-        answer = first_response.get("content", "")
+        answer = (
+            "Please narrow your request so I can retrieve no more than three "
+            "pieces of information at a time."
+            if too_many_tool_calls
+            else first_response.get("content", "")
+        )
 
     unique_actions: List[Dict[str, Any]] = []
     seen_actions = set()

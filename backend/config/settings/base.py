@@ -81,7 +81,6 @@ AI_TIMEOUT_SECONDS = int(os.getenv('AI_TIMEOUT_SECONDS', '45'))
 AI_OLLAMA_BASE_URL = os.getenv('AI_OLLAMA_BASE_URL', 'http://127.0.0.1:11434')
 AI_OLLAMA_KEEP_ALIVE = os.getenv('AI_OLLAMA_KEEP_ALIVE', '5m')
 AI_MAX_OUTPUT_TOKENS = int(os.getenv('AI_MAX_OUTPUT_TOKENS', '800'))
-AI_MAX_HISTORY_MESSAGES = int(os.getenv('AI_MAX_HISTORY_MESSAGES', '4'))
 AI_RATE_LIMIT_PER_MINUTE = int(os.getenv('AI_RATE_LIMIT_PER_MINUTE', '20'))
 
 DEBUG = os.getenv('DEBUG', 'false').lower() == 'true'

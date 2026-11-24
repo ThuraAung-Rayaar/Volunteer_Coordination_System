@@ -72,6 +72,8 @@ class OllamaProviderTests(SimpleTestCase):
         payload = json.loads(urlopen.call_args.args[0].data.decode("utf-8"))
         self.assertEqual(payload["messages"][-1]["role"], "tool")
         self.assertEqual(payload["messages"][-1]["tool_name"], "search_events")
+        self.assertEqual(payload["messages"][-2]["tool_calls"][0]["type"], "function")
+        self.assertEqual(payload["messages"][-2]["tool_calls"][0]["function"]["index"], 0)
         self.assertEqual(
             payload["messages"][-2]["tool_calls"][0]["function"]["arguments"],
             {"query": "cleanup"},
