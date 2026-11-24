@@ -14,6 +14,7 @@ import type {
   CoordinatorOverviewMetrics,
   CreateEventWizardDraft,
   EventPostCapacity,
+  EventStaffingInsight,
   GeoAttemptReview,
   VolunteerUuidLookup,
 } from '../../domain/models/coordinator';
@@ -34,12 +35,15 @@ export interface CoordinatorRepository {
   /**
    * Fetches the list of events owned or coordinated by the user.
    */
-  getMyEvents(): Promise<CoordinatorEventSummary[]>;
+  getMyEvents(forceRefresh?: boolean): Promise<CoordinatorEventSummary[]>;
 
   /**
    * Fetches full coordinator details for an event by ID.
    */
-  getEventDetail(eventId: string): Promise<CoordinatorEventDetail | null>;
+  getEventDetail(
+    eventId: string,
+    forceRefresh?: boolean,
+  ): Promise<CoordinatorEventDetail | null>;
 
   /**
    * Creates a new draft event using the validated wizard data.
@@ -133,7 +137,10 @@ export interface CoordinatorRepository {
   /**
    * Fetches applications for coordinator events, optionally filtered by eventId.
    */
-  getApplications(eventId?: string): Promise<CoordinatorApplicationItem[]>;
+  getApplications(
+    eventId?: string,
+    forceRefresh?: boolean,
+  ): Promise<CoordinatorApplicationItem[]>;
 
   /**
    * Updates an application status (accept, reject, waitlist).
@@ -290,4 +297,12 @@ export interface CoordinatorRepository {
     comment?: string,
     tags?: string[],
   ): Promise<CoordinatorOperationResult>;
+
+  /**
+   * Fetches real-time staffing gap metrics, role breakdown, and operational signals.
+   */
+  getStaffingInsight(
+    eventId: string,
+    forceRefresh?: boolean,
+  ): Promise<EventStaffingInsight>;
 }

@@ -5,6 +5,7 @@
 export const RouteNames = {
   Dashboard: 'Dashboard',
   Events: 'Events',
+  Assistant: 'Assistant',
   Notifications: 'Notifications',
   Friends: 'Friends',
   MyApplications: 'MyApplications',

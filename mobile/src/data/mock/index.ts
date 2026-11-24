@@ -15,6 +15,7 @@ export * from './MockDashboardRepository';
 export * from './MockEventRepository';
 export * from './MockProfileRepository';
 export * from './MockCoordinatorRepository';
+export * from './MockAssistantRepository';
 export * from './mockUtils';
 
 export const mockDefaultUser: UserProfileSnapshot = ordinaryVolunteerUser;

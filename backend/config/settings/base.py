@@ -72,6 +72,16 @@ ALLOW_DEV_CODE_IN_AUTH_RESPONSE = os.getenv(
     'true' if os.getenv('DEBUG', 'false').lower() == 'true' else 'false'
 ).lower() in ('true', '1')
 
+# AI Assistant Settings (Section 8)
+AI_ENABLED = os.getenv('AI_ENABLED', 'true').lower() in ('true', '1')
+AI_PROVIDER = os.getenv('AI_PROVIDER', 'mock' if not os.getenv('AI_API_KEY') and not os.getenv('GEMINI_API_KEY') else 'gemini')
+AI_MODEL = os.getenv('AI_MODEL', 'gemini-1.5-flash')
+AI_API_KEY = os.getenv('AI_API_KEY', os.getenv('GEMINI_API_KEY', ''))
+AI_TIMEOUT_SECONDS = int(os.getenv('AI_TIMEOUT_SECONDS', '15'))
+AI_MAX_OUTPUT_TOKENS = int(os.getenv('AI_MAX_OUTPUT_TOKENS', '800'))
+AI_MAX_HISTORY_MESSAGES = int(os.getenv('AI_MAX_HISTORY_MESSAGES', '4'))
+AI_RATE_LIMIT_PER_MINUTE = int(os.getenv('AI_RATE_LIMIT_PER_MINUTE', '20'))
+
 DEBUG = os.getenv('DEBUG', 'false').lower() == 'true'
 
 ALLOWED_HOSTS = [host.strip() for host in os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',') if host.strip()]
@@ -102,6 +112,7 @@ LOCAL_APPS = [
     'apps.audit',
     'admin_portal',
     'bff',
+    'ai',
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS

@@ -209,4 +209,18 @@ export const eventApi = {
       { reason },
     );
   },
+
+  /**
+   * Fetches volunteer-to-event recommendations.
+   * Authenticated endpoint.
+   */
+  getRecommendations(
+    limit: number = 10,
+    client: ApiClient = defaultApiClient,
+  ): Promise<ApiResult<{ results: any[]; policy_version: string }>> {
+    return client.get<{ results: any[]; policy_version: string }>(
+      'me/recommendations/events/',
+      { params: { limit } },
+    );
+  },
 };

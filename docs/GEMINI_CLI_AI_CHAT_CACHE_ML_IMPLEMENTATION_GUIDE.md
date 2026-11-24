@@ -1457,83 +1457,82 @@ Do not run database seed scripts or migrations. Do not change the local/prod dat
 
 ### Phase 0 — Branch and baseline
 
-- Confirm current branch is feature/ai-chat-cache-ml-insights.
-- Confirm HEAD descends from main commit 6239ebf922239a0e4500edc0144d142e961d55b9.
-- Read this guide plus the source references in Sections 1–2.
-- Record current focused test baseline before edits.
-- Confirm no pending unrelated user changes are present in the working tree.
-- Do not touch database schema or seed data.
+- [ ] Confirm current branch is `feature/ai-chat-cache-ml-insights`.
+- [ ] Confirm HEAD descends from main commit `6239ebf922239a0e4500edc0144d142e961d55b9`.
+- [ ] Read this guide plus the source references in Sections 1–2.
+- [ ] Record current focused test baseline before edits.
+- [ ] Confirm no pending unrelated user changes are present in the working tree.
+- [ ] Do not touch database schema or seed data.
 
 ### Phase 1 — Admin card refresh
 
-- Add partial/card endpoints and partial templates.
-- Refactor event inspector into list and selected-detail requests.
-- Refactor user inspector into list and selected-detail requests.
-- Remove decrypted phone from the user list context.
-- Make verification preview modal-based; retain private no-store file streaming.
-- Convert verification review/moderation actions to card-level fetch submissions.
-- Split dashboard data loading and aggregate feedback at the database.
-- Keep progressive-enhancement links/forms.
-- Add/adjust backend tests.
-- Manual check at 390px and 1440px.
+- [ ] Add partial/card endpoints and partial templates.
+- [ ] Refactor event inspector into list and selected-detail requests.
+- [ ] Refactor user inspector into list and selected-detail requests.
+- [ ] Remove decrypted phone from the user list context.
+- [ ] Make verification preview modal-based; retain private no-store file streaming.
+- [ ] Convert verification review/moderation actions to card-level fetch submissions.
+- [ ] Split dashboard data loading and aggregate feedback at the database.
+- [ ] Keep progressive-enhancement links/forms.
+- [ ] Add/adjust backend tests.
+- [ ] Manual check at 390px and 1440px.
 
 ### Phase 2 — Mobile query cache
 
-- Implement bounded in-memory QueryCache.
-- Add TTL and key policy.
-- Add single-flight request deduplication.
-- Add stale-while-revalidate and force refresh.
-- Add account/session/data-mode clearing.
-- Wrap/extend HTTP repositories, not screens with direct fetch.
-- Update screen focus and pull-to-refresh behavior.
-- Add precise invalidation after each relevant successful mutation.
-- Test mock and HTTP mode parity.
+- [ ] Implement bounded in-memory `QueryCache`.
+- [ ] Add TTL and key policy.
+- [ ] Add single-flight request deduplication.
+- [ ] Add stale-while-revalidate and force refresh.
+- [ ] Add account/session/data-mode clearing.
+- [ ] Wrap/extend HTTP repositories, not screens with direct fetch.
+- [ ] Update screen focus and pull-to-refresh behavior.
+- [ ] Add precise invalidation after each relevant successful mutation.
+- [ ] Test mock and HTTP mode parity.
 
 ### Phase 3 — Read-only AI backend
 
-- Add assistant API route and serializers.
-- Add provider abstraction and environment configuration.
-- Add bounded conversation validation.
-- Add role-scope policy and read-only tool registry.
-- Add safe redaction and structured response validation.
-- Add tests for role boundaries, event boundaries, injection, history cap, PII, timeouts, and no writes.
+- [ ] Add assistant API route and serializers.
+- [ ] Add provider abstraction and environment configuration.
+- [ ] Add bounded conversation validation.
+- [ ] Add role-scope policy and read-only tool registry.
+- [ ] Add safe redaction and structured response validation.
+- [ ] Add tests for role boundaries, event boundaries, injection, history cap, PII, timeouts, and no writes.
 
 ### Phase 4 — Chat UIs
 
-- Add admin floating panel in base_admin.html.
-- Add mobile assistant screen and navigation.
-- Extend RepositoryProvider with assistant repository.
-- Keep mock mode provider-independent.
-- Add loading/error/empty/clear states.
-- Add allowlisted navigation actions.
+- [ ] Add admin floating panel in `base_admin.html`.
+- [ ] Add mobile assistant screen and navigation.
+- [ ] Extend `RepositoryProvider` with assistant repository.
+- [ ] Keep mock mode provider-independent.
+- [ ] Add loading/error/empty/clear states.
+- [ ] Add allowlisted navigation actions.
 
 ### Phase 5 — Feature 1
 
-- Add recommendation service and endpoint.
-- Implement eligibility using existing query/application/availability services.
-- Add versioned deterministic scoring weights.
-- Add mobile “Recommended for you” card.
-- Reuse EventDetail and existing apply flow.
-- Add explanation and deterministic tests.
+- [ ] Add recommendation service and endpoint.
+- [ ] Implement eligibility using existing query/application/availability services.
+- [ ] Add versioned deterministic scoring weights.
+- [ ] Add mobile “Recommended for you” card.
+- [ ] Reuse `EventDetail` and existing apply flow.
+- [ ] Add explanation and deterministic tests.
 
 ### Phase 6 — Feature 2
 
-- Add staffing insight service and coordinator/admin read endpoints.
-- Read authoritative views and existing accepted-unassigned query.
-- Add coordinator staffing card and admin event card.
-- Connect to chat tools.
-- Add event-scope and metric consistency tests.
+- [ ] Add staffing insight service and coordinator/admin read endpoints.
+- [ ] Read authoritative views and existing accepted-unassigned query.
+- [ ] Add coordinator staffing card and admin event card.
+- [ ] Connect to chat tools.
+- [ ] Add event-scope and metric consistency tests.
 
 ### Phase 7 — Final review
 
-- Run backend and mobile verification.
-- Review every new endpoint for authentication, object-scope checks, field allowlists, pagination, and cache headers.
-- Review every new tool for read-only behavior.
-- Verify no new DB migration/schema file was added.
-- Verify no verification image or PII entered the cache or LLM context.
-- Summarize files changed, tests run, test results, and any unresolved policy decisions.
-- Do not merge the branch without the project owner's approval.
-
+- [ ] Run backend and mobile verification.
+- [ ] Review every new endpoint for authentication, object-scope checks, field allowlists, pagination, and cache headers.
+- [ ] Review every new tool for read-only behavior.
+- [ ] Verify no new DB migration/schema file was added.
+- [ ] Verify no verification image or PII entered the cache or LLM context.
+- [ ] Summarize files changed, tests run, test results, and any unresolved policy decisions.
+- [ ] Do not merge the branch without the project owner's approval.
 ---
 
 ## 13. Core file reference index

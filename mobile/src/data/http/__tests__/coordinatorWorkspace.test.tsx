@@ -12,6 +12,7 @@ import { coordinatorApi } from '../../endpoints/coordinatorApi';
 import { checkinApi } from '../../endpoints/checkinApi';
 import { eventApi } from '../../endpoints/eventApi';
 import { HttpCoordinatorRepository } from '../HttpCoordinatorRepository';
+import { queryCache } from '../../cache';
 import { MockCoordinatorRepository } from '../../mock/MockCoordinatorRepository';
 import { ThemeProvider } from '../../../theme/ThemeProvider';
 import { CoordinatorApplicationsScreen } from '../../../features/coordinator/screens/CoordinatorApplicationsScreen';
@@ -60,6 +61,7 @@ describe('Phase 7: Coordinator Workspace Integration', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    queryCache.clear();
     const tokenStore = new MemoryTokenStore();
     tokenStore.setToken('valid-test-token');
     const sessionManager = new SessionManager(tokenStore);

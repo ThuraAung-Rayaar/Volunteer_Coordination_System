@@ -26,6 +26,7 @@ interface DrawerItemConfig {
 const MAIN_ITEMS: DrawerItemConfig[] = [
   { name: 'Dashboard', label: 'Dashboard', icon: 'home' },
   { name: 'Events', label: 'Events', icon: 'compass' },
+  { name: 'Assistant', label: 'AI Assistant', icon: 'spark' },
   { name: 'Friends', label: 'Friends', icon: 'user' },
 ];
 

@@ -37,6 +37,7 @@ import { profileApi } from '../data/endpoints/profileApi';
 import { resetDiscoveryCache } from '../features/events/screens/EventDiscoveryScreen';
 import { resetApplicationsCache } from '../features/events/screens/MyApplicationsScreen';
 import { resetAssignmentsCache } from '../features/events/screens/MyAssignmentsScreen';
+import { queryCache } from '../data/cache';
 
 export type UserPreset = 'volunteer' | 'coordinator' | 'pending';
 
@@ -177,6 +178,7 @@ export function UserProvider({
   useEffect(() => {
     const unsubscribe = addDataModeListener(newMode => {
       setDataModeState(newMode);
+      queryCache.clear();
       if (newMode === 'mock') {
         setIsAuthenticated(true);
         setIsBootstrapping(false);
@@ -203,6 +205,7 @@ export function UserProvider({
       resetDiscoveryCache();
       resetApplicationsCache();
       resetAssignmentsCache();
+      queryCache.clear();
       setChallenge(null);
       if (getDataMode() === 'http') {
         setIsAuthenticated(false);
@@ -661,6 +664,7 @@ export function UserProvider({
     resetDiscoveryCache();
     resetApplicationsCache();
     resetAssignmentsCache();
+    queryCache.clear();
     setChallenge(null);
     if (getDataMode() === 'http') {
       try {
@@ -679,6 +683,7 @@ export function UserProvider({
   );
 
   const switchUserPreset = useCallback((preset: UserPreset) => {
+    queryCache.clearAccountScope();
     switch (preset) {
       case 'coordinator':
         setCurrentUser(approvedCoordinatorUser);

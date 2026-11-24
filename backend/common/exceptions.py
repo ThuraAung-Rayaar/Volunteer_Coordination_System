@@ -391,7 +391,10 @@ def custom_exception_handler(exc, context):
 
     if response is not None:
         if hasattr(response, "data"):
-            detail = response.data.get("detail", response.data)
+            if isinstance(response.data, dict):
+                detail = response.data.get("detail", response.data)
+            else:
+                detail = response.data
             if isinstance(detail, list):
                 detail = "; ".join(str(d) for d in detail)
             elif isinstance(detail, dict):

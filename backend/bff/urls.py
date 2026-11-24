@@ -10,6 +10,7 @@ urlpatterns = [
     path('maps/sync/', map_views.admin_map_sync_action_view, name='map_sync_action'),
 
     path('auth/', include('bff.auth.urls')),
+    path('assistant/', include('bff.assistant.urls')),
     path('volunteer/', include('bff.volunteer.urls')),
     path('checkin/', include('bff.checkin.urls')),
     path('coordinator/', include('bff.coordinator.urls')),

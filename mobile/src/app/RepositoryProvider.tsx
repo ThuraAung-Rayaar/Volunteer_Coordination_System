@@ -15,18 +15,21 @@ import {
   getDataMode,
 } from './configuration/dataMode';
 import type {
+  AssistantRepository,
   CoordinatorRepository,
   EventRepository,
   IDashboardRepository,
   ProfileRepository,
 } from '../data/contracts';
 import {
+  defaultAssistantRepository,
   defaultCoordinatorRepository,
   defaultDashboardRepository,
   defaultEventRepository,
   defaultProfileRepository,
 } from '../data/mock';
 import {
+  defaultHttpAssistantRepository,
   defaultHttpCoordinatorRepository,
   defaultHttpDashboardRepository,
   defaultHttpEventRepository,
@@ -38,6 +41,7 @@ export interface RepositoryContextType {
   eventRepository: EventRepository;
   profileRepository: ProfileRepository;
   coordinatorRepository: CoordinatorRepository;
+  assistantRepository: AssistantRepository;
   dataMode: DataMode;
 }
 
@@ -46,6 +50,7 @@ const fallbackContext: RepositoryContextType = {
   eventRepository: defaultEventRepository,
   profileRepository: defaultProfileRepository,
   coordinatorRepository: defaultCoordinatorRepository,
+  assistantRepository: defaultAssistantRepository,
   dataMode: 'mock',
 };
 
@@ -87,12 +92,14 @@ export function RepositoryProvider({
             eventRepository: defaultHttpEventRepository,
             profileRepository: defaultHttpProfileRepository,
             coordinatorRepository: defaultHttpCoordinatorRepository,
+            assistantRepository: defaultHttpAssistantRepository,
           }
         : {
             dashboardRepository: defaultDashboardRepository,
             eventRepository: defaultEventRepository,
             profileRepository: defaultProfileRepository,
             coordinatorRepository: defaultCoordinatorRepository,
+            assistantRepository: defaultAssistantRepository,
           };
 
     return {
@@ -108,6 +115,9 @@ export function RepositoryProvider({
       coordinatorRepository:
         overrideRepositories?.coordinatorRepository ??
         baseRepositories.coordinatorRepository,
+      assistantRepository:
+        overrideRepositories?.assistantRepository ??
+        baseRepositories.assistantRepository,
       dataMode: overrideRepositories?.dataMode ?? activeMode,
     };
   }, [activeMode, overrideRepositories]);
@@ -127,4 +137,9 @@ export function RepositoryProvider({
 export function useRepositories(): RepositoryContextType {
   const context = useContext(RepositoryContext);
   return context ?? fallbackContext;
+}
+
+export function useAssistantRepository(): AssistantRepository {
+  const { assistantRepository } = useRepositories();
+  return assistantRepository;
 }

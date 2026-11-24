@@ -547,5 +547,24 @@ class MeBootstrapView(APIView):
         return Response(UserBootstrapResponseSerializer(data).data, status=status.HTTP_200_OK)
 
 
+class VolunteerRecommendationsView(APIView):
+    """
+    GET /api/v1/me/recommendations/events/?limit=10
+    Feature 1: Deterministic explainable volunteer event recommendations.
+    Strictly actor-scoped to request.user.
+    """
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        summary="Volunteer event recommendations",
+        description="Returns personalized, explainable event recommendations matching the signed-in volunteer's profile and availability.",
+    )
+    def get(self, request):
+        limit = min(int(request.query_params.get("limit") or 10), 20)
+        from services.recommendation_service import get_recommendations_for_user
+        results = get_recommendations_for_user(request.user, limit=limit)
+        return Response(results, status=status.HTTP_200_OK)
+
+
 
 

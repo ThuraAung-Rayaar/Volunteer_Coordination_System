@@ -458,4 +458,17 @@ export const coordinatorApi = {
       data,
     );
   },
+
+  /**
+   * Fetches real-time staffing gap metrics and operational signals.
+   * Authenticated endpoint.
+   */
+  getStaffingInsight(
+    eventId: number | string,
+    client: ApiClient = defaultApiClient,
+  ): Promise<ApiResult<any>> {
+    return client.get<any>(
+      `coordinator/events/${eventId}/staffing-insight/`,
+    );
+  },
 };

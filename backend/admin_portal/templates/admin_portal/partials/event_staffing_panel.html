@@ -1,0 +1,83 @@
+{% if insight %}
+<div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+    <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div class="flex items-center gap-2">
+            <span class="text-blue-500 font-mono text-sm">📊</span>
+            <h3 class="text-xs font-bold uppercase tracking-wider text-white">Staffing Health & Coverage Insights</h3>
+        </div>
+        <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider
+            {% if insight.readiness_status == 'healthy' %}bg-emerald-500/10 text-emerald-400 border border-emerald-500/30
+            {% elif insight.readiness_status == 'warning' %}bg-amber-500/10 text-amber-400 border border-amber-500/30
+            {% else %}bg-rose-500/10 text-rose-400 border border-rose-500/30{% endif %}">
+            {{ insight.readiness_status }}
+        </span>
+    </div>
+
+    <!-- Coverage Progress Bar -->
+    <div class="space-y-1.5">
+        <div class="flex justify-between items-center text-xs">
+            <span class="text-slate-400 font-medium">Overall Coverage</span>
+            <span class="font-mono font-bold text-white">{{ insight.summary.coverage_percent }}% ({{ insight.summary.assigned_count }} / {{ insight.summary.required_headcount }})</span>
+        </div>
+        <div class="w-full bg-slate-800 rounded-full h-2.5 overflow-hidden">
+            <div class="h-full rounded-full transition-all duration-300
+                {% if insight.summary.coverage_percent >= 80 %}bg-emerald-500
+                {% elif insight.summary.coverage_percent >= 50 %}bg-amber-500
+                {% else %}bg-rose-500{% endif %}"
+                style="width: {{ insight.summary.coverage_percent }}%">
+            </div>
+        </div>
+    </div>
+
+    <!-- Metrics Grid -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-2 text-xs">
+        <div class="bg-slate-800/50 p-2.5 rounded-xl border border-slate-700/60">
+            <span class="text-slate-400 text-[10px] uppercase font-semibold">Open Slots</span>
+            <p class="font-mono text-base font-bold mt-0.5 {% if insight.summary.open_slots > 0 %}text-amber-400{% else %}text-emerald-400{% endif %}">
+                {{ insight.summary.open_slots }}
+            </p>
+        </div>
+        <div class="bg-slate-800/50 p-2.5 rounded-xl border border-slate-700/60">
+            <span class="text-slate-400 text-[10px] uppercase font-semibold">Accepted Unassigned</span>
+            <p class="font-mono text-base font-bold mt-0.5 {% if insight.summary.accepted_unassigned > 0 %}text-blue-400{% else %}text-slate-300{% endif %}">
+                {{ insight.summary.accepted_unassigned }}
+            </p>
+        </div>
+        <div class="bg-slate-800/50 p-2.5 rounded-xl border border-slate-700/60">
+            <span class="text-slate-400 text-[10px] uppercase font-semibold">Pending Review</span>
+            <p class="font-mono text-base font-bold mt-0.5 {% if insight.summary.pending_applications > 0 %}text-amber-400{% else %}text-slate-300{% endif %}">
+                {{ insight.summary.pending_applications }}
+            </p>
+        </div>
+        <div class="bg-slate-800/50 p-2.5 rounded-xl border border-slate-700/60">
+            <span class="text-slate-400 text-[10px] uppercase font-semibold">Checked In</span>
+            <p class="font-mono text-base font-bold mt-0.5 text-emerald-400">
+                {{ insight.summary.checked_in_count }}
+            </p>
+        </div>
+    </div>
+
+    <!-- Actionable Operational Signals -->
+    {% if insight.signals %}
+    <div class="space-y-2 pt-2 border-t border-slate-800">
+        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Operational Signals ({{ insight.signals|length }})</span>
+        <div class="space-y-1.5">
+            {% for sig in insight.signals %}
+            <div class="p-2.5 rounded-xl border flex items-start gap-2.5 text-xs
+                {% if sig.severity == 'high' %}bg-rose-500/10 border-rose-500/30 text-rose-300
+                {% elif sig.severity == 'medium' %}bg-amber-500/10 border-amber-500/30 text-amber-300
+                {% else %}bg-blue-500/10 border-blue-500/30 text-blue-300{% endif %}">
+                <span class="text-xs">
+                    {% if sig.severity == 'high' %}⚠️{% elif sig.severity == 'medium' %}⚡{% else %}ℹ️{% endif %}
+                </span>
+                <div class="flex-1">
+                    <p class="font-semibold">{{ sig.title }}</p>
+                    <span class="font-mono text-[10px] opacity-75">Code: {{ sig.code }}</span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endif %}

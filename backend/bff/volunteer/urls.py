@@ -23,9 +23,13 @@ from .views import (
     PublicEventPostsView,
     UserByUuidView,
     VolunteerFeedbackView,
+    VolunteerRecommendationsView,
 )
 
 urlpatterns = [
+    # Feature 1: Recommendations (Section 7)
+    path("me/recommendations/events/", VolunteerRecommendationsView.as_view(), name="me-recommendations-events"),
+    path("recommendations/events/", VolunteerRecommendationsView.as_view(), name="recommendations-events"),
     # Public Events & Taxonomy (Phase 2)
     path("charity-fields/", CharityFieldsListView.as_view(), name="charity-fields-list"),
     path("events/", PublicEventListView.as_view(), name="public-event-list"),

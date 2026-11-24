@@ -12,6 +12,7 @@ from services import (
     event_post_service,
     event_service,
     query_service,
+    staffing_insight_service,
 )
 
 from bff.volunteer.serializers import ApplicationDecisionSerializer
@@ -30,6 +31,7 @@ from .serializers import (
     HandoverSerializer,
     ManualAssignSerializer,
     RetakeSerializer,
+    StaffingInsightSerializer,
 )
 
 
@@ -454,6 +456,17 @@ class CoordinatorEventHistoryView(APIView):
         from services import audit_service
         rows = audit_service.get_event_coordinator_history_for_manager(request.user, event_id)
         return Response({"results": rows})
+
+
+class EventStaffingInsightView(APIView):
+    """GET /api/v1/coordinator/events/{event_id}/staffing-insight/ — staffing health, gaps, and signals."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, event_id):
+        get_event_for_manager_or_404(request.user, event_id, require_write=False)
+        insight = staffing_insight_service.get_staffing_insight(event_id)
+        return Response(StaffingInsightSerializer(insight).data)
+
 
 
 
