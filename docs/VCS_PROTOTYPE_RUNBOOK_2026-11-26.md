@@ -54,6 +54,10 @@ psql -X -h 127.0.0.1 -p 5432 -U postgres -d volunteer_coordination_db -v ON_ERRO
 
 Confirm that the database name, host, port and version are the expected local values before continuing. If the target is remote, production, a different database, or cannot be identified, stop.
 
+### Test database warning
+
+The repository uses a custom Django SQL-file test runner. Running Django tests may create and then drop/recreate the separate database named test_volunteer_coordination_db (unless an explicit test DB name is configured). Before running tests, verify that this test database is disposable and contains no user data or work that must be preserved. Never point Django's TEST.NAME at volunteer_coordination_db. If the expected test database contains valuable data, stop and arrange a new, uniquely named disposable test database through reviewed local test settings before running the suite.
+
 **Never run the following against the existing application database as part of this demo:**
 
 - postgres_sql/VCS_db.sql
