@@ -3,8 +3,9 @@
 **Database Name:** `volunteer_coordination_db`  
 **Engine:** PostgreSQL 18.6 with `btree_gist` and native `uuidv7()`  
 **Host / Port:** `127.0.0.1:5432`  
+**Canonical DDL:** `postgres_sql/VCS_db.sql`  
 **Contract Status:** DATABASE FROZEN — Immutable Schema Contract as of v0.12.0 Stabilization  
-**Generated At:** 2026-11-20 22:15:27 | **Audit Verified:** 2026-11-22 (Preflight PASS: `artifacts/v0_12_0_db_preflight_99db25a.md`)  
+**Generated At:** 2026-11-20 22:15:27 | **Audit Verified:** 2026-11-24 (Read-Only Audit & Disposable Bootstrap Parity PASS: [DB_SOURCE_OF_TRUTH_REPORT.md](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/docs/audit/DB_SOURCE_OF_TRUTH_REPORT.md))  
 **Safety Script:** `scripts/db_preflight_check.py` (Read-only validation of frozen contract)  
 
 ---
