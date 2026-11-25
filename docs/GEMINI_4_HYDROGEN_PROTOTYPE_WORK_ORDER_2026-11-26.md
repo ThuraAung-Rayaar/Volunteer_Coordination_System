@@ -486,16 +486,23 @@ Do not silently switch Gemini -> paid model. Do not return a blank answer or raw
 
 ### Prototype provider: Gemini 4 Hydrogen
 
-Use Google Gemini API only as an explanation provider for **synthetic/non-sensitive prototype data**.
+There are **two separate Hydrogen uses**. Do not confuse them:
 
-- API model ID: gemini-4-hydrogen
+1. **Coding agent:** Use Gemini 4 Hydrogen as the worker model in the user's Gemini CLI / Antigravity environment to execute this work order. The agent's subscription/quota and tool permissions are separate from the runtime backend API key. Select Hydrogen in the coding environment's model selector and verify that the agent is working on the correct local checkout/branch before allowing file writes.
+2. **Prototype runtime:** Configure the Django GeminiProvider for the API model ID gemini-4-hydrogen. Use it only as an explanation provider for synthetic/non-sensitive DTOs.
+
+Google's current launch announcement says Hydrogen is available across Google AI Studio and Gemini API tiers and publishes API pricing of **$1.50 per million input tokens and $7.50 per million output tokens**. It is a hosted API model, not a free local model and not a sub-1-GB download. Verify the project quota, region, billing and current price before the smoke test. The coding-agent quota is not the same as Gemini API token billing.
+
+Runtime API safeguards:
+
+- Use the exact API model ID gemini-4-hydrogen.
 - Use existing GeminiProvider REST adapter unless the current official Gemini API contract requires a narrowly scoped fix.
 - Keep the key on the backend only, in ignored local .env or environment variable.
 - Continue to send the key in x-goog-api-key header, not URL/query parameters.
 - Do not commit, log, print, return, or expose the key to mobile/admin frontend.
-- Do not send production volunteer personal data, raw DB dumps, real phone/profile data, T3/T4 data or sensitive volunteer notes to the free tier.
+- Do not send production volunteer personal data, raw DB dumps, real phone/profile data, T3/T4 data or sensitive volunteer notes to the API. Use synthetic DTOs for Gemini. For real account-specific prototype data, use the mock/local provider until data-processing terms are approved.
 - The smoke test and one synthetic integration scenario must be checked with the configured Google AI Studio project.
-- If the model is unavailable to the user's account, report that exact blocker and use mock deterministic fallback. Do not silently choose another paid model.
+- If the model is unavailable or quota/billing is not configured, report that exact blocker and use mock deterministic fallback. Do not silently choose another paid model.
 
 The API model is not a local downloadable model. Keep model configuration independent of the provider.
 
