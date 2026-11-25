@@ -22,6 +22,8 @@ python_stack/docs/
 ├── mobile_analysis.md                      # React Native client, DDD layers, Assistant & QueryCache
 ├── full_database_details.md                # PostgreSQL 18.6 schema catalog & frozen contract
 ├── tokenization_login_architecture.md      # Zero-PII auth handshake & OTP session state machine
+├── GEMINI_4_HYDROGEN_PROTOTYPE_WORK_ORDER_2026-11-26.md # Branch-scoped AI implementation handoff
+├── VCS_PROTOTYPE_RUNBOOK_2026-11-26.md     # Safe local startup, verification & demo sequence
 └── audit/                                  # 2026-11-24 AI/DB Readiness & Bootstrap Audit Reports
     ├── DB_SOURCE_OF_TRUTH_REPORT.md
     ├── DISPOSABLE_BOOTSTRAP_COMPARISON_PLAN.md
@@ -42,6 +44,15 @@ python_stack/docs/
 | [docs/mobile_analysis.md](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/docs/mobile_analysis.md) | **Mobile Client Tier** | React Native 0.88.1 & TS 6.0 client, Drawer navigation with `AssistantScreen`, DDD presentation/domain/data tiers, dual-mode runtime (`mock` vs `http`), `VolunteerDynamicIsland` & `CoordinatorDynamicIsland`, and bounded `QueryCache` with tag invalidation. |
 | [docs/full_database_details.md](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/docs/full_database_details.md) | **Database Layer** | Exhaustive PostgreSQL 18.6 schema catalog (canonical `postgres_sql/VCS_db.sql`): 31 base tables (23 domain + 8 Django), views, domain stored procedures & triggers, `btree_gist`, native `uuidv7()`, and immutable frozen schema policy. |
 | [docs/tokenization_login_architecture.md](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/docs/tokenization_login_architecture.md) | **Security & Auth** | Zero-cleartext phone tokenization, ephemeral `auth_session_token` with 180s TTL, row-level locking state machine, `OtpDeliveryAdapter` boundary, and sub-500ms latency budget compliance. |
+
+### Prototype Handoff & Operator Runbook
+
+| Document | Purpose |
+|---|---|
+| [GEMINI_4_HYDROGEN_PROTOTYPE_WORK_ORDER_2026-11-26.md](GEMINI_4_HYDROGEN_PROTOTYPE_WORK_ORDER_2026-11-26.md) | Detailed, branch-only Gemini 4 Hydrogen implementation work order for the database-first, role-aware assistant, recommendation/staffing verification, client integration, security boundaries and release gates. |
+| [VCS_PROTOTYPE_RUNBOOK_2026-11-26.md](VCS_PROTOTYPE_RUNBOOK_2026-11-26.md) | Operator instructions to verify the branch and local PostgreSQL target, start Django and React Native, use mock/Gemini modes safely, rehearse volunteer/coordinator scenarios and run tests without mutating the frozen database. |
+
+**Implementation status note:** The existing assistant implementation described in `ai_ml_integration.md` currently uses bounded model-selected tool calls. The Gemini work order specifies a proposed backend-owned intent/data-retrieval flow in which the LLM receives only an authorised DTO. That architecture is a target for the next implementation pass, not a claim that it is already complete.
 
 ### Audit & Readiness Reports (`docs/audit/`)
 
@@ -80,8 +91,8 @@ flowchart TD
     end
 
     subgraph ExternalAI["LLM Providers (Configurable)"]
-        GEM["Google Gemini REST (gemini-3.5-flash-lite)"]
-        OLL["Local Ollama (/api/chat, qwen3.5:4b)"]
+        GEM["Google Gemini API (Hydrogen sample model)"]
+        OLL["Local Ollama (small-model benchmark candidate)"]
         MOCK_AI["Deterministic MockAIProvider"]
     end
 
