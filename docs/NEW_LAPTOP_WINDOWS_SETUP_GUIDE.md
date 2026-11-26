@@ -122,12 +122,14 @@ Every command above should print a valid version without `"is not recognized"` e
    ```powershell
    Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
    ```
-2. Clone the project and navigate into `python_stack`:
+2. Clone the project into a **short folder path** (e.g., `C:\vcs\` — recommended to avoid Windows' 260-character path limit during Android C++/CMake builds) and navigate into `python_stack`:
    ```powershell
-   git clone <your-repo-url> Volunteer_HR_Management
-   cd Volunteer_HR_Management\python_stack
+   cd C:\
+   git clone <your-repo-url> vcs
+   cd C:\vcs\python_stack
    git checkout feature/ai-chat-cache-ml-insights
    ```
+   *(If you must clone into a deep folder like `Documents\...`, enable Windows Long Paths once in an **Administrator** PowerShell: `Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" -Name "LongPathsEnabled" -Value 1`.)*
 3. Run the read-only system status checker to see what is already satisfied on your laptop:
    ```powershell
    python scripts\check_system_status.py

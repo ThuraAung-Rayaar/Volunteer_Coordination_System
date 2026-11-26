@@ -195,7 +195,8 @@ def build_di_payload(
     )
 
     if dev_options_enabled is None:
-        raw_dev = ex_cui.get("dev_options_enabled") if "dev_options_enabled" in ex_cui else env.get("VCS_DEV_OPTIONS_ENABLED", "false")
+        default_dev_flag = "true" if (environment != "production" and debug_val) else "false"
+        raw_dev = ex_cui.get("dev_options_enabled") if "dev_options_enabled" in ex_cui else env.get("VCS_DEV_OPTIONS_ENABLED", default_dev_flag)
         dev_opts = str(raw_dev).strip().lower() in ("1", "true", "yes", "on")
     else:
         dev_opts = bool(dev_options_enabled)
