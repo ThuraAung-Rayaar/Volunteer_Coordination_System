@@ -20,7 +20,7 @@ import {
   defaultEventRepository,
   MockEventRepository,
 } from '../../../data/mock/MockEventRepository';
-import { isHttpMode, isMockMode } from '../../../app/configuration/dataMode';
+import { isMockMode } from '../../../app/configuration/dataMode';
 import { useRepositories } from '../../../app/RepositoryProvider';
 import {
   VolunteerAssignmentItem,
@@ -40,6 +40,7 @@ import {
   EmptyState,
   ErrorState,
   FilterChip,
+  KeyboardLiftView,
   LoadingState,
   StatusBadge,
 } from '../../../shared';
@@ -103,7 +104,10 @@ function formatDateTimeRange(startIso?: string, endIso?: string): string {
   }
 }
 
-function isAssignmentEnded(item: VolunteerAssignmentItem): boolean {
+function isAssignmentEnded(
+  item: VolunteerAssignmentItem,
+  useMockRepo: boolean,
+): boolean {
   if (
     item.eventStatus === 'completed' ||
     item.eventStatus === 'ended' ||
@@ -111,7 +115,7 @@ function isAssignmentEnded(item: VolunteerAssignmentItem): boolean {
   ) {
     return true;
   }
-  if (isHttpMode() && item.endAt) {
+  if (!useMockRepo && item.endAt) {
     try {
       return new Date(item.endAt).getTime() < Date.now();
     } catch {
@@ -121,8 +125,8 @@ function isAssignmentEnded(item: VolunteerAssignmentItem): boolean {
   return false;
 }
 
-function isWithinLockWindow(startIso?: string): boolean {
-  if (!isHttpMode() || !startIso) return false;
+function isWithinLockWindow(startIso: string | undefined, useMockRepo: boolean): boolean {
+  if (useMockRepo || !startIso) return false;
   try {
     const startMs = new Date(startIso).getTime();
     return startMs - Date.now() < 48 * 60 * 60 * 1000;
@@ -131,11 +135,14 @@ function isWithinLockWindow(startIso?: string): boolean {
   }
 }
 
-function getAssignmentBadgeConfig(item: VolunteerAssignmentItem): {
+function getAssignmentBadgeConfig(
+  item: VolunteerAssignmentItem,
+  useMockRepo: boolean,
+): {
   badgeStatus: BadgeStatus;
   label: string;
 } {
-  if (isAssignmentEnded(item)) {
+  if (isAssignmentEnded(item, useMockRepo)) {
     return { badgeStatus: 'muted', label: 'Ended' };
   }
   if (item.status === 'completed' || item.attendanceStatus === 'completed') {
@@ -280,11 +287,7 @@ export function MyAssignmentsScreen({
     try {
       const result = await repository.confirmAssignment(item.id);
       if (result.success) {
-        setFeedbackBanner(
-          isMockMode()
-            ? `Shift for "${item.eventTitle}" confirmed (${result.message})`
-            : result.message,
-        );
+        setFeedbackBanner(result.message);
         await fetchAssignments();
       } else {
         setFeedbackBanner(result.message);
@@ -307,11 +310,7 @@ export function MyAssignmentsScreen({
     try {
       const result = await repository.cancelAssignment(assignmentToCancel.id);
       if (result.success) {
-        setFeedbackBanner(
-          isMockMode()
-            ? `Participation in "${assignmentToCancel.eventTitle}" (${assignmentToCancel.postTitle}) cancelled (${result.message})`
-            : result.message,
-        );
+        setFeedbackBanner(result.message);
         setAssignmentToCancel(null);
         await fetchAssignments();
       } else {
@@ -604,6 +603,10 @@ export function MyAssignmentsScreen({
           title="Could not load assignments"
           description={errorMessage}
           onRetry={fetchAssignments}
+          templateFields={[
+            { label: 'Assigned Shift', placeholder: 'No shift assigned yet' },
+            { label: 'Check-In Status', placeholder: 'Confirmed / Pending' },
+          ]}
         />
       ) : (
         <FlatList
@@ -624,9 +627,11 @@ export function MyAssignmentsScreen({
             />
           }
           renderItem={({ item }) => {
-            const isEnded = isAssignmentEnded(item);
-            const badge = getAssignmentBadgeConfig(item);
-            const isWithin48h = isWithinLockWindow(item.startAt);
+            const useMockRepo =
+              isMockMode() || repository instanceof MockEventRepository;
+            const isEnded = isAssignmentEnded(item, useMockRepo);
+            const badge = getAssignmentBadgeConfig(item, useMockRepo);
+            const isWithin48h = isWithinLockWindow(item.startAt, useMockRepo);
             const canCancel =
               !isEnded &&
               (item.status === 'assigned' || item.status === 'confirmed') &&
@@ -818,16 +823,6 @@ export function MyAssignmentsScreen({
               Your shift will be released.
             </AppText>
 
-            {isMockMode() ? (
-              <AppText
-                variant="caption"
-                color={theme.colors.textSecondary}
-                style={styles.modalDemoNotice}
-              >
-                Demo only — this cancels your own shift assignment in local preview, not the event.
-              </AppText>
-            ) : null}
-
             <View style={styles.modalActions}>
               <View style={styles.modalButtonWrap}>
                 <AppButton
@@ -944,17 +939,21 @@ export function MyAssignmentsScreen({
         animationType="fade"
         onRequestClose={() => setCheckInItem(null)}
       >
-        <View style={styles.modalBackdrop}>
-          <View
-            style={[
-              styles.modalCard,
-              {
-                backgroundColor: theme.colors.surface,
-                borderRadius: theme.radius.md,
-                borderColor: theme.colors.border,
-              },
-            ]}
+        <KeyboardLiftView inModal>
+          <ScrollView
+            contentContainerStyle={styles.modalScrollBackdrop}
+            keyboardShouldPersistTaps="handled"
           >
+            <View
+              style={[
+                styles.modalCard,
+                {
+                  backgroundColor: theme.colors.surface,
+                  borderRadius: theme.radius.md,
+                  borderColor: theme.colors.border,
+                },
+              ]}
+            >
             <AppText variant="title" weight="bold" style={styles.modalTitle}>
               Shift Check-In
             </AppText>
@@ -1028,8 +1027,9 @@ export function MyAssignmentsScreen({
                 }}
               />
             </View>
-          </View>
-        </View>
+            </View>
+          </ScrollView>
+        </KeyboardLiftView>
       </Modal>
 
       {/* QR Camera Scanner Modal */}
@@ -1047,17 +1047,21 @@ export function MyAssignmentsScreen({
         animationType="fade"
         onRequestClose={() => setFeedbackItem(null)}
       >
-        <View style={styles.modalBackdrop}>
-          <View
-            style={[
-              styles.modalCard,
-              {
-                backgroundColor: theme.colors.surface,
-                borderRadius: theme.radius.md,
-                borderColor: theme.colors.border,
-              },
-            ]}
+        <KeyboardLiftView inModal>
+          <ScrollView
+            contentContainerStyle={styles.modalScrollBackdrop}
+            keyboardShouldPersistTaps="handled"
           >
+            <View
+              style={[
+                styles.modalCard,
+                {
+                  backgroundColor: theme.colors.surface,
+                  borderRadius: theme.radius.md,
+                  borderColor: theme.colors.border,
+                },
+              ]}
+            >
             <AppText variant="title" weight="bold" style={styles.modalTitle}>
               Leave Event Feedback
             </AppText>
@@ -1131,8 +1135,9 @@ export function MyAssignmentsScreen({
                 />
               </View>
             </View>
-          </View>
-        </View>
+            </View>
+          </ScrollView>
+        </KeyboardLiftView>
       </Modal>
     </View>
   );
@@ -1197,6 +1202,13 @@ const styles = StyleSheet.create({
   },
   modalBackdrop: {
     flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modalScrollBackdrop: {
+    flexGrow: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',

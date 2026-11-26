@@ -11,6 +11,10 @@ import { CoordinatorAttendanceScreen } from '../coordinator/screens/CoordinatorA
 import { AttendanceRow } from '../coordinator/components/AttendanceRow';
 import { FriendsScreen } from '../friends/screens/FriendsScreen';
 import { UserContext, FullUserContextValue } from '../../app/UserContext';
+import {
+  resetConsumerModeState,
+  setConsumerModeState,
+} from '../../app/configuration/consumerMode';
 import { RepositoryProvider } from '../../app/RepositoryProvider';
 import { ordinaryVolunteerUser, approvedCoordinatorUser } from '../../data/mock/fixtures/demoUsers';
 import { AppButton, AppInput, AppText, StatusBadge } from '../../shared';
@@ -78,6 +82,7 @@ describe('Phase 7: Mobile UI Screen Integration & Verification Suite', () => {
   describe('1. OtpLoginScreen Phase 6A Challenge Flow Integration', () => {
     it('enforces server-supplied code_length (6 digits) in copy and validation', async () => {
       const mockClearChallenge = jest.fn();
+      setConsumerModeState({ devOptionsEnabled: true });
       const mockRequestTokenizedOtp = jest.fn().mockResolvedValue({
         success: true,
         authSessionToken: 'sess-token-123',
@@ -175,6 +180,10 @@ describe('Phase 7: Mobile UI Screen Integration & Verification Suite', () => {
         t.props.children?.toString().includes('Please enter the 6-digit verification code.'),
       );
       expect(fieldError).toBeDefined();
+      await act(async () => {
+        root!.unmount();
+      });
+      resetConsumerModeState();
     });
 
     it('submits verification with auth_session_token and code only (never resending phone)', async () => {
@@ -652,10 +661,10 @@ describe('Phase 7: Mobile UI Screen Integration & Verification Suite', () => {
       });
 
       const json = safeStringify(root!.toJSON());
-      // Discloses BR-PRIV-T4 server-side calculation and absence of active GPS
+      // Discloses BR-PRIV-T4 server-side calculation
       expect(json).toContain('Operational Notice: Authoritative distance calculated on server.');
       expect(json).toContain('Raw GPS coordinates and device telemetry are hidden per Privacy Rule BR-PRIV-T4.');
-      expect(json).toContain('Real location permission and GPS capture are not active in this UI preview.');
+      expect(json).not.toContain('Real location permission and GPS capture are not active in this UI preview.');
     });
   });
 });

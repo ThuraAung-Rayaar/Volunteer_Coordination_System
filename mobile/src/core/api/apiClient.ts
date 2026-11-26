@@ -2,9 +2,9 @@
  * @format
  */
 
+import { isOfflineMode } from '../../app/configuration/dataMode';
 import { buildApiUrl, getApiConfig } from './apiConfig';
 import {
-  AppError,
   createNetworkError,
   createTimeoutError,
   normalizeApiError,
@@ -22,6 +22,7 @@ export interface RequestOptions {
   headers?: Record<string, string>;
   authRequired?: boolean;
   timeoutMs?: number;
+  baseUrl?: string;
   signal?: AbortSignal;
   params?: Record<
     string,
@@ -189,9 +190,17 @@ export class ApiClient {
     options: RequestOptions = {},
   ): Promise<ApiResult<T>> {
     const startTime = Date.now();
+    if (isOfflineMode() && method !== 'GET') {
+      return apiFailure(
+        createNetworkError('Offline Mode: reconnect to the BFF to submit changes.'),
+      );
+    }
     const config = getApiConfig();
+    const effectiveConfig = options.baseUrl
+      ? { ...config, baseUrl: options.baseUrl }
+      : config;
     const query = serializeQueryParams(options.params);
-    const fullUrl = `${buildApiUrl(endpointPath, config)}${query}`;
+    const fullUrl = `${buildApiUrl(endpointPath, effectiveConfig)}${query}`;
 
     // Generate or preserve request correlation ID
     const requestId =

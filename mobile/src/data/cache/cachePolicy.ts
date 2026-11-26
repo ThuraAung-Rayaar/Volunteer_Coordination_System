@@ -11,7 +11,11 @@ export const CACHE_TTL = {
   VOLUNTEER_ASSIGNMENTS: 20 * 1000,    // 20 seconds
   VOLUNTEER_PROFILE: 60 * 1000,        // 60 seconds
   VOLUNTEER_AVAILABILITY: 60 * 1000,   // 60 seconds
+  VOLUNTEER_VERIFICATION: 60 * 1000,   // 60 seconds
+  VOLUNTEER_ATTENDANCE: 30 * 1000,     // 30 seconds
+  VOLUNTEER_FEEDBACK: 60 * 1000,       // 60 seconds
   VOLUNTEER_DASHBOARD: 30 * 1000,      // 30 seconds
+  ASSISTANT_PROMPTS: 5 * 60 * 1000,    // 5 minutes
   COORDINATOR_EVENTS: 20 * 1000,       // 20 seconds
   COORDINATOR_DETAILS: 15 * 1000,      // 15 seconds
   COORDINATOR_EVENT_DETAIL: 15 * 1000, // 15 seconds

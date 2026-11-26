@@ -157,6 +157,11 @@ export function ProfileScreen({
           title="Profile Unavailable"
           description={loadError ?? 'Could not find profile summary.'}
           onRetry={loadData}
+          templateFields={[
+            { label: 'Display Name', placeholder: 'Volunteer Name' },
+            { label: 'Home Area', placeholder: 'Township / Region' },
+            { label: 'Skills & Availability', placeholder: 'Profile fields will appear here' },
+          ]}
         />
       </View>
     );

@@ -11,7 +11,6 @@ import {
 import type { CoordinatorRepository } from '../../../data/contracts/coordinatorRepository';
 import { defaultCoordinatorRepository } from '../../../data/mock/MockCoordinatorRepository';
 import { useRepositories } from '../../../app/RepositoryProvider';
-import { isMockMode } from '../../../app/configuration/dataMode';
 import type {
   CoordinatorEventSummary,
   CoordinatorOverviewMetrics,
@@ -194,7 +193,7 @@ export function CoordinatorOverviewScreen({
                   value={metrics.totalEventsCount}
                   icon="calendar"
                   color={theme.colors.sky ?? theme.colors.accent}
-                  subtext={`${events.filter(e => (e.status === 'active' || e.status === 'published') && (isMockMode() || !e.endAt || new Date(e.endAt).getTime() >= Date.now())).length} currently live`}
+                  subtext={`${events.filter(e => (e.status === 'active' || e.status === 'published') && (!e.endAt || new Date(e.endAt).getTime() >= Date.now())).length} currently live`}
                 />
               </View>
               <View style={styles.metricCol}>
@@ -323,7 +322,7 @@ export function CoordinatorOverviewScreen({
                   e.status !== 'completed' &&
                   e.status !== 'cancelled' &&
                   e.status !== 'ended' &&
-                  (isMockMode() || !e.endAt || new Date(e.endAt).getTime() >= Date.now()),
+                  (!e.endAt || new Date(e.endAt).getTime() >= Date.now()),
               );
               if (liveEvents.length === 0) {
                 return (

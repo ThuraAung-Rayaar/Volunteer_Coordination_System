@@ -1,7 +1,10 @@
 from django.urls import path, include
 from admin_portal import map_views
+from bff.auth.views import ClientConfigView
 
 urlpatterns = [
+    path('client-config/', ClientConfigView.as_view(), name='client-config'),
+
     # Self-Hosted Map Engine & Tile Streaming (MAP-TASK-01)
     path('maps/catalog/', map_views.map_catalog_api_view, name='map_catalog'),
     path('maps/style.json', map_views.map_style_api_view, name='map_style'),

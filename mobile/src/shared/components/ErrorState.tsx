@@ -4,16 +4,22 @@
 
 import React from 'react';
 import { StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
+import {
+  sanitizeConsumerMessage,
+  useConsumerMode,
+} from '../../app/configuration/consumerMode';
 import { hexToRgba, useAppTheme } from '../../theme';
 import { AppButton } from './AppButton';
 import { AppIcon } from './AppIcon';
 import { AppText } from './AppText';
+import { EmptyFormFieldSpec, EmptyFormTemplate } from './EmptyFormTemplate';
 
 export interface ErrorStateProps {
   title?: string;
   description: string;
   onRetry?: () => void;
   retryLabel?: string;
+  templateFields?: ReadonlyArray<EmptyFormFieldSpec>;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -22,9 +28,31 @@ export function ErrorState({
   description,
   onRetry,
   retryLabel = 'Try again',
+  templateFields,
   style,
 }: ErrorStateProps): React.JSX.Element {
   const { theme, isDark } = useAppTheme();
+  const { consumerOnly } = useConsumerMode();
+
+  if (consumerOnly) {
+    const safeTitle = /failed|error|something went wrong|unavailable/i.test(title)
+      ? 'Empty Form Template'
+      : title;
+    const safeDescription = sanitizeConsumerMessage(
+      description,
+      'Information will appear here once available.',
+    );
+    return (
+      <EmptyFormTemplate
+        title={safeTitle}
+        description={safeDescription}
+        fields={templateFields}
+        actionLabel={onRetry ? 'Refresh' : undefined}
+        onActionPress={onRetry}
+        style={style}
+      />
+    );
+  }
 
   return (
     <View

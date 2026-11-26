@@ -1,14 +1,50 @@
+import logging
+
+from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import status
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import APIException
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.throttling import ScopedRateThrottle
-from common.permissions import IsActiveUser
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
-from drf_spectacular.utils import extend_schema
 
 from ai.services.chat_service import process_chat_message
-from .serializers import AssistantChatRequestSerializer, AssistantChatResponseSerializer
+from ai.services.prompt_catalog import get_prompt_catalog_for_actor
+from common.exceptions import DomainError
+from common.permissions import IsActiveUser
+from .serializers import (
+    AssistantChatRequestSerializer,
+    AssistantChatResponseSerializer,
+    AssistantPromptCatalogResponseSerializer,
+)
+
+logger = logging.getLogger(__name__)
+
+
+class AssistantPromptCatalogView(APIView):
+    """
+    GET /api/v1/assistant/prompts/
+    Return the backend-controlled, role-scoped prompt catalogue for the current user.
+    """
+    permission_classes = [IsAuthenticated, IsActiveUser]
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name="language",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                required=False,
+                description="Preferred language code ('en' or 'my').",
+            )
+        ],
+        responses={200: AssistantPromptCatalogResponseSerializer},
+        description="Retrieve role-appropriate predefined assistant prompts.",
+    )
+    def get(self, request):
+        language = request.query_params.get("language", "en")
+        catalog = get_prompt_catalog_for_actor(request.user, language=language)
+        return Response(catalog, status=status.HTTP_200_OK)
 
 
 class AssistantChatView(APIView):
@@ -24,7 +60,7 @@ class AssistantChatView(APIView):
     @extend_schema(
         request=AssistantChatRequestSerializer,
         responses={200: AssistantChatResponseSerializer},
-        description="Submit a conversation query to the role-scoped AI Assistant.",
+        description="Submit a prompt key or conversation query to the role-scoped AI Assistant.",
     )
     def post(self, request):
         from django.conf import settings
@@ -42,16 +78,17 @@ class AssistantChatView(APIView):
         try:
             result = process_chat_message(
                 actor=request.user,
-                message=data["message"],
+                message=data.get("message", ""),
                 conversation_history=data.get("conversation"),
                 language=data.get("language", "en"),
+                prompt_key=data.get("prompt_key", ""),
+                event_id=data.get("event_id"),
             )
-        except ValidationError:
+        except (APIException, DomainError):
             raise
         except Exception:
             # Never return provider URLs, SQL errors, prompts, or configuration.
-            import logging
-            logging.getLogger(__name__).exception("Assistant request failed")
+            logger.exception("Assistant request failed")
             return Response(
                 {
                     "detail": "The assistant could not complete this request. Please retry shortly.",

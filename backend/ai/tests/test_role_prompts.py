@@ -38,7 +38,7 @@ class RolePromptTemplateTests(SimpleTestCase):
     """Verify template contents, version strings, and assembly rules."""
 
     def test_version_constants(self):
-        self.assertEqual(SHARED_POLICY_VERSION, "vcs.shared.v1")
+        self.assertEqual(SHARED_POLICY_VERSION, "vcs.shared.v2")
         self.assertEqual(VOLUNTEER_PROMPT_VERSION, "vcs.volunteer.v1")
         self.assertEqual(COORDINATOR_PROMPT_VERSION, "vcs.coordinator.v1")
         self.assertEqual(ADMIN_PROMPT_VERSION, "vcs.admin.v1")

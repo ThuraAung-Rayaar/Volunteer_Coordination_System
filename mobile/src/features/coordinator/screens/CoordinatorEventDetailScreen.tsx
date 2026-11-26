@@ -31,6 +31,7 @@ import {
   AppText,
   ErrorState,
   FilterChip,
+  KeyboardLiftView,
   LoadingState,
   SectionHeader,
   StatusBadge,
@@ -301,19 +302,21 @@ export function CoordinatorEventDetailScreen({
           onBackPress={handleBack}
         />
 
-        <ScrollView
-          refreshControl={
-            <RefreshControl
-              refreshing={isRefreshing}
-              onRefresh={onRefresh}
-              colors={[theme.colors.primary]}
-            />
-          }
-          contentContainerStyle={[
-            styles.scrollContent,
-            { padding: theme.spacing.md },
-          ]}
-        >
+        <KeyboardLiftView>
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            refreshControl={
+              <RefreshControl
+                refreshing={isRefreshing}
+                onRefresh={onRefresh}
+                colors={[theme.colors.primary]}
+              />
+            }
+            contentContainerStyle={[
+              styles.scrollContent,
+              { padding: theme.spacing.md },
+            ]}
+          >
           {/* Feedback Banner */}
           {feedbackBanner ? (
             <View
@@ -988,6 +991,7 @@ export function CoordinatorEventDetailScreen({
             </View>
           </AppCard>
         </ScrollView>
+        </KeyboardLiftView>
 
         {/* Consequential Transition Confirmation Modal */}
         <Modal
@@ -1035,14 +1039,10 @@ export function CoordinatorEventDetailScreen({
                   weight="bold"
                   color={theme.colors.warning}
                 >
-                  {repositories.dataMode === 'mock'
-                    ? 'Template Preview — local state only'
-                    : 'HTTP Mode — the BFF will process this transition'}
+                  Confirm Lifecycle Update
                 </AppText>
                 <AppText variant="caption" color={theme.colors.textSecondary}>
-                  {repositories.dataMode === 'mock'
-                    ? 'This transition updates local mock state for this preview session.'
-                    : 'This request will be sent to the backend and may change the event status in PostgreSQL.'}
+                  This action updates the event status and visibility for volunteers.
                 </AppText>
               </View>
 
@@ -1068,7 +1068,7 @@ export function CoordinatorEventDetailScreen({
                 </View>
                 <View style={styles.modalButtonWrap}>
                   <AppButton
-                    label={repositories.dataMode === 'mock' ? 'Confirm (Template)' : 'Confirm Transition'}
+                    label="Confirm Transition"
                     variant={
                       pendingTargetStatus === 'cancelled'
                         ? 'danger'

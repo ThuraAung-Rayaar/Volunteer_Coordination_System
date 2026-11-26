@@ -90,9 +90,15 @@ python -m pip install -r backend\requirements\local.txt
 
 Do not add dependencies for the demo unless the implementation agent documents and justifies them.
 
-### Backend local environment file
+### Backend local environment & DI config
 
-Django settings load backend/.env and then the repository-root .env. Use one local untracked file and verify which values are loaded. The backend-level file is preferred for this runbook.
+Django settings load [config_di.py](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/config_di.py), which prioritizes `<root>/di_config.local.json` (created via `python scripts/setup_di_config.py`) before falling back to `backend/.env` and root `.env`. Both `di_config.local.json` and `.env` are gitignored; never commit real keys.
+
+For a brand-new laptop/workstation setup from scratch:
+1. Check prerequisites: `python scripts\check_system_status.py` (writes `SYSTEM_STATUS.md`).
+2. Generate `di_config.local.json`: `.\.venv\Scripts\python.exe scripts\setup_di_config.py --interactive`.
+3. Create and seed local DB + `SEEDED_CREDENTIALS.txt`: `.\.venv\Scripts\python.exe postgres_sql\manage_database.py`.
+4. Launch Django + Metro + Android AVD/USB (3 terminals): see [NEW_LAPTOP_WINDOWS_SETUP_GUIDE.md](NEW_LAPTOP_WINDOWS_SETUP_GUIDE.md).
 
 Required local DB settings should match the verified local instance:
 

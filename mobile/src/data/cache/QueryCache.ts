@@ -2,9 +2,11 @@
  * @format
  *
  * Bounded in-memory query cache with TTL, single-flight requests, tag
- * invalidation, and protection against stale requests repopulating cleared data.
+ * invalidation, offline stale fallback, and protection against stale requests
+ * repopulating cleared data.
  */
 
+import { isOfflineMode } from '../../app/configuration/dataMode';
 import { CACHE_SCOPE, CacheScope } from './cachePolicy';
 
 export interface CacheEntry<T> {
@@ -26,6 +28,43 @@ export interface CacheOptions {
   tags?: string[];
   scope?: CacheScope;
   forceRefresh?: boolean;
+  /** Allow serving stale cached entry when offline or when a network error occurs (default true). */
+  allowStaleOffline?: boolean;
+}
+
+export interface CacheStats {
+  totalEntries: number;
+  publicEntries: number;
+  accountEntries: number;
+  latestFetchedAt: number | null;
+}
+
+export class OfflineCacheMissError extends Error {
+  public readonly isOfflineCacheMiss = true;
+
+  constructor(
+    message: string = 'Offline Mode: no cached data is available yet for this view. Reconnect to BFF to load it.',
+  ) {
+    super(message);
+    this.name = 'OfflineCacheMissError';
+    Object.setPrototypeOf(this, OfflineCacheMissError.prototype);
+  }
+}
+
+function isNetworkFailure(err: unknown): boolean {
+  if (!(err instanceof Error)) {
+    return false;
+  }
+  const msg = err.message.toLowerCase();
+  return (
+    msg.includes('network') ||
+    msg.includes('timeout') ||
+    msg.includes('timed out') ||
+    msg.includes('unable to connect') ||
+    msg.includes('unreachable') ||
+    msg.includes('econnrefused') ||
+    msg.includes('failed to fetch')
+  );
 }
 
 interface InFlightEntry<T> {
@@ -40,9 +79,27 @@ export class QueryCache {
   private inFlight: Map<string, InFlightEntry<unknown>> = new Map();
   private cacheEpoch = 0;
   private maxEntries: number;
+  private changeListeners = new Set<() => void>();
 
   constructor(maxEntries: number = 150) {
     this.maxEntries = Math.max(1, maxEntries);
+  }
+
+  public subscribe(listener: () => void): () => void {
+    this.changeListeners.add(listener);
+    return () => {
+      this.changeListeners.delete(listener);
+    };
+  }
+
+  private notifyChange(): void {
+    this.changeListeners.forEach(listener => {
+      try {
+        listener();
+      } catch {
+        // Listener errors must never disrupt cache operations
+      }
+    });
   }
 
   public get<T>(key: string): GetResult<T> | undefined {
@@ -58,6 +115,10 @@ export class QueryCache {
       fetchedAt: entry.fetchedAt,
       isFresh: Date.now() - entry.fetchedAt <= entry.ttlMs,
     };
+  }
+
+  public getStale<T>(key: string): GetResult<T> | undefined {
+    return this.get<T>(key);
   }
 
   public set<T>(key: string, value: T, options?: CacheOptions): void {
@@ -81,6 +142,7 @@ export class QueryCache {
       tags: options?.tags ?? [],
       scope: options?.scope ?? CACHE_SCOPE.PUBLIC,
     });
+    this.notifyChange();
   }
 
   public async getOrFetch<T>(
@@ -88,10 +150,20 @@ export class QueryCache {
     loader: () => Promise<T>,
     options?: CacheOptions,
   ): Promise<T> {
+    const allowStaleOffline = options?.allowStaleOffline ?? true;
+
+    if (isOfflineMode() && allowStaleOffline) {
+      const cached = this.get<T>(key);
+      if (cached) {
+        return cached.value;
+      }
+      throw new OfflineCacheMissError();
+    }
+
     if (options?.forceRefresh) {
       // A forced refresh supersedes an older in-flight request. Its result may
       // still be returned to its original caller, but cannot overwrite the cache.
-        this.inFlight.delete(key);
+      this.inFlight.delete(key);
     } else {
       const cached = this.get<T>(key);
       if (cached?.isFresh) return cached.value;
@@ -116,6 +188,14 @@ export class QueryCache {
           this.store(key, result, options);
         }
         return result;
+      } catch (err) {
+        if (allowStaleOffline && isNetworkFailure(err)) {
+          const stale = this.get<T>(key);
+          if (stale) {
+            return stale.value;
+          }
+        }
+        throw err;
       } finally {
         if (this.inFlight.get(key) === entry) {
           this.inFlight.delete(key);
@@ -133,9 +213,50 @@ export class QueryCache {
     return promise;
   }
 
+  public exportSnapshot(): Array<[string, CacheEntry<unknown>]> {
+    return Array.from(this.entries.entries()).map(([k, v]) => [k, { ...v }]);
+  }
+
+  public hydrateSnapshot(entries: Array<[string, CacheEntry<unknown>]>): void {
+    for (const [key, entry] of entries) {
+      if (!key || !entry || entry.value === undefined || entry.value === null) {
+        continue;
+      }
+      if (this.entries.size >= this.maxEntries && !this.entries.has(key)) {
+        const oldestKey = this.entries.keys().next().value;
+        if (oldestKey !== undefined) this.entries.delete(oldestKey);
+      }
+      this.entries.set(key, entry);
+    }
+    this.notifyChange();
+  }
+
+  public getStats(): CacheStats {
+    let publicEntries = 0;
+    let accountEntries = 0;
+    let latestFetchedAt: number | null = null;
+    for (const entry of this.entries.values()) {
+      if (entry.scope === CACHE_SCOPE.ACCOUNT) {
+        accountEntries += 1;
+      } else {
+        publicEntries += 1;
+      }
+      if (latestFetchedAt === null || entry.fetchedAt > latestFetchedAt) {
+        latestFetchedAt = entry.fetchedAt;
+      }
+    }
+    return {
+      totalEntries: this.entries.size,
+      publicEntries,
+      accountEntries,
+      latestFetchedAt,
+    };
+  }
+
   public invalidate(key: string): void {
     this.entries.delete(key);
     this.inFlight.delete(key);
+    this.notifyChange();
   }
 
   public invalidateTag(tag: string): void {
@@ -166,6 +287,7 @@ export class QueryCache {
     this.cacheEpoch += 1;
     this.entries.clear();
     this.inFlight.clear();
+    this.notifyChange();
   }
 
   public clearScope(scope: CacheScope): void {
@@ -186,7 +308,10 @@ export class QueryCache {
   private invalidateKeys(keys: Set<string>): void {
     for (const key of keys) {
       this.entries.delete(key);
-        this.inFlight.delete(key);
+      this.inFlight.delete(key);
+    }
+    if (keys.size > 0) {
+      this.notifyChange();
     }
   }
 

@@ -11,6 +11,7 @@ from rest_framework.throttling import AnonRateThrottle
 from rest_framework.views import APIView
 
 from common.exceptions import DomainError
+from common.runtime_config import get_client_runtime_config
 from services import auth_service
 
 from .serializers import (
@@ -212,6 +213,19 @@ class LogoutView(APIView):
     def post(self, request):
         auth_service.logout_user(request.user, request.auth)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ClientConfigView(APIView):
+    """
+    GET /api/v1/client-config/
+    Public non-secret runtime flags for mobile Consumer-Only / Developer-Options mode.
+    """
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    @extend_schema(exclude=True)
+    def get(self, _request):
+        return Response(get_client_runtime_config(), status=status.HTTP_200_OK)
 
 
 # Aliases for specification naming compatibility

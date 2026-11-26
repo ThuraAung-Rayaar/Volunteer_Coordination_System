@@ -1,10 +1,12 @@
 import secrets
 from datetime import timedelta
+from unittest.mock import patch
+
 from django.test import TestCase
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from apps.accounts.models import Users, UserCharityInterests
+from apps.accounts.models import Users, UserCharityInterests, VolunteerAvailabilityRules
 from apps.coordination.models import CoordinatorProfiles, Assignments
 from apps.events.models import (
     CharityFields,
@@ -13,6 +15,7 @@ from apps.events.models import (
     EventPosts,
     Events,
 )
+from services.recommendation_service import get_recommendations_for_user
 
 
 def _phone_hash():
@@ -50,7 +53,6 @@ class VolunteerRecommendationsTests(TestCase):
         profile.save()
         cls.coord_profile = profile
 
-        # Charity taxonomies
         CharityFields.objects.filter(code__in=["rec_env", "rec_edu", "rec_health"]).delete()
         cls.cf_env = CharityFields.objects.create(code="rec_env", label="Environment", sort_order=1, active=True)
         cls.cf_edu = CharityFields.objects.create(code="rec_edu", label="Education", sort_order=2, active=True)
@@ -59,7 +61,6 @@ class VolunteerRecommendationsTests(TestCase):
         cls.volunteer = _make_user("Active Volunteer", skills=["first_aid", "teaching"])
         UserCharityInterests.objects.create(user=cls.volunteer, field_code=cls.cf_edu)
 
-        # 1. Matching Event (Education, Future)
         future_start = timezone.now() + timedelta(days=5)
         future_end = future_start + timedelta(hours=4)
         cls.matching_event = Events.objects.create(
@@ -82,7 +83,6 @@ class VolunteerRecommendationsTests(TestCase):
             status="open",
         )
 
-        # 2. Non-matching Event (Environment, no matching skills/interest)
         cls.env_event = Events.objects.create(
             owner=cls.coord_profile,
             current_coordinator=cls.coord_profile,
@@ -103,7 +103,6 @@ class VolunteerRecommendationsTests(TestCase):
             status="open",
         )
 
-        # 3. Excluded Event: Draft
         cls.draft_event = Events.objects.create(
             owner=cls.coord_profile,
             current_coordinator=cls.coord_profile,
@@ -121,7 +120,6 @@ class VolunteerRecommendationsTests(TestCase):
             status="open",
         )
 
-        # 4. Excluded Event: Already Applied
         cls.applied_event = Events.objects.create(
             owner=cls.coord_profile,
             current_coordinator=cls.coord_profile,
@@ -142,7 +140,6 @@ class VolunteerRecommendationsTests(TestCase):
             status="open",
         )
 
-        # Publish matching, env, and applied events
         Events.objects.filter(id__in=[cls.matching_event.id, cls.env_event.id, cls.applied_event.id]).update(status="published")
         cls.matching_event.refresh_from_db()
         cls.env_event.refresh_from_db()
@@ -182,10 +179,7 @@ class VolunteerRecommendationsTests(TestCase):
             r["event"].get("id") or r["event"].get("event_id")
             for r in res.json()["results"]
         ]
-
-        # Draft event must not be returned
         self.assertNotIn(self.draft_event.id, returned_event_ids)
-        # Event user already applied to must not be returned
         self.assertNotIn(self.applied_event.id, returned_event_ids)
 
     def test_ranking_and_explainable_reasons(self):
@@ -197,13 +191,46 @@ class VolunteerRecommendationsTests(TestCase):
         self.assertTrue(len(results) > 0)
 
         top_match = results[0]
-        # The matching education event should rank first
         top_id = top_match["event"].get("id") or top_match["event"].get("event_id")
         self.assertEqual(top_id, self.matching_event.id)
         self.assertGreaterEqual(top_match["match_score"], 50)
-        self.assertIn("reasons", top_match)
-        self.assertIsInstance(top_match["reasons"], list)
-        self.assertTrue(len(top_match["reasons"]) > 0)
-        # Verify explainable reason references the matched interest
+        self.assertLessEqual(top_match["match_score"], 100)
         reasons_text = " ".join(top_match["reasons"])
         self.assertIn("rec_edu", reasons_text)
+        # No availability rule saved -> reason must cite absence of conflict, not preference match
+        self.assertIn("No schedule conflict was found", reasons_text)
+
+    def test_score_cap_and_labels_and_empty_profile_safety(self):
+        empty_vol = _make_user("Empty Profile Volunteer")
+        recs = get_recommendations_for_user(empty_vol)
+        self.assertEqual(recs["policy_version"], "recommendation-v1")
+        for item in recs["results"]:
+            self.assertLessEqual(item["match_score"], 100)
+            self.assertLess(item["match_score"], 75)
+            self.assertIn(item["match_label"], ("moderate", "exploratory"))
+
+    @patch("services.recommendation_service.check_user_availability_for_event")
+    def test_availability_db_error_excludes_candidate_safely(self, mock_avail):
+        mock_avail.side_effect = RuntimeError("DB failure")
+        recs = get_recommendations_for_user(self.volunteer)
+        self.assertEqual(recs["results"], [])
+
+    def test_expired_deadline_and_cancelled_assignment_eligibility(self):
+        # Expired deadline removes event
+        past_deadline = timezone.now() - timedelta(hours=1)
+        Events.objects.filter(id=self.env_event.id).update(application_deadline=past_deadline)
+        recs = get_recommendations_for_user(self.volunteer)
+        ids = [r["event"]["event_id"] for r in recs["results"]]
+        self.assertNotIn(self.env_event.id, ids)
+
+        # Cancelled assignment does not exclude event when application is also withdrawn
+        Events.objects.filter(id=self.env_event.id).update(application_deadline=timezone.now() + timedelta(days=4))
+        vol2 = _make_user("Cancelled Volunteer")
+        app = EventApplications.objects.create(event=self.env_event, post=self.post_env, user=vol2)
+        EventApplications.objects.filter(id=app.id).update(status="accepted")
+        Assignments.objects.filter(application_id=app.id).update(status="cancelled")
+        EventApplications.objects.filter(id=app.id).update(status="withdrawn")
+
+        recs_after = get_recommendations_for_user(vol2)
+        ids_after = [r["event"]["event_id"] for r in recs_after["results"]]
+        self.assertIn(self.env_event.id, ids_after)

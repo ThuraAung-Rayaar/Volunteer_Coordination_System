@@ -551,13 +551,13 @@ describe('Coordinator Screens Component Integration', () => {
 
     let json = safeStringify(renderer.toJSON());
     expect(json).toContain('Step 7 of 7: Review');
-    expect(json).toContain('Publish Event (Template)');
-    expect(json).toContain('Save as Draft (Template)');
+    expect(json).toContain('Publish Event');
+    expect(json).toContain('Save as Draft');
 
     // Tap Publish Event
     const publishBtn = renderer.root
       .findAllByProps({ accessibilityRole: 'button' })
-      .find(b => b.props.accessibilityLabel === 'Publish Event (Template)')!;
+      .find(b => b.props.accessibilityLabel === 'Publish Event')!;
 
     expect(publishBtn).toBeDefined();
 
@@ -605,10 +605,10 @@ describe('Coordinator Screens Component Integration', () => {
       publishButton!.props.onPress();
     });
 
-    // Verify confirmation modal with Template Preview warning
+    // Verify confirmation modal without developer/template status banners
     json = safeStringify(renderer.toJSON());
     expect(json).toContain('Confirm Status Transition');
-    expect(json).toContain('Template Preview — local state only');
-    expect(json).toContain('Confirm (Template)');
+    expect(json).toContain('Confirm Lifecycle Update');
+    expect(json).toContain('Confirm Transition');
   });
 });

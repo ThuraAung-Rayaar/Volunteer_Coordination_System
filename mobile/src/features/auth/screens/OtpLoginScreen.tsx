@@ -5,8 +5,18 @@
 import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useCurrentUser } from '../../../app/UserContext';
-import { getDataMode } from '../../../app/configuration/dataMode';
 import type { RequestOtpResult, VerifyOtpResult } from '../../../app/UserContext';
+import {
+  sanitizeConsumerMessage,
+  useConsumerMode,
+} from '../../../app/configuration/consumerMode';
+import {
+  addBffConnectionListener,
+  BffConnectionState,
+  discoverAndConnectBff,
+  getBffConnectionState,
+} from '../../../core/api/bffDiscovery';
+import { queryCache } from '../../../data/cache';
 import type { OtpDeliveryDto, TokenizedOtpDeliveryDto } from '../../../data/dto/authDto';
 import {
   AppButton,
@@ -15,6 +25,7 @@ import {
   AppText,
   ScreenContainer,
   StatusBadge,
+  VcsLogo,
 } from '../../../shared';
 import { AppHeader } from '../../../shared/layout/AppHeader';
 import { hexToRgba, useAppTheme } from '../../../theme';
@@ -30,10 +41,11 @@ export interface OtpLoginScreenProps {
 export function getDeliveryStatusDescription(
   delivery?: TokenizedOtpDeliveryDto | OtpDeliveryDto,
   status?: string,
+  consumerOnly: boolean = false,
 ): string {
   if (!delivery) return '';
-  if (status === 'template_simulated') {
-    return 'Template Mode: local demo code generated — no SMS or network request.';
+  if (consumerOnly) {
+    return 'Verification code sent via SMS.';
   }
   const channel = delivery.channel || 'SMS';
   if (delivery.delivered) {
@@ -58,7 +70,12 @@ export function OtpLoginScreen({
   onLoginSuccess,
 }: OtpLoginScreenProps): React.JSX.Element {
   const { theme } = useAppTheme();
+  const { consumerOnly } = useConsumerMode();
   const {
+    currentUser,
+    isAuthenticated,
+    offlineCachedUser,
+    enterOfflineMode,
     challenge,
     clearChallenge,
     requestTokenizedOtp,
@@ -72,12 +89,21 @@ export function OtpLoginScreen({
   const [displayName, setDisplayName] = useState('');
   const [phone, setPhone] = useState('+959');
   const [code, setCode] = useState('');
-  const [devCode, setDevCode] = useState<string | null>(null);
 
   const [isLoading, setIsLoading] = useState(false);
+  const [isCheckingBff, setIsCheckingBff] = useState(false);
+  const [bffState, setBffState] = useState<BffConnectionState>(() =>
+    getBffConnectionState(),
+  );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [nameError, setNameError] = useState<string | null>(null);
+
+  useEffect(() => {
+    return addBffConnectionListener(state => {
+      setBffState(state);
+    });
+  }, []);
 
   // Clear ephemeral challenge and code state on navigation exit / unmount
   useEffect(() => {
@@ -89,23 +115,27 @@ export function OtpLoginScreen({
   // Server-supplied code_length (default locked 6 digits)
   const codeLength = challenge?.codeLength ?? 6;
 
-  // Development build check: show dev banner ONLY in dev builds when dev_code is returned
-  // AND an external network provider is NOT configured (Section 4.2)
-  const isDevBuild =
-    (typeof __DEV__ !== 'undefined' && Boolean(__DEV__)) ||
-    process.env.NODE_ENV !== 'production';
   const isRealProvider = Boolean(
     challenge?.delivery &&
     'configured' in challenge.delivery &&
     challenge.delivery.configured === true &&
     challenge.delivery.provider !== 'console'
   );
-  const effectiveDevCode =
-    challenge?.status === 'template_simulated'
-      ? challenge.devCode ?? '123456'
-      : isDevBuild && !isRealProvider
-        ? challenge?.devCode ?? devCode
-        : null;
+
+  const handleRetryBff = async () => {
+    setIsCheckingBff(true);
+    setErrorMessage(null);
+    try {
+      await discoverAndConnectBff();
+    } finally {
+      setIsCheckingBff(false);
+    }
+  };
+
+  const handleContinueOffline = async () => {
+    await enterOfflineMode?.();
+    onLoginSuccess?.();
+  };
 
   const executeSendOtp = async (explicitRequestId?: string) => {
     if (isLoading) return; // Prevent double-submit while in flight
@@ -127,28 +157,8 @@ export function OtpLoginScreen({
       return;
     }
 
-    if (userType === 'new') {
-      // If existing user attempts to enter as new, reject with error
-      const KNOWN_EXISTING_PHONES = [
-        '+959111111111',
-        '+959222222222',
-        '+959333333333',
-        '+959444444444',
-        '+95912345678',
-      ];
-      if (KNOWN_EXISTING_PHONES.includes(trimmedPhone)) {
-        setErrorMessage(
-          'This phone number is already registered. Please switch to Returning User to sign in.',
-        );
-        return;
-      }
-    }
-
     clearChallenge?.();
     setIsLoading(true);
-    const requestId =
-      explicitRequestId ||
-      `req-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
     try {
       let result: RequestOtpResult;
@@ -168,8 +178,6 @@ export function OtpLoginScreen({
       }
 
       if (result.success) {
-        // Truthful handling of provider delivery states (Section 4.3 B4):
-        // If provider is unconfigured, do NOT advance as if sent
         if (result.status === 'provider_not_configured') {
           setErrorMessage(
             'SMS provider is not configured. Real network delivery is currently unavailable in this environment.',
@@ -177,7 +185,6 @@ export function OtpLoginScreen({
           return;
         }
 
-        // If provider rejected delivery, do NOT advance as if sent
         if (result.status === 'delivery_rejected') {
           setErrorMessage(
             'SMS delivery was rejected by telecom provider. Please verify your phone number and try again.',
@@ -185,7 +192,6 @@ export function OtpLoginScreen({
           return;
         }
 
-        // If provider timed out with unknown outcome, do NOT advance as if sent
         if (result.status === 'delivery_timeout') {
           setErrorMessage(
             'Provider network timeout. The delivery outcome is uncertain. Please check your handset or tap Resend.',
@@ -193,8 +199,7 @@ export function OtpLoginScreen({
           return;
         }
 
-        if (result.devCode && !isRealProvider) {
-          setDevCode(result.devCode);
+        if (result.devCode && !isRealProvider && !consumerOnly) {
           setCode(result.devCode);
         }
         setStep('otp');
@@ -205,19 +210,24 @@ export function OtpLoginScreen({
           setErrorMessage('Request parameter mismatch. Please tap Resend to request a new code.');
         } else {
           setErrorMessage(
-            result.error || 'Failed to send verification code. Please try again.',
+            sanitizeConsumerMessage(
+              result.error,
+              'Unable to send verification code. Please check your number and try again.',
+            ),
           );
         }
       }
     } catch (err: unknown) {
       const msg =
-        err instanceof Error ? err.message : 'Network connection error.';
+        err instanceof Error ? err.message : 'Unable to connect right now.';
       if (msg.toLowerCase().includes('timeout')) {
         setErrorMessage(
-          'Network request timed out. The delivery outcome is uncertain. You may request a new code.',
+          'Request timed out. Please try again or tap Resend.',
         );
       } else {
-        setErrorMessage(msg);
+        setErrorMessage(
+          sanitizeConsumerMessage(msg, 'Unable to connect right now. Please try again.'),
+        );
       }
     } finally {
       setIsLoading(false);
@@ -229,10 +239,8 @@ export function OtpLoginScreen({
   };
 
   const handleResendOtp = async () => {
-    // Generate a fresh request_id for user-requested resend (Section 4.2)
     const newRequestId = `req-resend-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
     setCode('');
-    setDevCode(null);
     setErrorMessage(null);
     setFieldError(null);
     await executeSendOtp(newRequestId);
@@ -252,7 +260,6 @@ export function OtpLoginScreen({
     setIsLoading(true);
     try {
       let result: VerifyOtpResult;
-      // Phase 6A: Submit verification with auth_session_token + code only (never resending phone)
       if (challenge?.authSessionToken && verifyTokenizedOtp) {
         result = await verifyTokenizedOtp({
           code: trimmedCode,
@@ -261,7 +268,6 @@ export function OtpLoginScreen({
             : {}),
         });
       } else if (verifyOtp) {
-        // Fallback for legacy mocks or providers where tokenized method is absent
         result =
           userType === 'new' && displayName.trim()
             ? await verifyOtp(phone.trim(), trimmedCode, displayName.trim())
@@ -274,15 +280,19 @@ export function OtpLoginScreen({
         clearChallenge?.();
         onLoginSuccess?.();
       } else {
-        // Display expired/invalid/locked errors without needlessly wiping the user's phone input
         setErrorMessage(
-          result.error || 'Invalid verification code. Please try again.',
+          sanitizeConsumerMessage(
+            result.error,
+            'Invalid verification code. Please try again.',
+          ),
         );
       }
     } catch (err: unknown) {
       const msg =
-        err instanceof Error ? err.message : 'Network connection error.';
-      setErrorMessage(msg);
+        err instanceof Error ? err.message : 'Unable to connect right now.';
+      setErrorMessage(
+        sanitizeConsumerMessage(msg, 'Unable to verify right now. Please try again.'),
+      );
     } finally {
       setIsLoading(false);
     }
@@ -292,28 +302,121 @@ export function OtpLoginScreen({
     clearChallenge?.();
     setStep('phone');
     setCode('');
-    setDevCode(null);
     setErrorMessage(null);
     setFieldError(null);
     setNameError(null);
   };
 
+  const hasCachedOfflineData = queryCache.size > 0 || Boolean(offlineCachedUser);
+
   return (
     <View style={[styles.root, { backgroundColor: theme.colors.background }]}>
       <AppHeader
-        title={step === 'phone' ? 'Workshift Sign In' : 'Verify Code'}
+        title={step === 'phone' ? 'VCS Sign In' : 'Verify Code'}
         subtitle={
           step === 'phone'
             ? 'Access your volunteer shifts & coordinator workspace'
-            : challenge?.status === 'template_simulated'
-              ? `Local template demo for ${phone}`
-              : `Code sent to ${phone}`
+            : `Code sent to ${phone}`
         }
         showNotificationBell={false}
+        showOfflineBanner={false}
         onBackPress={step === 'otp' ? handleBackToPhone : undefined}
+        rightAction={<VcsLogo size={36} showRing={false} />}
       />
 
       <ScreenContainer scroll style={styles.scroll}>
+        {/* BFF Connection Status Strip (Developer Options Only) */}
+        {!consumerOnly ? (
+          <AppCard style={styles.connectionCard}>
+            <View style={styles.connectionRow}>
+              <StatusBadge
+                status={
+                  bffState.status === 'online'
+                    ? 'emerald'
+                    : bffState.status === 'checking'
+                      ? 'sky'
+                      : 'amber'
+                }
+                label={
+                  bffState.status === 'online'
+                    ? 'BFF Connected'
+                    : bffState.status === 'checking'
+                      ? 'Checking BFF...'
+                      : 'BFF Offline'
+                }
+              />
+              <AppText
+                variant="caption"
+                color={theme.colors.textSecondary}
+                numberOfLines={1}
+                style={styles.endpointText}
+              >
+                {bffState.activeBaseUrl}
+                {bffState.status === 'online' && bffState.latencyMs !== null
+                  ? ` (${bffState.latencyMs}ms)`
+                  : ''}
+              </AppText>
+            </View>
+
+            {bffState.status === 'offline' ? (
+              <View style={styles.offlineActions}>
+                <AppText variant="caption" color={theme.colors.textSecondary}>
+                  {bffState.errorMessage ||
+                    'Local BFF could not be reached. Retry connection or continue with cached data.'}
+                </AppText>
+                <View style={styles.offlineButtonsRow}>
+                  <View style={styles.flexOne}>
+                    <AppButton
+                      label={isCheckingBff ? 'Testing...' : 'Retry BFF'}
+                      variant="outline"
+                      onPress={handleRetryBff}
+                      disabled={isCheckingBff}
+                    />
+                  </View>
+                  <View style={styles.flexOne}>
+                    <AppButton
+                      label={
+                        hasCachedOfflineData ? 'Use Offline Cache' : 'Offline Mode'
+                      }
+                      variant="secondary"
+                      onPress={handleContinueOffline}
+                    />
+                  </View>
+                </View>
+              </View>
+            ) : null}
+          </AppCard>
+        ) : null}
+
+        {/* Quick-resume card when a valid session was restored on startup */}
+        {step === 'phone' && isAuthenticated && onLoginSuccess ? (
+          <AppCard variant="raised" style={styles.resumeCard}>
+            <AppText variant="eyebrow" weight="bold" color={theme.colors.primary}>
+              ACTIVE SESSION DETECTED
+            </AppText>
+            <AppText
+              variant="title"
+              weight="bold"
+              color={theme.colors.textPrimary}
+              style={styles.resumeName}
+            >
+              {currentUser.displayName}
+            </AppText>
+            <AppText
+              variant="caption"
+              color={theme.colors.textSecondary}
+              style={styles.resumeSub}
+            >
+              {currentUser.phone ?? 'Verified VCS Account'}
+            </AppText>
+            <AppButton
+              label={`Continue as ${currentUser.displayName}`}
+              variant="primary"
+              onPress={onLoginSuccess}
+            />
+          </AppCard>
+        ) : null}
+
         {step === 'phone' ? (
           <AppCard style={styles.card}>
             <View style={styles.headerBlock}>
@@ -325,11 +428,9 @@ export function OtpLoginScreen({
                 color={theme.colors.textSecondary}
                 style={styles.subtext}
               >
-                {getDataMode() === 'mock'
-                  ? 'Template Mode: enter any demo mobile number. No SMS or network request will be made.'
-                  : userType === 'new'
-                    ? 'Enter your name and mobile number to register as a new volunteer.'
-                    : 'Enter your registered mobile phone number to receive an SMS one-time passcode.'}
+                {userType === 'new'
+                  ? 'Enter your name and mobile number to register as a new volunteer.'
+                  : 'Enter your registered mobile phone number to receive an SMS one-time passcode.'}
               </AppText>
             </View>
 
@@ -423,9 +524,7 @@ export function OtpLoginScreen({
               keyboardType="phone-pad"
               autoComplete="tel"
               error={fieldError ?? undefined}
-              helperText={getDataMode() === 'mock'
-                ? 'Template Mode: any demo number is accepted locally.'
-                : 'E.g. +959 followed by your 8-9 digit phone number'}
+              helperText="E.g. +959 followed by your 8-9 digit phone number"
             />
 
             {errorMessage ? (
@@ -468,46 +567,25 @@ export function OtpLoginScreen({
                 color={theme.colors.textSecondary}
                 style={styles.subtext}
               >
-                {challenge?.status === 'template_simulated'
-                  ? 'A local demo code is ready for '
-                  : 'An authentication code was requested for '}
+                {'An authentication code was requested for '}
                 <AppText weight="bold" color={theme.colors.textPrimary}>
                   {phone}
                 </AppText>
-                {challenge?.status === 'template_simulated'
-                  ? '. No SMS was sent.'
-                  : '.'}
+                {'.'}
               </AppText>
 
-              {/* Truthful delivery status metadata */}
               {challenge?.delivery ? (
                 <View style={styles.deliveryBlock}>
                   <AppText variant="caption" color={theme.colors.textSecondary}>
-                    {getDeliveryStatusDescription(challenge.delivery, challenge.status)}
+                    {getDeliveryStatusDescription(
+                      challenge.delivery,
+                      challenge.status,
+                      consumerOnly,
+                    )}
                   </AppText>
                 </View>
               ) : null}
             </View>
-
-            {effectiveDevCode ? (
-              <View
-                style={[
-                  styles.devBanner,
-                  {
-                    backgroundColor: hexToRgba(theme.colors.primary, 0.1),
-                    borderColor: theme.colors.primary,
-                  },
-                ]}
-              >
-                <View style={styles.devBadgeRow}>
-                  <StatusBadge status="info" label="DEV TEST OTP" />
-                </View>
-                <AppText variant="caption" color={theme.colors.primary}>
-                  {challenge?.status === 'template_simulated' ? 'Template Demo Code: ' : 'Development Code: '}
-                  <AppText weight="bold">{effectiveDevCode}</AppText>
-                </AppText>
-              </View>
-            ) : null}
 
             <AppInput
               label="Verification Code"
@@ -520,9 +598,7 @@ export function OtpLoginScreen({
               keyboardType="number-pad"
               maxLength={codeLength}
               error={fieldError ?? undefined}
-              helperText={challenge?.status === 'template_simulated'
-                ? `Enter the local ${codeLength}-digit demo code`
-                : `Enter the ${codeLength}-digit code received via SMS`}
+              helperText={`Enter the ${codeLength}-digit code received via SMS`}
             />
 
             {errorMessage ? (
@@ -579,8 +655,44 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scroll: {
-    paddingVertical: 20,
+    paddingVertical: 16,
     paddingHorizontal: 16,
+  },
+  connectionCard: {
+    padding: 12,
+    marginBottom: 14,
+  },
+  connectionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  endpointText: {
+    flex: 1,
+    textAlign: 'right',
+  },
+  offlineActions: {
+    marginTop: 10,
+    gap: 10,
+  },
+  offlineButtonsRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  flexOne: {
+    flex: 1,
+  },
+  resumeCard: {
+    padding: 16,
+    marginBottom: 14,
+  },
+  resumeName: {
+    marginTop: 4,
+  },
+  resumeSub: {
+    marginTop: 2,
+    marginBottom: 12,
   },
   card: {
     padding: 20,
@@ -594,9 +706,6 @@ const styles = StyleSheet.create({
   },
   deliveryBlock: {
     marginTop: 8,
-  },
-  fieldSpacer: {
-    height: 16,
   },
   buttonBlock: {
     marginTop: 24,
@@ -626,15 +735,5 @@ const styles = StyleSheet.create({
   },
   nameInputSpacing: {
     marginBottom: 12,
-  },
-  devBanner: {
-    marginBottom: 16,
-    padding: 12,
-    borderWidth: 1,
-    borderRadius: 8,
-  },
-  devBadgeRow: {
-    marginBottom: 6,
-    alignSelf: 'flex-start',
   },
 });

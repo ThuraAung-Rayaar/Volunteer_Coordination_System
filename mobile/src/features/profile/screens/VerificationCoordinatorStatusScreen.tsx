@@ -337,8 +337,7 @@ export function VerificationCoordinatorStatusScreen({
               color={theme.colors.textSecondary}
               style={styles.uploadNoticeText}
             >
-              Hardware camera and file uploads are disabled in this UI preview. Document images
-              are encrypted on the server in production (AES-256-GCM). Local copies are retained encrypted on this device.
+              Document images are encrypted on your device and protected on the server (AES-256-GCM).
             </AppText>
           </View>
 

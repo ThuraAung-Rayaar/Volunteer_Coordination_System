@@ -86,20 +86,20 @@ export function RepositoryProvider({
 
   const contextValue = useMemo<RepositoryContextType>(() => {
     const baseRepositories: Omit<RepositoryContextType, 'dataMode'> =
-      activeMode === 'http'
+      activeMode === 'mock'
         ? {
-            dashboardRepository: defaultHttpDashboardRepository,
-            eventRepository: defaultHttpEventRepository,
-            profileRepository: defaultHttpProfileRepository,
-            coordinatorRepository: defaultHttpCoordinatorRepository,
-            assistantRepository: defaultHttpAssistantRepository,
-          }
-        : {
             dashboardRepository: defaultDashboardRepository,
             eventRepository: defaultEventRepository,
             profileRepository: defaultProfileRepository,
             coordinatorRepository: defaultCoordinatorRepository,
             assistantRepository: defaultAssistantRepository,
+          }
+        : {
+            dashboardRepository: defaultHttpDashboardRepository,
+            eventRepository: defaultHttpEventRepository,
+            profileRepository: defaultHttpProfileRepository,
+            coordinatorRepository: defaultHttpCoordinatorRepository,
+            assistantRepository: defaultHttpAssistantRepository,
           };
 
     return {

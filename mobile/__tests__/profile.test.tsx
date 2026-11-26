@@ -585,7 +585,7 @@ describe('ProfileEditScreen', () => {
     });
 
     const json = safeStringify(renderer.toJSON());
-    expect(json).toContain('Profile saved in local mock state');
+    expect(json).toContain('Demo only — not submitted to server');
     expect(nav.navigate).toHaveBeenCalledWith('Profile');
   });
 
@@ -723,7 +723,7 @@ describe('AvailabilityScreen', () => {
 
     const confirmAddButton = renderer.root
       .findAllByProps({ accessibilityRole: 'button' })
-      .find(b => b.props.accessibilityLabel === 'Add Rule (Demo)');
+      .find(b => b.props.accessibilityLabel === 'Add Rule');
 
     await ReactTestRenderer.act(async () => {
       await confirmAddButton!.props.onPress();
@@ -761,7 +761,7 @@ describe('AvailabilityScreen', () => {
 
     const confirmAddButton = renderer.root
       .findAllByProps({ accessibilityRole: 'button' })
-      .find(b => b.props.accessibilityLabel === 'Add Rule (Demo)');
+      .find(b => b.props.accessibilityLabel === 'Add Rule');
 
     expect(confirmAddButton).toBeDefined();
 
@@ -823,7 +823,7 @@ describe('AvailabilityScreen', () => {
 
     const confirmExceptionButton = renderer.root
       .findAllByProps({ accessibilityRole: 'button' })
-      .find(b => b.props.accessibilityLabel === 'Save Exception (Demo)');
+      .find(b => b.props.accessibilityLabel === 'Save Exception');
 
     await ReactTestRenderer.act(async () => {
       await confirmExceptionButton!.props.onPress();
@@ -864,7 +864,7 @@ describe('AvailabilityScreen', () => {
 
     const confirmExceptionButton = renderer.root
       .findAllByProps({ accessibilityRole: 'button' })
-      .find(b => b.props.accessibilityLabel === 'Save Exception (Demo)');
+      .find(b => b.props.accessibilityLabel === 'Save Exception');
 
     await ReactTestRenderer.act(async () => {
       await confirmExceptionButton!.props.onPress();
@@ -919,7 +919,7 @@ describe('VerificationCoordinatorStatusScreen', () => {
     expect(json).toContain('Photo Verification (Selfie)');
     expect(json).toContain('National Identity Document');
     expect(json).toContain(
-      'Hardware camera and file uploads are disabled in this UI preview',
+      'Document images are encrypted on your device and protected on the server (AES-256-GCM).',
     );
     expect(json).toContain('Coordinator Authority & Application');
     expect(json).toContain('Applying for Coordinator authority requires');

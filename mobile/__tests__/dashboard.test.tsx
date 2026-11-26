@@ -25,6 +25,10 @@ import { defaultEventRepository } from '../src/data/mock/MockEventRepository';
 import { mapDashboardSummary } from '../src/data/mappers/dashboardMapper';
 import { appEventBus, AppEvents } from '../src/core/events/eventBus';
 import { DashboardScreen } from '../src/features/dashboard/screens/DashboardScreen';
+import {
+  resetConsumerModeState,
+  setConsumerModeState,
+} from '../src/app/configuration/consumerMode';
 import { ThemeProvider } from '../src/theme/ThemeProvider';
 
 const activeRenderers: ReactTestRenderer.ReactTestRenderer[] = [];
@@ -276,6 +280,7 @@ describe('DashboardScreen UI & Visibility Rules', () => {
   });
 
   it('handles error state and allows retry', async () => {
+    setConsumerModeState({ devOptionsEnabled: true });
     defaultDashboardRepository.setShouldFail(true);
 
     const mockUserContext: UserContextValue = {
@@ -299,6 +304,7 @@ describe('DashboardScreen UI & Visibility Rules', () => {
     const str = safeStringify(renderer.toJSON());
     expect(str).toContain('Failed to load dashboard');
     expect(str).toContain('Retry Dashboard');
+    resetConsumerModeState();
   });
 
   it('navigates to EventDetail with returnTo=Dashboard when tapping an upcoming commitment card', async () => {
@@ -396,10 +402,9 @@ describe('DashboardScreen UI & Visibility Rules', () => {
       cancelButtons[0].props.onPress();
     });
 
-    // Verify modal is open with Demo warning and context
+    // Verify modal is open with context
     let str = safeStringify(renderer.toJSON());
     expect(str).toContain('Cancel Participation');
-    expect(str).toContain('Demo only — not submitted to server');
     expect(str).toContain('Cancel your participation in this event?');
     expect(str).toContain('Community Garden Revitalization');
 
@@ -414,7 +419,7 @@ describe('DashboardScreen UI & Visibility Rules', () => {
 
     // Verify feedback banner is shown and commitment count is updated
     str = safeStringify(renderer.toJSON());
-    expect(str).toContain('cancelled. Participation cancelled in local mock state');
+    expect(str).toContain('Participation cancelled in local mock state');
   });
 
   it('strictly filters completed activities requiring attendanceStatus=completed', async () => {

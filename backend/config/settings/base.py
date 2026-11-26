@@ -1,63 +1,36 @@
 import os
+import sys
 from pathlib import Path
-from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
+PROJECT_ROOT = BASE_DIR.parent
 
-# Load .env from backend/ or project root
-load_dotenv(BASE_DIR / '.env')
-load_dotenv(BASE_DIR.parent / '.env')
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
-SECRET_KEY = os.getenv(
-    'DJANGO_SECRET_KEY',
-    os.getenv('SECRET_KEY', 'django-insecure-f7(wutn^($y(7%in-uwbzw6auh6vnuc(zr7yc@vdt70xx(a8nd')
-)
-PHONE_HASH_HMAC_SECRET = os.getenv(
-    'PHONE_HASH_HMAC_SECRET',
-    'dev-hmac-secret-at-least-32-chars-long-abcdef'
-)
-OTP_CODE_HMAC_SECRET = os.getenv(
-    'OTP_CODE_HMAC_SECRET',
-    'dev-otp-code-hmac-secret-at-least-32-chars-long-distinct'
-)
-AUTH_SESSION_TOKEN_SECRET = os.getenv(
-    'AUTH_SESSION_TOKEN_SECRET',
-    'dev-auth-session-token-secret-at-least-32-chars-distinct'
-)
-PHONE_ENCRYPTION_KEY = os.getenv(
-    'PHONE_ENCRYPTION_KEY',
-    'IcY3lXCl1k0P1NawgjDSeCYOqcNRWJStRaqbWN21nGs='
-)
+from config_di import get_config_container
+
+CONFIG_CONTAINER = get_config_container()
+
+SECRET_KEY = CONFIG_CONTAINER.security.django_secret_key
+PHONE_HASH_HMAC_SECRET = CONFIG_CONTAINER.security.phone_hash_hmac_secret
+OTP_CODE_HMAC_SECRET = CONFIG_CONTAINER.security.otp_code_hmac_secret
+AUTH_SESSION_TOKEN_SECRET = CONFIG_CONTAINER.security.auth_session_token_secret
+PHONE_ENCRYPTION_KEY = CONFIG_CONTAINER.security.phone_encryption_key
+
 # Verification Image Encryption Key (AES-256-GCM, strictly distinct from PHONE_ENCRYPTION_KEY and HMAC secrets)
-VERIFICATION_IMAGE_ENCRYPTION_KEY = os.getenv(
-    'VERIFICATION_IMAGE_ENCRYPTION_KEY',
-    'k8Vz9X2mQ5wL1nR4tY7uI0oP3aS6dF9gH2jK5lZ8xC0='
-)
-VERIFICATION_IMAGE_KEY_ID = os.getenv(
-    'VERIFICATION_IMAGE_KEY_ID',
-    'v1'
-)
-VERIFICATION_IMAGE_KEYRING = os.getenv(
-    'VERIFICATION_IMAGE_KEYRING',
-    '{}'
-)
-CARTO_API_KEY = os.getenv(
-    'CARTO_API_KEY',
-    'cb1_5490_1_395a9eafc491da9c508bf094'
-)
-MAP_TILE_URL_TEMPLATE = os.getenv(
-    'MAP_TILE_URL_TEMPLATE',
-    f'https://basemaps.cartocdn.com/rastertiles/voyager/{{z}}/{{x}}/{{y}}.png?key={CARTO_API_KEY}'
-)
-MAP_TILE_ATTRIBUTION = os.getenv(
-    'MAP_TILE_ATTRIBUTION',
-    '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-)
+VERIFICATION_IMAGE_ENCRYPTION_KEY = CONFIG_CONTAINER.security.verification_image_encryption_key
+VERIFICATION_IMAGE_KEY_ID = CONFIG_CONTAINER.security.verification_image_key_id
+VERIFICATION_IMAGE_KEYRING = CONFIG_CONTAINER.security.verification_image_keyring
+
+CARTO_API_KEY = CONFIG_CONTAINER.maps.carto_api_key
+MAP_TILE_URL_TEMPLATE = CONFIG_CONTAINER.maps.tile_url_template
+MAP_TILE_ATTRIBUTION = CONFIG_CONTAINER.maps.attribution
 MAP_TILE_OFFLINE_ALLOWED = os.getenv('MAP_TILE_OFFLINE_ALLOWED', 'true').lower() in ('true', '1')
 
 # External SMS / Network OTP Delivery Settings (Section 4.2)
-OTP_DELIVERY_PROVIDER = os.getenv('OTP_DELIVERY_PROVIDER', 'console')
-OTP_DELIVERY_ENABLED = os.getenv('OTP_DELIVERY_ENABLED', 'false').lower() in ('true', '1')
+OTP_DELIVERY_PROVIDER = CONFIG_CONTAINER.auth.otp_delivery_provider
+OTP_DELIVERY_ENABLED = CONFIG_CONTAINER.auth.otp_delivery_enabled
 OTP_PROVIDER_BASE_URL = os.getenv('OTP_PROVIDER_BASE_URL', '')
 OTP_PROVIDER_API_KEY = os.getenv('OTP_PROVIDER_API_KEY', '')
 OTP_PROVIDER_API_SECRET = os.getenv('OTP_PROVIDER_API_SECRET', '')
@@ -65,27 +38,32 @@ OTP_PROVIDER_SENDER_ID = os.getenv('OTP_PROVIDER_SENDER_ID', 'VOLUNTEER')
 OTP_PROVIDER_TIMEOUT_SECONDS = int(os.getenv('OTP_PROVIDER_TIMEOUT_SECONDS', '10'))
 OTP_PROVIDER_DELIVERY_RECEIPTS_ENABLED = os.getenv('OTP_PROVIDER_DELIVERY_RECEIPTS_ENABLED', 'false').lower() in ('true', '1')
 OTP_REQUEST_IP_THROTTLE_RATE = os.getenv('OTP_REQUEST_IP_THROTTLE_RATE', '30/minute')
+OTP_CODE_LENGTH = CONFIG_CONTAINER.auth.otp_code_length
+
+# Consumer-Only / Developer Options Mode Toggle
+ENVIRONMENT = CONFIG_CONTAINER.runtime.environment
+DEV_OPTIONS_ENABLED = CONFIG_CONTAINER.consumer_ui.dev_options_enabled
+RUNTIME_FLAGS_PATH = CONFIG_CONTAINER.consumer_ui.runtime_flags_path
+ADMIN_BOOTSTRAP_PASSWORD = CONFIG_CONTAINER.auth.admin_bootstrap_password
 
 # Dedicated feature flag to gate dev_code exposure in auth responses (local/test only)
-ALLOW_DEV_CODE_IN_AUTH_RESPONSE = os.getenv(
-    'ALLOW_DEV_CODE_IN_AUTH_RESPONSE',
-    'true' if os.getenv('DEBUG', 'false').lower() == 'true' else 'false'
-).lower() in ('true', '1')
+ALLOW_DEV_CODE_IN_AUTH_RESPONSE = CONFIG_CONTAINER.auth.allow_dev_code_in_auth_response
+DEV_FIXED_OTP = CONFIG_CONTAINER.auth.dev_fixed_otp
 
 # AI Assistant Settings (Section 8)
-AI_ENABLED = os.getenv('AI_ENABLED', 'true').lower() in ('true', '1')
-AI_PROVIDER = os.getenv('AI_PROVIDER', 'mock' if not os.getenv('AI_API_KEY') and not os.getenv('GEMINI_API_KEY') else 'gemini')
-AI_MODEL = os.getenv('AI_MODEL', 'qwen3.5:4b' if os.getenv('AI_PROVIDER', '').lower() == 'ollama' else 'gemini-3.5-flash-lite')
-AI_API_KEY = os.getenv('AI_API_KEY', os.getenv('GEMINI_API_KEY', ''))
-AI_TIMEOUT_SECONDS = int(os.getenv('AI_TIMEOUT_SECONDS', '45'))
-AI_OLLAMA_BASE_URL = os.getenv('AI_OLLAMA_BASE_URL', 'http://127.0.0.1:11434')
-AI_OLLAMA_KEEP_ALIVE = os.getenv('AI_OLLAMA_KEEP_ALIVE', '5m')
-AI_MAX_OUTPUT_TOKENS = int(os.getenv('AI_MAX_OUTPUT_TOKENS', '800'))
-AI_RATE_LIMIT_PER_MINUTE = int(os.getenv('AI_RATE_LIMIT_PER_MINUTE', '20'))
+AI_ENABLED = CONFIG_CONTAINER.ai.enabled
+AI_PROVIDER = CONFIG_CONTAINER.ai.provider
+AI_MODEL = CONFIG_CONTAINER.ai.model
+AI_API_KEY = CONFIG_CONTAINER.ai.api_key
+AI_TIMEOUT_SECONDS = CONFIG_CONTAINER.ai.timeout_seconds
+AI_OLLAMA_BASE_URL = CONFIG_CONTAINER.ai.ollama_base_url
+AI_OLLAMA_KEEP_ALIVE = CONFIG_CONTAINER.ai.ollama_keep_alive
+AI_MAX_OUTPUT_TOKENS = CONFIG_CONTAINER.ai.max_output_tokens
+AI_RATE_LIMIT_PER_MINUTE = CONFIG_CONTAINER.ai.rate_limit_per_minute
 
-DEBUG = os.getenv('DEBUG', 'false').lower() == 'true'
+DEBUG = CONFIG_CONTAINER.runtime.debug
 
-ALLOWED_HOSTS = [host.strip() for host in os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',') if host.strip()]
+ALLOWED_HOSTS = list(CONFIG_CONTAINER.runtime.allowed_hosts)
 
 DJANGO_APPS = [
     'django.contrib.admin',
@@ -153,12 +131,12 @@ ASGI_APPLICATION = 'config.asgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv('DB_NAME', 'volunteer_coordination_db'),
-        'USER': os.getenv('DB_USER', 'postgres'),
-        'PASSWORD': os.getenv('DB_PASSWORD', 'postgres'),
-        'HOST': os.getenv('DB_HOST', '127.0.0.1'),
-        'PORT': os.getenv('DB_PORT', '5432'),
+        'ENGINE': CONFIG_CONTAINER.database.engine,
+        'NAME': CONFIG_CONTAINER.database.name,
+        'USER': CONFIG_CONTAINER.database.user,
+        'PASSWORD': CONFIG_CONTAINER.database.password,
+        'HOST': CONFIG_CONTAINER.database.host,
+        'PORT': CONFIG_CONTAINER.database.port,
         'ATOMIC_REQUESTS': True,
     }
 }
@@ -220,7 +198,7 @@ VERIFICATION_MAX_DIMENSION = 6000                 # px
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-CORS_ALLOW_ALL_ORIGINS = os.environ.get('CORS_ALLOW_ALL_ORIGINS', 'True' if DEBUG else 'False').lower() in ('true', '1')
-CORS_ALLOWED_ORIGINS = [o.strip() for o in os.environ.get('CORS_ALLOWED_ORIGINS', '').split(',') if o.strip()]
+CORS_ALLOW_ALL_ORIGINS = CONFIG_CONTAINER.runtime.cors_allow_all_origins
+CORS_ALLOWED_ORIGINS = list(CONFIG_CONTAINER.runtime.cors_allowed_origins)
 
 TEST_RUNNER = 'config.test_runner.SqlFileTestRunner'

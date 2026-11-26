@@ -1,5 +1,6 @@
 import logging
 
+from django.conf import settings
 from django.http import FileResponse, JsonResponse
 from django.shortcuts import render, redirect
 from django.utils import timezone
@@ -154,9 +155,10 @@ def admin_login_view(request):
     if raw_user_pw.startswith(("pbkdf2_", "argon2", "bcrypt")):
         password_valid = user.check_password(password)
     elif raw_user_pw and not raw_user_pw.startswith("!"):
-        # Only allow AdminDemo123! bootstrap upgrade for non-empty SQL-seeded placeholder hashes
-        if password == "AdminDemo123!":
-            user.set_password("AdminDemo123!")
+        # Optional DI-configured bootstrap password upgrade for SQL-seeded placeholder hashes
+        bootstrap_password = str(getattr(settings, "ADMIN_BOOTSTRAP_PASSWORD", "") or "")
+        if bootstrap_password and password == bootstrap_password:
+            user.set_password(bootstrap_password)
             user.save(update_fields=["password"])
             password_valid = True
 
@@ -1154,8 +1156,12 @@ def user_provision_view(request):
                         skills=normalize_tags(skills_list),
                     )
 
-                    password_to_set = password or "AdminDemo123!"
-                    new_user.set_password(password_to_set)
+                    bootstrap_password = str(getattr(settings, "ADMIN_BOOTSTRAP_PASSWORD", "") or "")
+                    password_to_set = password or bootstrap_password
+                    if password_to_set:
+                        new_user.set_password(password_to_set)
+                    else:
+                        new_user.set_unusable_password()
                     new_user.save(update_fields=["password"])
 
                     if assign_role == "coordinator":
@@ -1497,6 +1503,11 @@ def admin_settings_view(request):
     from apps.accounts.models import Users
     from apps.audit.models import AppSettings, AuditLogs
     from common.map_engine import get_map_catalog_status, seed_region_tiles
+    from common.runtime_config import (
+        get_client_runtime_config,
+        is_consumer_only_mode,
+        set_dev_options_enabled,
+    )
     from common.security import compute_phone_hash, decrypt_phone, encrypt_phone
     from services import maintenance_service
     from .phone_utils import normalize_myanmar_phone, resolve_user_by_phone_or_hash
@@ -1611,6 +1622,31 @@ def admin_settings_view(request):
                 maintenance_result = maintenance_service.run_all_maintenance()
                 success_message = "PostgreSQL database maintenance routines executed successfully."
 
+            elif form_action == "toggle_dev_options":
+                raw_enabled = (
+                    request.POST.get("dev_options_enabled")
+                    or getattr(request, "data", {}).get("dev_options_enabled")
+                    or "0"
+                )
+                target_enabled = str(raw_enabled).strip().lower() in ("1", "true", "yes", "on")
+                before_cfg = get_client_runtime_config()
+                updated_cfg = set_dev_options_enabled(
+                    target_enabled,
+                    updated_by=f"user#{request.user.id}",
+                )
+                AuditLogs.objects.create(
+                    actor_user=request.user,
+                    action="admin.dev_options_toggled",
+                    entity_type="runtime_config",
+                    entity_id=0,
+                    before_data={"dev_options_enabled": before_cfg["dev_options_enabled"]},
+                    after_data={"dev_options_enabled": updated_cfg["dev_options_enabled"]},
+                )
+                if updated_cfg["consumer_only"]:
+                    success_message = "Consumer-Only Mode enabled: developer options and diagnostic errors are hidden."
+                else:
+                    success_message = "Developer Options enabled for local diagnostics."
+
             elif form_action == "sync_offline_maps":
                 region_code = request.POST.get("region_code") or getattr(request, "data", {}).get("region_code") or "yangon"
                 fetch_remote_raw = request.POST.get("fetch_remote") or getattr(request, "data", {}).get("fetch_remote") or "0"
@@ -1622,7 +1658,11 @@ def admin_settings_view(request):
             else:
                 error_message = f"Unknown form action '{form_action}'."
         except Exception as exc:
-            error_message = str(exc)
+            error_message = (
+                "Unable to complete action. Please review the form inputs and try again."
+                if is_consumer_only_mode() and not isinstance(exc, DomainError)
+                else str(exc)
+            )
 
         if request.headers.get("accept") == "application/json" or "application/json" in request.META.get("HTTP_ACCEPT", ""):
             if error_message:
@@ -1631,6 +1671,7 @@ def admin_settings_view(request):
                 "status": "ok",
                 "message": success_message,
                 "maintenance_result": maintenance_result,
+                "client_config": get_client_runtime_config(),
             })
 
     all_users = list(Users.objects.all().order_by("id")[:200])
@@ -1638,6 +1679,7 @@ def admin_settings_view(request):
         u.decrypted_phone = decrypt_phone(u.phone_enc) or u.phone_enc or ""
 
     app_settings = list(AppSettings.objects.all().order_by("key"))
+    client_config = get_client_runtime_config()
 
     context = {
         "active_tab": "settings",
@@ -1648,6 +1690,7 @@ def admin_settings_view(request):
         "success_message": success_message,
         "error_message": error_message,
         "map_catalog": get_map_catalog_status(),
+        "client_config": client_config,
     }
     return render(request, "admin_portal/settings.html", context)
 

@@ -11,7 +11,10 @@ import {
   View,
 } from 'react-native';
 import { CoordinatorRepository } from '../../../data/contracts/coordinatorRepository';
-import { defaultCoordinatorRepository } from '../../../data/mock/MockCoordinatorRepository';
+import {
+  defaultCoordinatorRepository,
+  MockCoordinatorRepository,
+} from '../../../data/mock/MockCoordinatorRepository';
 import { useRepositories } from '../../../app/RepositoryProvider';
 import { isMockMode } from '../../../app/configuration/dataMode';
 import type {
@@ -29,6 +32,7 @@ import {
   AppText,
   EmptyState,
   FilterChip,
+  KeyboardLiftView,
   LoadingState,
   SearchInput,
   StatusBadge,
@@ -81,12 +85,13 @@ export function CoordinatorApplicationsScreen({
       setIsLoading(true);
       try {
         const evList = await repo.getMyEvents();
+        const isMockRepo = isMockMode() || repo instanceof MockCoordinatorRepository;
         const operationalEvents = evList.filter(
           e =>
             e.status !== 'cancelled' &&
             e.status !== 'completed' &&
             e.status !== 'ended' &&
-            (isMockMode() || !e.endAt || new Date(e.endAt).getTime() >= Date.now()),
+            (isMockRepo || !e.endAt || new Date(e.endAt).getTime() >= Date.now()),
         );
         setEvents(operationalEvents);
 
@@ -482,27 +487,30 @@ export function CoordinatorApplicationsScreen({
         ) : isLoading ? (
           <LoadingState label="Loading applications..." />
         ) : (
-          <FlatList
-            data={filteredApplications}
-            keyExtractor={item => item.id}
-            ListHeaderComponent={renderHeader}
-            renderItem={({ item }) => (
-              <ApplicationReviewCard
-                application={item}
-                isMonitorMode={isMonitorMode}
-                onAccept={id => handleUpdateStatus(id, 'accepted')}
-                onReject={id => handleUpdateStatus(id, 'rejected')}
-                onWaitlist={id => handleUpdateStatus(id, 'waitlisted')}
-              />
-            )}
-            contentContainerStyle={styles.listContent}
-            ListEmptyComponent={
-              <EmptyState
-                title="No Applications"
-                description={`No applications match the "${activeFilter}" filter.`}
-              />
-            }
-          />
+          <KeyboardLiftView>
+            <FlatList
+              data={filteredApplications}
+              keyExtractor={item => item.id}
+              keyboardShouldPersistTaps="handled"
+              ListHeaderComponent={renderHeader}
+              renderItem={({ item }) => (
+                <ApplicationReviewCard
+                  application={item}
+                  isMonitorMode={isMonitorMode}
+                  onAccept={id => handleUpdateStatus(id, 'accepted')}
+                  onReject={id => handleUpdateStatus(id, 'rejected')}
+                  onWaitlist={id => handleUpdateStatus(id, 'waitlisted')}
+                />
+              )}
+              contentContainerStyle={styles.listContent}
+              ListEmptyComponent={
+                <EmptyState
+                  title="No Applications"
+                  description={`No applications match the "${activeFilter}" filter.`}
+                />
+              }
+            />
+          </KeyboardLiftView>
         )}
 
         <CoordinatorDynamicIsland

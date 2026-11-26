@@ -332,7 +332,7 @@ describe('Coordinator Operational Screens Flow', () => {
     const json = safeStringify(renderer.toJSON());
     expect(json).toContain('Shift Assignments');
     expect(json).toContain('Auto-Assignment Engine');
-    expect(json).toContain('Run Auto-Assignment (Demo Preview)');
+    expect(json).toContain('Run Auto-Assignment');
     expect(json).toContain('Unassigned Accepted Volunteers');
     expect(json).toContain('Current Shift Assignments');
     expect(json).toContain('Nilar Win');

@@ -19,7 +19,7 @@ import {
   defaultEventRepository,
   MockEventRepository,
 } from '../../../data/mock/MockEventRepository';
-import { isHttpMode, isMockMode } from '../../../app/configuration/dataMode';
+import { isMockMode } from '../../../app/configuration/dataMode';
 import { useRepositories } from '../../../app/RepositoryProvider';
 import {
   EventApplicationStatus,
@@ -84,7 +84,10 @@ function formatDate(isoString?: string): string {
   }
 }
 
-function isApplicationEventEnded(item: VolunteerApplicationItem): boolean {
+function isApplicationEventEnded(
+  item: VolunteerApplicationItem,
+  useMockRepo: boolean,
+): boolean {
   if (
     item.eventStatus === 'completed' ||
     item.eventStatus === 'ended' ||
@@ -92,7 +95,7 @@ function isApplicationEventEnded(item: VolunteerApplicationItem): boolean {
   ) {
     return true;
   }
-  if (isHttpMode() && item.eventEndAt) {
+  if (!useMockRepo && item.eventEndAt) {
     try {
       return new Date(item.eventEndAt).getTime() < Date.now();
     } catch {
@@ -102,11 +105,14 @@ function isApplicationEventEnded(item: VolunteerApplicationItem): boolean {
   return false;
 }
 
-function getBadgeConfig(item: VolunteerApplicationItem): {
+function getBadgeConfig(
+  item: VolunteerApplicationItem,
+  useMockRepo: boolean,
+): {
   badgeStatus: BadgeStatus;
   label: string;
 } {
-  if (isApplicationEventEnded(item)) {
+  if (isApplicationEventEnded(item, useMockRepo)) {
     return { badgeStatus: 'muted', label: 'Ended' };
   }
   switch (item.status) {
@@ -229,11 +235,7 @@ export function MyApplicationsScreen({
     try {
       const result = await repository.withdrawApplication(appToWithdraw.id);
       if (result.success) {
-        setFeedbackBanner(
-          isMockMode()
-            ? `Application for "${appToWithdraw.eventTitle}" (${appToWithdraw.postTitle}) withdrawn (${result.message})`
-            : result.message,
-        );
+        setFeedbackBanner(result.message);
         await fetchApplications();
       } else {
         setFeedbackBanner(result.message);
@@ -331,6 +333,10 @@ export function MyApplicationsScreen({
           title="Could not load applications"
           description={errorMessage}
           onRetry={fetchApplications}
+          templateFields={[
+            { label: 'Event & Role', placeholder: 'No application submitted yet' },
+            { label: 'Status', placeholder: 'Pending / Approved' },
+          ]}
         />
       ) : (
         <FlatList
@@ -351,8 +357,10 @@ export function MyApplicationsScreen({
             />
           }
           renderItem={({ item }) => {
-            const badge = getBadgeConfig(item);
-            const isEnded = isApplicationEventEnded(item);
+            const useMockRepo =
+              isMockMode() || repository instanceof MockEventRepository;
+            const badge = getBadgeConfig(item, useMockRepo);
+            const isEnded = isApplicationEventEnded(item, useMockRepo);
             const isTerminal =
               item.status === 'withdrawn' ||
               item.status === 'rejected' ||
@@ -488,16 +496,6 @@ export function MyApplicationsScreen({
               Are you sure you want to withdraw your application for "
               {appToWithdraw?.postTitle}" on "{appToWithdraw?.eventTitle}"?
             </AppText>
-
-            {isMockMode() ? (
-              <AppText
-                variant="caption"
-                color={theme.colors.textSecondary}
-                style={styles.modalDemoNotice}
-              >
-                Demo only — your application status will be marked withdrawn in local preview.
-              </AppText>
-            ) : null}
 
             <View style={styles.modalActions}>
               <View style={styles.modalButtonWrap}>

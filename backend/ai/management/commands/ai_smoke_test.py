@@ -35,22 +35,23 @@ class Command(BaseCommand):
             "--model",
             type=str,
             default=None,
-            help="Override model name (e.g. gemini-1.5-flash, gemini-2.0-flash)",
+            help="Override model name (e.g. gemini-3.5-flash-lite, qwen2.5:0.5b)",
         )
 
     def handle(self, *args, **options):
         provider_override = options.get("provider")
         api_key = getattr(settings, "AI_API_KEY", "") or getattr(settings, "GEMINI_API_KEY", "")
-        model = options.get("model") or getattr(settings, "AI_MODEL", "gemini-1.5-flash")
+        model = options.get("model") or getattr(settings, "AI_MODEL", "gemini-3.5-flash-lite")
         timeout = getattr(settings, "AI_TIMEOUT_SECONDS", 15)
 
         if provider_override == "mock":
             provider = MockAIProvider()
             provider_name = "mock"
         elif provider_override == "ollama":
+            ollama_model = options.get("model") or getattr(settings, "AI_MODEL", "qwen3.5:4b")
             provider = OllamaProvider(
                 base_url=getattr(settings, "AI_OLLAMA_BASE_URL", "http://127.0.0.1:11434"),
-                model=getattr(settings, "AI_MODEL", "qwen3.5:4b"),
+                model=ollama_model,
                 timeout_seconds=timeout,
             )
             provider_name = "ollama"

@@ -80,6 +80,8 @@ export interface EventSummary {
   status: EventStatus;
   locationName: string;
   landmarkText?: string;
+  latitude?: number;
+  longitude?: number;
   startAt: string;
   endAt: string;
   applicationDeadline?: string;

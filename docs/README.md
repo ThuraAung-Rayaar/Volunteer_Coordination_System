@@ -1,11 +1,11 @@
 # Volunteer HR Management System — Technical Documentation Portal
 
-> **Release Baseline:** v0.12.2 Core + AI/ML & Query Cache Integration  
-> **Last Updated:** 2026-11-25  
+> **Release Baseline:** v0.12.2+ (Version 0 Client Prototype — AI Assistant, QueryCache, DI & Bootstrap)  
+> **Last Updated:** 2026-11-26  
 > **Target Repository:** `python_stack/docs/`  
 > **Active Branch:** `feature/ai-chat-cache-ml-insights`  
-> **Database Engine:** PostgreSQL 18.6 (Schema Frozen & Immutable — `postgres_sql/VCS_db.sql`)  
-> **Backend Framework:** Django 5.1 / DRF 3.15.2 (`backend/`)  
+> **Database Engine:** PostgreSQL 18.6 (Schema Frozen & Immutable — `postgres_sql/VCS_db.sql`, seedlings in `postgres_sql/seedlings/`)  
+> **Backend Framework:** Django 5.1 / DRF 3.15.2 (`backend/`, injected via `config_di.py` & `di_config.local.json`)  
 > **Mobile Client:** React Native 0.88.1 / React 19.3 / TypeScript 6.0 (`mobile/`)  
 
 ---
@@ -17,12 +17,13 @@ This directory (`docs/`) serves as the authoritative technical reference reposit
 ```
 python_stack/docs/
 ├── README.md                               # This documentation portal index
+├── V0_CLIENT_PROTOTYPE_FINAL_ANALYSIS.md   # Version 0 (v0) client prototype final analysis & readiness
+├── NEW_LAPTOP_WINDOWS_SETUP_GUIDE.md       # Clean Windows laptop installation & environment setup guide
 ├── ai_ml_integration.md                    # AI Assistant, ML Recommendations, Staffing Insights & QueryCache
 ├── backend_analysis.md                     # Django 5.1 backend, AI/BFF routes, 22 services & security
 ├── mobile_analysis.md                      # React Native client, DDD layers, Assistant & QueryCache
 ├── full_database_details.md                # PostgreSQL 18.6 schema catalog & frozen contract
 ├── tokenization_login_architecture.md      # Zero-PII auth handshake & OTP session state machine
-├── GEMINI_4_HYDROGEN_PROTOTYPE_WORK_ORDER_2026-11-26.md # Branch-scoped AI implementation handoff
 ├── VCS_PROTOTYPE_RUNBOOK_2026-11-26.md     # Safe local startup, verification & demo sequence
 └── audit/                                  # 2026-11-24 AI/DB Readiness & Bootstrap Audit Reports
     ├── DB_SOURCE_OF_TRUTH_REPORT.md
@@ -45,14 +46,23 @@ python_stack/docs/
 | [docs/full_database_details.md](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/docs/full_database_details.md) | **Database Layer** | Exhaustive PostgreSQL 18.6 schema catalog (canonical `postgres_sql/VCS_db.sql`): 31 base tables (23 domain + 8 Django), views, domain stored procedures & triggers, `btree_gist`, native `uuidv7()`, and immutable frozen schema policy. |
 | [docs/tokenization_login_architecture.md](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/docs/tokenization_login_architecture.md) | **Security & Auth** | Zero-cleartext phone tokenization, ephemeral `auth_session_token` with 180s TTL, row-level locking state machine, `OtpDeliveryAdapter` boundary, and sub-500ms latency budget compliance. |
 
-### Prototype Handoff & Operator Runbook
+### Prototype Readiness, Setup & Operator Runbook
 
 | Document | Purpose |
 |---|---|
-| [GEMINI_4_HYDROGEN_PROTOTYPE_WORK_ORDER_2026-11-26.md](GEMINI_4_HYDROGEN_PROTOTYPE_WORK_ORDER_2026-11-26.md) | Detailed, branch-only Gemini 4 Hydrogen implementation work order for the database-first, role-aware assistant, recommendation/staffing verification, client integration, security boundaries and release gates. |
+| [V0_CLIENT_PROTOTYPE_FINAL_ANALYSIS.md](V0_CLIENT_PROTOTYPE_FINAL_ANALYSIS.md) | Version 0 client prototype final analysis: product potential, end-to-end flow audit, live verification matrix, and v1 production roadmap. |
+| [NEW_LAPTOP_WINDOWS_SETUP_GUIDE.md](NEW_LAPTOP_WINDOWS_SETUP_GUIDE.md) | Step-by-step clean Windows laptop installation guide: download links, Windows `PATH`/`JAVA_HOME`/`ANDROID_HOME` setup, Android SDK versions, DI config, DB bootstrap, and 3-terminal launch. |
 | [VCS_PROTOTYPE_RUNBOOK_2026-11-26.md](VCS_PROTOTYPE_RUNBOOK_2026-11-26.md) | Operator instructions to verify the branch and local PostgreSQL target, start Django and React Native, use mock/Gemini modes safely, rehearse volunteer/coordinator scenarios and run tests without mutating the frozen database. |
 
-**Implementation status note:** The existing assistant implementation described in `ai_ml_integration.md` currently uses bounded model-selected tool calls. The Gemini work order specifies a proposed backend-owned intent/data-retrieval flow in which the LLM receives only an authorised DTO. That architecture is a target for the next implementation pass, not a claim that it is already complete.
+**Implementation status note:** The database-first assistant architecture (backend-owned `resolve_intent()` + `build_intent_context()` allowlisted DTOs + `format_deterministic_response()` fallback) is implemented and smoke-tested with `mock` and `gemini-3.5-flash-lite`.
+
+### New-Laptop Bootstrap & DI Tooling
+
+| Artifact / Script | Purpose |
+|---|---|
+| [SYSTEM_STATUS.md](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/SYSTEM_STATUS.md) & [scripts/check_system_status.py](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/scripts/check_system_status.py) | Read-only environment probe checking Python, PostgreSQL 18+, Node.js, React Native, JDK, Android Studio/SDK/NDK/ADB/AVDs, DI config, and MBTiles packs with satisfaction percentage. |
+| [config_di.py](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/config_di.py), `di_config.local.json` & [scripts/setup_di_config.py](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/scripts/setup_di_config.py) | Root Dependency Injection container and generator creating a real untracked `di_config.local.json` with DB, Map, AI, Auth, and distinct cryptographic keys. |
+| [postgres_sql/manage_database.py](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/postgres_sql/manage_database.py) & [postgres_sql/seedlings/](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/postgres_sql/seedlings/README.md) | Unified localhost database creation, schema DDL (`VCS_db.sql`), Django migrations, mandatory crypto-aware seedlings (`01_yangon_demo_seed.sql` + `ai_seed_bundle/`), and root `SEEDED_CREDENTIALS.txt` generation. |
 
 ### Audit & Readiness Reports (`docs/audit/`)
 
@@ -138,8 +148,8 @@ As of **2026-11-25** (`feature/ai-chat-cache-ml-insights`), all core v0.12.2 cap
 |---|---|---|---|
 | **Database Engine** | PostgreSQL 18.6 (`postgres_sql/VCS_db.sql`) | **Frozen & Verified** | 31 base tables (23 domain + 8 Django), 11 public views in live DB, 53 triggers, 438 constraints, `uuidv7()` active; 100% disposable bootstrap parity & preflight PASS (`docs/audit/FINAL_VCS_AI_HANDOFF_REPORT.md`). |
 | **Backend & BFF** | Django 5.1 / DRF 3.15.2 (`backend/`) | **Complete** | 22 business services, unified `/api/v1/` and `/api/bff/mobile/` routes, tokenized OTP auth, AES-256-GCM image streaming, self-hosted map tile engine. |
-| **AI & ML Layer** | `backend/ai/`, `bff/assistant/`, `recommendation_service.py`, `staffing_insight_service.py` | **Complete & Smoke-Tested** | Role-scoped read-only AI Assistant (`Mock`, `Ollama`, `Gemini`), versioned prompts (`vcs.*.v1`), PII redaction, `recommendation-v1`, staffing gap insights; 58 AI/analytics/DB tests passing + live Gemini 200 OK smoke test. |
-| **Mobile Client** | React Native 0.88.1 / TS 6.0 (`mobile/`) | **Complete** | 25 feature screens (including `AssistantScreen`), 82 role capabilities, `VolunteerDynamicIsland` & `CoordinatorDynamicIsland`, `QueryCache` (LRU 150, TTLs, tag/prefix invalidation, account-scope clear). |
+| **AI & ML Layer** | `backend/ai/`, `bff/assistant/`, `recommendation_service.py`, `staffing_insight_service.py` | **Complete & Smoke-Tested** | Database-first AI Assistant (`Mock`, `Ollama`, `Gemini`), versioned prompts (`vcs.shared.v2`), PII redaction, `recommendation-v1`, staffing gap insights; 73 targeted AI/analytics/DI tests passing + mock smoke test 200 OK. |
+| **Mobile Client** | React Native 0.88.1 / TS 6.0 (`mobile/`) | **Complete** | 25+ feature screens (including `AssistantScreen`), 82 role capabilities, `VolunteerDynamicIsland` & `CoordinatorDynamicIsland`, `QueryCache`, **0 TS errors, 46/46 Jest suites (658/658 tests) passing**. |
 | **Security & Privacy** | AES-256-GCM / HMAC-SHA256 / `scope_policy.py` | **Enforced** | Server-side encrypted verification images (`VIMG\x01`), blind index phone hashing, single-use `auth_session_token` (180s TTL), Privacy Rule BR-PRIV-T4, AI PII redaction & zero chat persistence. |
 
 ---

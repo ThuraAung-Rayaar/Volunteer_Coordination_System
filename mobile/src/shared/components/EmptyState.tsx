@@ -4,10 +4,17 @@
 
 import React from 'react';
 import { StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
-import { useAppTheme } from '../../theme';
+import { useConsumerMode } from '../../app/configuration/consumerMode';
+import { hexToRgba, useAppTheme } from '../../theme';
 import { AppButton } from './AppButton';
 import { AppIcon, IconName } from './AppIcon';
 import { AppText } from './AppText';
+import type { EmptyFormFieldSpec } from './EmptyFormTemplate';
+
+const DEFAULT_PLACEHOLDER_FIELDS: ReadonlyArray<EmptyFormFieldSpec> = [
+  { label: 'Title', placeholder: 'No record yet' },
+  { label: 'Schedule / Status', placeholder: '—' },
+];
 
 export interface EmptyStateProps {
   title: string;
@@ -15,6 +22,8 @@ export interface EmptyStateProps {
   icon?: IconName;
   actionLabel?: string;
   onActionPress?: () => void;
+  templateFields?: ReadonlyArray<EmptyFormFieldSpec>;
+  showTemplateForm?: boolean;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -24,9 +33,13 @@ export function EmptyState({
   icon = 'info',
   actionLabel,
   onActionPress,
+  templateFields = DEFAULT_PLACEHOLDER_FIELDS,
+  showTemplateForm,
   style,
 }: EmptyStateProps): React.JSX.Element {
-  const { theme } = useAppTheme();
+  const { theme, isDark } = useAppTheme();
+  const { consumerOnly } = useConsumerMode();
+  const renderFormSlots = showTemplateForm ?? consumerOnly;
 
   return (
     <View
@@ -75,6 +88,47 @@ export function EmptyState({
         {description}
       </AppText>
 
+      {renderFormSlots && templateFields.length > 0 ? (
+        <View
+          testID="empty-state-form-template"
+          style={[
+            styles.placeholderForm,
+            {
+              backgroundColor: hexToRgba(
+                theme.colors.surfaceRaised,
+                isDark ? 0.55 : 0.75,
+              ),
+              borderColor: theme.colors.border,
+            },
+          ]}
+        >
+          {templateFields.map(field => (
+            <View key={field.label} style={styles.placeholderField}>
+              <AppText
+                variant="eyebrow"
+                weight="semibold"
+                color={theme.colors.textSecondary}
+              >
+                {field.label}
+              </AppText>
+              <View
+                style={[
+                  styles.placeholderInput,
+                  {
+                    backgroundColor: theme.colors.surface,
+                    borderColor: theme.colors.border,
+                  },
+                ]}
+              >
+                <AppText variant="caption" color={theme.colors.muted}>
+                  {field.placeholder ?? '—'}
+                </AppText>
+              </View>
+            </View>
+          ))}
+        </View>
+      ) : null}
+
       {actionLabel && onActionPress ? (
         <AppButton
           label={actionLabel}
@@ -116,5 +170,23 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     minWidth: 140,
+  },
+  placeholderForm: {
+    width: '100%',
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 14,
+    gap: 10,
+  },
+  placeholderField: {
+    gap: 4,
+  },
+  placeholderInput: {
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
   },
 });

@@ -20,10 +20,7 @@ import {
   View,
 } from 'react-native';
 import type { EventRepository } from '../../../data/contracts/eventRepository';
-import {
-  defaultEventRepository,
-  MockEventRepository,
-} from '../../../data/mock/MockEventRepository';
+import { defaultEventRepository } from '../../../data/mock/MockEventRepository';
 import { useRepositories } from '../../../app/RepositoryProvider';
 import { useCurrentUser } from '../../../app/UserContext';
 import {
@@ -32,6 +29,14 @@ import {
   RecommendedEvent,
 } from '../../../domain/models/event';
 import { appEventBus, AppEvents } from '../../../core/events/eventBus';
+import { defaultLocationProvider } from '../../../core/location/locationProvider';
+import {
+  detectRegionFromText,
+  filterEventsByUserRegion,
+  RegionDefinition,
+  resolveUserRegion,
+} from '../../../core/location/regionFilter';
+import { inspectStartupPermissions } from '../../../core/permissions/startupPermissions';
 import type { MainDrawerScreenProps } from '../../../navigation/navigationTypes';
 import {
   AppButton,
@@ -47,6 +52,7 @@ import { useAppTheme } from '../../../theme';
 import {
   EventCard,
   EventFilterSheet,
+  EventMapView,
 } from '../components';
 
 export interface DiscoveryStateCache {
@@ -92,14 +98,65 @@ export function EventDiscoveryScreen({
     () => discoveryCache.activeFilters,
   );
   const [isFilterSheetVisible, setIsFilterSheetVisible] = useState(false);
+  const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
 
   const [events, setEvents] = useState<EventSummary[]>([]);
   const [recommendations, setRecommendations] = useState<RecommendedEvent[]>([]);
+  const [userRegion, setUserRegion] = useState<RegionDefinition | null>(null);
+  const [regionScope, setRegionScope] = useState<'my_region' | 'all_regions'>(
+    'my_region',
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const flatListRef = useRef<FlatList<EventSummary>>(null);
+
+  useEffect(() => {
+    let active = true;
+    async function detectUserCurrentRegion() {
+      let gpsLat: number | null = null;
+      let gpsLng: number | null = null;
+      let homeArea: string | null = null;
+
+      try {
+        const permState = await inspectStartupPermissions();
+        if (
+          permState.location === 'permanent_granted' ||
+          permState.location === 'session_granted'
+        ) {
+          const fix = await defaultLocationProvider.getCurrentPosition();
+          gpsLat = fix.latitude;
+          gpsLng = fix.longitude;
+        }
+      } catch {
+        // Silent fallback to profile homeArea
+      }
+
+      if (repositories.profileRepository) {
+        try {
+          const profile = await repositories.profileRepository.getProfile();
+          homeArea = profile?.homeArea ?? null;
+        } catch {
+          // Silent fallback if unauthenticated or offline
+        }
+      }
+
+      const resolved = resolveUserRegion({
+        latitude: gpsLat,
+        longitude: gpsLng,
+        homeArea,
+      });
+      if (active) {
+        setUserRegion(resolved.region);
+      }
+    }
+
+    detectUserCurrentRegion();
+    return () => {
+      active = false;
+    };
+  }, [repositories.profileRepository]);
 
   // Compute combined filter query
   const effectiveFilters = useMemo((): EventFilters => {
@@ -241,8 +298,25 @@ export function EventDiscoveryScreen({
 
   const hasAnyFilter = searchQuery.trim().length > 0 || activeFilterCount > 0;
 
+  const visibleEvents = useMemo(() => {
+    if (regionScope === 'all_regions' || !userRegion) {
+      return events;
+    }
+    return filterEventsByUserRegion(events, userRegion);
+  }, [events, regionScope, userRegion]);
+
+  const visibleRecommendations = useMemo(() => {
+    if (regionScope === 'all_regions' || !userRegion) {
+      return recommendations;
+    }
+    return recommendations.filter(item => {
+      const recRegion = detectRegionFromText(item.event.locationName);
+      return !recRegion || recRegion.code === userRegion.code;
+    });
+  }, [recommendations, regionScope, userRegion]);
+
   const renderRecommendationsHeader = () => {
-    if (hasAnyFilter || recommendations.length === 0) {
+    if (hasAnyFilter || visibleRecommendations.length === 0) {
       return null;
     }
 
@@ -274,7 +348,7 @@ export function EventDiscoveryScreen({
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.recScrollContent}
         >
-          {recommendations.map(item => (
+          {visibleRecommendations.map(item => (
             <Pressable
               key={String(item.event.eventId)}
               accessibilityRole="button"
@@ -367,7 +441,7 @@ export function EventDiscoveryScreen({
             weight="bold"
             color={theme.colors.textSecondary}
           >
-            All Volunteer Opportunities ({events.length})
+            All Volunteer Opportunities ({visibleEvents.length})
           </AppText>
         </View>
       </View>
@@ -400,6 +474,41 @@ export function EventDiscoveryScreen({
             placeholder="Search by title, location, or landmark..."
           />
         </View>
+
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={
+            viewMode === 'list' ? 'Switch to Map View' : 'Switch to List View'
+          }
+          onPress={() =>
+            setViewMode(prev => (prev === 'list' ? 'map' : 'list'))
+          }
+          hitSlop={8}
+          style={[
+            styles.filterButton,
+            {
+              backgroundColor:
+                viewMode === 'map'
+                  ? theme.colors.primary
+                  : theme.colors.surfaceRaised,
+              borderColor:
+                viewMode === 'map'
+                  ? theme.colors.primary
+                  : theme.colors.border,
+              borderRadius: theme.radius.sm,
+            },
+          ]}
+        >
+          <AppIcon
+            name={viewMode === 'map' ? 'menu' : 'map'}
+            size={18}
+            color={
+              viewMode === 'map'
+                ? theme.colors.onPrimary
+                : theme.colors.textPrimary
+            }
+          />
+        </Pressable>
 
         <Pressable
           accessibilityRole="button"
@@ -450,6 +559,42 @@ export function EventDiscoveryScreen({
         </Pressable>
       </View>
 
+      {/* User Region Scope Bar */}
+      {userRegion ? (
+        <View
+          style={[
+            styles.activeFiltersBar,
+            {
+              backgroundColor: theme.colors.surfaceRaised,
+              borderBottomColor: theme.colors.border,
+            },
+          ]}
+        >
+          <View style={styles.regionInfoRow}>
+            <AppIcon name="location" size={14} color={theme.colors.primary} />
+            <AppText
+              variant="caption"
+              weight="semibold"
+              color={theme.colors.textPrimary}
+            >
+              {regionScope === 'my_region'
+                ? `Region: ${userRegion.label} (${visibleEvents.length})`
+                : `All Regions (${visibleEvents.length})`}
+            </AppText>
+          </View>
+          <AppButton
+            label={regionScope === 'my_region' ? 'All Regions' : 'My Region'}
+            variant="ghost"
+            onPress={() =>
+              setRegionScope(prev =>
+                prev === 'my_region' ? 'all_regions' : 'my_region',
+              )
+            }
+            style={styles.clearAllButton}
+          />
+        </View>
+      ) : null}
+
       {/* Active Filters Summary Bar */}
       {hasAnyFilter ? (
         <View
@@ -466,7 +611,7 @@ export function EventDiscoveryScreen({
             weight="semibold"
             color={theme.colors.textSecondary}
           >
-            Showing filtered results ({events.length} found)
+            Showing filtered results ({visibleEvents.length} found)
           </AppText>
           <AppButton
             label="Clear all"
@@ -485,11 +630,24 @@ export function EventDiscoveryScreen({
           title="Could not load events"
           description={errorMessage}
           onRetry={fetchEvents}
+          templateFields={[
+            { label: 'Opportunity Title', placeholder: 'Event name' },
+            { label: 'Date & Time', placeholder: 'Schedule' },
+            { label: 'Location', placeholder: 'Venue / Area' },
+          ]}
+        />
+      ) : viewMode === 'map' ? (
+        <EventMapView
+          mode="explore"
+          events={visibleEvents}
+          regionCenter={userRegion?.center ?? null}
+          regionLabel={regionScope === 'my_region' ? userRegion?.label ?? null : null}
+          onSelectEvent={handleEventPress}
         />
       ) : (
         <FlatList
           ref={flatListRef}
-          data={events}
+          data={visibleEvents}
           keyExtractor={item => item.id}
           contentContainerStyle={[
             styles.listContent,
@@ -514,10 +672,29 @@ export function EventDiscoveryScreen({
               description={
                 hasAnyFilter
                   ? 'No published or active events match your current search and filter criteria.'
-                  : 'There are currently no published volunteer opportunities available.'
+                  : regionScope === 'my_region' && userRegion
+                    ? `There are currently no published volunteer opportunities in ${userRegion.label}.`
+                    : 'There are currently no published volunteer opportunities available.'
               }
-              actionLabel={hasAnyFilter ? 'Reset Filters' : undefined}
-              onActionPress={hasAnyFilter ? handleClearAll : undefined}
+              templateFields={[
+                { label: 'Opportunity Title', placeholder: 'No open events right now' },
+                { label: 'Category / Skills', placeholder: '—' },
+                { label: 'Venue', placeholder: 'Location details will appear here' },
+              ]}
+              actionLabel={
+                hasAnyFilter
+                  ? 'Reset Filters'
+                  : regionScope === 'my_region' && userRegion
+                    ? 'Show All Regions'
+                    : undefined
+              }
+              onActionPress={
+                hasAnyFilter
+                  ? handleClearAll
+                  : regionScope === 'my_region' && userRegion
+                    ? () => setRegionScope('all_regions')
+                    : undefined
+              }
             />
           }
         />
@@ -583,6 +760,11 @@ const styles = StyleSheet.create({
   clearAllButton: {
     minHeight: 28,
     paddingHorizontal: 8,
+  },
+  regionInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   listContent: {
     flexGrow: 1,

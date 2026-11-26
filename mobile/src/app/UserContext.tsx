@@ -27,6 +27,7 @@ import {
   addDataModeListener,
   DataMode,
   getDataMode,
+  setDataMode,
 } from './configuration/dataMode';
 import { sessionManager } from '../core/auth/sessionManager';
 import { authApi } from '../data/endpoints/authApi';
@@ -38,7 +39,14 @@ import { profileApi } from '../data/endpoints/profileApi';
 import { resetDiscoveryCache } from '../features/events/screens/EventDiscoveryScreen';
 import { resetApplicationsCache } from '../features/events/screens/MyApplicationsScreen';
 import { resetAssignmentsCache } from '../features/events/screens/MyAssignmentsScreen';
-import { queryCache } from '../data/cache';
+import {
+  clearOfflineCacheAll,
+  getLastCachedUser,
+  hydrateOfflineCacheFromStorage,
+  queryCache,
+  setLastCachedUser,
+  startOfflineCachePersistence,
+} from '../data/cache';
 
 export type UserPreset = 'volunteer' | 'coordinator' | 'pending';
 
@@ -117,6 +125,8 @@ export interface UserContextValue {
   ) => Promise<VerifyOtpResult>;
   logout?: () => Promise<void>;
   refreshSessionUser?: () => Promise<void>;
+  enterOfflineMode?: () => Promise<void>;
+  offlineCachedUser?: UserProfileSnapshot | null;
 }
 
 export interface FullUserContextValue extends UserContextValue {
@@ -142,6 +152,8 @@ export interface FullUserContextValue extends UserContextValue {
   ) => Promise<VerifyOtpResult>;
   logout: () => Promise<void>;
   refreshSessionUser: () => Promise<void>;
+  enterOfflineMode?: () => Promise<void>;
+  offlineCachedUser?: UserProfileSnapshot | null;
 }
 
 export const UserContext = createContext<UserContextValue | undefined>(
@@ -175,12 +187,18 @@ export function UserProvider({
 
   // Ephemeral challenge state held strictly in memory, isolated from persisted DRF token
   const [challenge, setChallenge] = useState<EphemeralChallengeState | null>(null);
+  const [offlineCachedUser, setOfflineCachedUser] =
+    useState<UserProfileSnapshot | null>(() => getLastCachedUser());
 
   // Sync with global dataMode changes
   useEffect(() => {
     const unsubscribe = addDataModeListener(newMode => {
-      setDataModeState(newMode);
-      queryCache.clear();
+      setDataModeState(prev => {
+        if (prev === 'mock' || newMode === 'mock') {
+          queryCache.clear();
+        }
+        return newMode;
+      });
       if (newMode === 'mock') {
         setIsAuthenticated(true);
         setIsBootstrapping(false);
@@ -253,6 +271,8 @@ export function UserProvider({
       };
 
       setCurrentUser(snapshot);
+      setOfflineCachedUser(snapshot);
+      setLastCachedUser(snapshot).catch(() => {});
       setIsAuthenticated(true);
       return;
     }
@@ -293,22 +313,45 @@ export function UserProvider({
     };
 
     setCurrentUser(snapshot);
+    setOfflineCachedUser(snapshot);
+    setLastCachedUser(snapshot).catch(() => {});
     setIsAuthenticated(true);
   }, []);
 
   // Session bootstrap on cold start in HTTP mode
   useEffect(() => {
-    if (dataMode !== 'http') {
+    if (dataMode === 'mock') {
       setIsBootstrapping(false);
       setIsAuthenticated(true);
       return;
     }
 
+    if (dataMode === 'offline') {
+      setIsBootstrapping(false);
+      return;
+    }
+
     let isMounted = true;
     setIsBootstrapping(true);
+    const stopPersistence = startOfflineCachePersistence();
 
     async function bootstrap() {
-      const token = await sessionManager.getToken();
+      try {
+        const hydrated = await hydrateOfflineCacheFromStorage();
+        if (isMounted && hydrated.lastUser) {
+          setOfflineCachedUser(hydrated.lastUser);
+        }
+      } catch {
+        // Ignore cache hydration failure
+      }
+
+      let token: string | null = null;
+      try {
+        token = await sessionManager.getToken();
+      } catch {
+        token = null;
+      }
+
       if (!token || token.trim().length === 0) {
         if (isMounted) {
           setIsAuthenticated(false);
@@ -332,6 +375,7 @@ export function UserProvider({
 
     return () => {
       isMounted = false;
+      stopPersistence();
     };
   }, [dataMode, refreshSessionUser]);
 
@@ -681,18 +725,40 @@ export function UserProvider({
     resetDiscoveryCache();
     resetApplicationsCache();
     resetAssignmentsCache();
-    queryCache.clear();
     setChallenge(null);
-    if (getDataMode() === 'http') {
+    if (getDataMode() !== 'mock') {
       try {
         await authApi.logout();
       } catch {
         // Ignore server error during logout
       }
+      await clearOfflineCacheAll();
+      setOfflineCachedUser(null);
       await sessionManager.logout();
       setIsAuthenticated(false);
+    } else {
+      queryCache.clear();
     }
   }, []);
+
+  const enterOfflineMode = useCallback(async (): Promise<void> => {
+    const hydrated = await hydrateOfflineCacheFromStorage();
+    const cachedUser =
+      hydrated.lastUser ??
+      offlineCachedUser ??
+      getLastCachedUser() ?? {
+        id: 'offline-cache-user',
+        displayName: 'Offline Reader',
+        phone: null,
+        coordinatorStatus: 'none' as CoordinatorStatus,
+        accountStatus: 'active' as UserAccountStatus,
+      };
+    setOfflineCachedUser(cachedUser);
+    setCurrentUser(cachedUser);
+    setDataMode('offline');
+    setIsAuthenticated(true);
+    setIsBootstrapping(false);
+  }, [offlineCachedUser]);
 
   const isCoordinator = useMemo(
     () => hasCoordinatorAccess(currentUser),
@@ -731,6 +797,8 @@ export function UserProvider({
       verifyTokenizedOtp,
       logout,
       refreshSessionUser,
+      enterOfflineMode,
+      offlineCachedUser,
     }),
     [
       currentUser,
@@ -746,6 +814,8 @@ export function UserProvider({
       verifyTokenizedOtp,
       logout,
       refreshSessionUser,
+      enterOfflineMode,
+      offlineCachedUser,
     ],
   );
 
@@ -769,6 +839,8 @@ const fallbackUserContext: FullUserContextValue = {
   verifyTokenizedOtp: async () => ({ success: true }),
   logout: async () => {},
   refreshSessionUser: async () => {},
+  enterOfflineMode: async () => {},
+  offlineCachedUser: null,
 };
 
 export function useCurrentUser(): FullUserContextValue {

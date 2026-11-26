@@ -56,7 +56,7 @@ describe('RepositoryProvider & Dependency-Injection Bridge', () => {
     return <Text testID="mode">{repos.dataMode}</Text>;
   }
 
-  it('provides Mock repositories by default when dataMode is unset', () => {
+  it('provides Http repositories by default when dataMode is unset', () => {
     let capturedContext: ReturnType<typeof useRepositories> | null = null;
 
     act(() => {
@@ -72,14 +72,18 @@ describe('RepositoryProvider & Dependency-Injection Bridge', () => {
     });
 
     expect(capturedContext).not.toBeNull();
-    expect(capturedContext!.dataMode).toBe('mock');
-    expect(capturedContext!.dashboardRepository).toBe(
-      defaultDashboardRepository,
+    expect(capturedContext!.dataMode).toBe('http');
+    expect(capturedContext!.dashboardRepository).toBeInstanceOf(
+      HttpDashboardRepository,
     );
-    expect(capturedContext!.eventRepository).toBe(defaultEventRepository);
-    expect(capturedContext!.profileRepository).toBe(defaultProfileRepository);
-    expect(capturedContext!.coordinatorRepository).toBe(
-      defaultCoordinatorRepository,
+    expect(capturedContext!.eventRepository).toBeInstanceOf(
+      HttpEventRepository,
+    );
+    expect(capturedContext!.profileRepository).toBeInstanceOf(
+      HttpProfileRepository,
+    );
+    expect(capturedContext!.coordinatorRepository).toBeInstanceOf(
+      HttpCoordinatorRepository,
     );
   });
 
@@ -153,14 +157,14 @@ describe('RepositoryProvider & Dependency-Injection Bridge', () => {
       );
     });
 
-    expect(capturedContext!.dataMode).toBe('mock');
-    expect(capturedContext!.eventRepository).toBe(defaultEventRepository);
+    expect(capturedContext!.dataMode).toBe('http');
+    expect(capturedContext!.eventRepository).toBeInstanceOf(HttpEventRepository);
 
     act(() => {
-      setDataMode('http');
+      setDataMode('offline');
     });
 
-    expect(capturedContext!.dataMode).toBe('http');
+    expect(capturedContext!.dataMode).toBe('offline');
     expect(capturedContext!.eventRepository).toBeInstanceOf(HttpEventRepository);
 
     act(() => {
@@ -192,7 +196,7 @@ describe('RepositoryProvider & Dependency-Injection Bridge', () => {
     });
 
     expect(capturedContext!.dashboardRepository).toBe(customMockDashboard);
-    expect(capturedContext!.eventRepository).toBe(defaultEventRepository);
+    expect(capturedContext!.eventRepository).toBeInstanceOf(HttpEventRepository);
   });
 
   it('useRepositories hook falls back safely to mock repositories outside of Provider', () => {

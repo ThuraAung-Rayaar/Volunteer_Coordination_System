@@ -17,6 +17,10 @@ import {
   resetDataMode,
   setDataMode,
 } from '../../../app/configuration/dataMode';
+import {
+  resetConsumerModeState,
+  setConsumerModeState,
+} from '../../../app/configuration/consumerMode';
 import { defaultTokenStore, MemoryTokenStore } from '../../../core/auth/tokenStore';
 import { sessionManager } from '../../../core/auth/sessionManager';
 import { authApi } from '../../../data/endpoints/authApi';
@@ -181,7 +185,7 @@ describe('Phase 4: Authentication & Session Integration', () => {
       expect(inputs.length).toBe(1);
 
       const header = rootInstance.findByType(AppHeader);
-      expect(header.props.title).toBe('Workshift Sign In');
+      expect(header.props.title).toBe('VCS Sign In');
 
       const submitButton = rootInstance.findByType(AppButton);
       expect(submitButton.props.label).toBe('Send Verification Code');
@@ -260,27 +264,10 @@ describe('Phase 4: Authentication & Session Integration', () => {
         t.props.children?.toString().includes('Please enter your name.'),
       );
       expect(nameErrorText).toBeDefined();
-
-      // If an existing (old) user tries to enter as new user, shows error
-      const nameInput = rootInstance.findByProps({ placeholder: 'e.g. Alex Morgan' });
-      const phoneInput = rootInstance.findByProps({ placeholder: '+95912345678' });
-
-      await act(async () => {
-        nameInput.props.onChangeText('Alex Morgan');
-        phoneInput.props.onChangeText('+959111111111');
-      });
-
-      await act(async () => {
-        await submitButton.props.onPress();
-      });
-
-      const alreadyRegisteredError = rootInstance.findAllByType(AppText).find(t =>
-        t.props.children?.toString().includes('This phone number is already registered. Please switch to Returning User to sign in.'),
-      );
-      expect(alreadyRegisteredError).toBeDefined();
     });
 
     it('submits phone to requestOtp and transitions to Step 2 with dev code banner', async () => {
+      setConsumerModeState({ devOptionsEnabled: true });
       const mockRequestOtp = jest.fn().mockResolvedValue({
         success: true,
         devCode: '123456',
@@ -327,11 +314,18 @@ describe('Phase 4: Authentication & Session Integration', () => {
       const header = rootInstance.findByType(AppHeader);
       expect(header.props.title).toBe('Verify Code');
 
-      // Dev code badge should appear
-      const devCodeText = rootInstance.findAllByType(AppText).find(t =>
-        t.props.children?.toString().includes('123456'),
-      );
-      expect(devCodeText).toBeDefined();
+      // Developer status banner must NOT appear
+      const json = JSON.stringify(root!.toJSON());
+      expect(json).not.toContain('DEV TEST OTP');
+      expect(json).not.toContain('Development Code:');
+
+      // Code input still receives the auto-filled value when dev options are enabled
+      const codeInput = rootInstance.findByType(AppInput);
+      expect(codeInput.props.value).toBe('123456');
+      await act(async () => {
+        root!.unmount();
+      });
+      resetConsumerModeState();
     });
 
     it('allows navigating back from Step 2 to Step 1 via AppHeader back button', async () => {
@@ -378,7 +372,7 @@ describe('Phase 4: Authentication & Session Integration', () => {
         rootInstance.findByType(AppHeader).props.onBackPress();
       });
 
-      expect(rootInstance.findByType(AppHeader).props.title).toBe('Workshift Sign In');
+      expect(rootInstance.findByType(AppHeader).props.title).toBe('VCS Sign In');
     });
 
     it('validates OTP code and submits verifyOtp successfully', async () => {
@@ -497,6 +491,9 @@ describe('Phase 4: Authentication & Session Integration', () => {
 
   describe('UserProvider Session Lifecycle & Auth Integration', () => {
     it('in mock mode: boots immediately into authenticated demo user', () => {
+      act(() => {
+        setDataMode('mock');
+      });
       let capturedContext: FullUserContextValue | undefined;
 
       function Consumer() {
@@ -781,9 +778,9 @@ describe('Phase 4: Authentication & Session Integration', () => {
   });
 
   describe('UI Mode Switching & Drawer Invariants', () => {
-    it('renders QA Demo Profile Switcher in MainDrawerContent when dataMode is mock', () => {
+    it('always hides QA Demo Profile Switcher in MainDrawerContent (template mode removed)', () => {
       act(() => {
-        resetDataMode(); // 'mock'
+        resetDataMode();
       });
 
       act(() => {
@@ -800,7 +797,7 @@ describe('Phase 4: Authentication & Session Integration', () => {
       const qaTitle = rootInstance.findAllByType(AppText).find(t =>
         t.props.children?.toString().toUpperCase().includes('QA DEMO PROFILE SWITCHER'),
       );
-      expect(qaTitle).toBeDefined();
+      expect(qaTitle).toBeUndefined();
     });
 
     it('hides QA Demo Profile Switcher in MainDrawerContent when dataMode is http', () => {

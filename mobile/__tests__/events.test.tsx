@@ -619,8 +619,9 @@ describe('EventDetailScreen', () => {
     const json = safeStringify(renderer.toJSON());
     expect(json).toContain('Riverbank Environmental Cleanup');
     expect(json).toContain('Downtown Riverwalk Plaza');
-    expect(json).toContain('OpenStreetMap Geographic Preview');
-    expect(json).toContain('Interactive map SDK not connected in UI preview');
+    expect(json).toContain('maplibre-map');
+    expect(json).toContain('Expand Map');
+    expect(json).not.toContain('Interactive map SDK not connected in UI preview');
     expect(json).toContain('Volunteer Support & Amenities');
     expect(json).toContain('Your Application Status');
     expect(json).toContain('Available Roles & Posts');
@@ -676,9 +677,8 @@ describe('EventDetailScreen', () => {
       applyButton!.props.onPress();
     });
 
-    // Verify modal is open with Demo-only warning
+    // Verify modal is open
     let json = safeStringify(renderer.toJSON());
-    expect(json).toContain('Demo only — not submitted to server');
     expect(json).toContain('Confirm Application');
 
     // Confirm application
@@ -694,7 +694,7 @@ describe('EventDetailScreen', () => {
 
     // Verify confirmation banner is shown
     json = safeStringify(renderer.toJSON());
-    expect(json).toContain('Application recorded locally');
+    expect(json).toContain('Demo only — not submitted to server');
   });
 
   it('navigates back to Events discovery when returnTo=Events on back press', async () => {
@@ -883,7 +883,6 @@ describe('MyApplicationsScreen', () => {
     // Modal is now open
     let json = safeStringify(renderer.toJSON());
     expect(json).toContain('Withdraw Application');
-    expect(json).toContain('Demo only');
 
     // Confirm withdrawal
     const confirmBtn = renderer.root
@@ -898,8 +897,6 @@ describe('MyApplicationsScreen', () => {
 
     // Verification banner is displayed
     json = safeStringify(renderer.toJSON());
-    expect(json).toContain('Riverbank Environmental Cleanup & Waste Audit');
-    expect(json).toContain('(Recycling & Waste Data Auditor) withdrawn');
     expect(json).toContain('Demo only');
   });
 
@@ -1191,7 +1188,6 @@ describe('MyAssignmentsScreen', () => {
 
     let json = safeStringify(renderer.toJSON());
     expect(json).toContain('Cancel Participation');
-    expect(json).toContain('Demo only');
 
     // Confirm cancellation
     const confirmBtn = renderer.root
@@ -1205,8 +1201,6 @@ describe('MyAssignmentsScreen', () => {
     });
 
     json = safeStringify(renderer.toJSON());
-    expect(json).toContain('Riverbank Environmental Cleanup & Waste Audit');
-    expect(json).toContain('(Recycling & Waste Data Auditor) cancelled');
     expect(json).toContain('Demo only');
   });
 

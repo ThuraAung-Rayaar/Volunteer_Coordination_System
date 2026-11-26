@@ -19,7 +19,6 @@ import { NotificationsScreen } from '../features/notifications/screens/Notificat
 import { MyApplicationsScreen } from '../features/events/screens/MyApplicationsScreen';
 import { MyAssignmentsScreen } from '../features/events/screens/MyAssignmentsScreen';
 import { VolunteerWorkspaceScreen } from '../features/events/screens/VolunteerWorkspaceScreen';
-import { FriendsScreen } from '../features/friends/screens/FriendsScreen';
 import { AvailabilityScreen } from '../features/profile/screens/AvailabilityScreen';
 import { ProfileScreen } from '../features/profile/screens/ProfileScreen';
 import { ProfileEditScreen } from '../features/profile/screens/ProfileEditScreen';
@@ -53,7 +52,6 @@ export function MainDrawerNavigator(): React.JSX.Element {
       <Drawer.Screen name="Assistant" component={AssistantScreen} />
       <Drawer.Screen name="Notifications" component={NotificationsScreen} />
       <Drawer.Screen name="EventDetail" component={EventDetailScreen} />
-      <Drawer.Screen name="Friends" component={FriendsScreen} />
       <Drawer.Screen name="MyApplications" component={MyApplicationsScreen} />
       <Drawer.Screen name="MyAssignments" component={MyAssignmentsScreen} />
       <Drawer.Screen

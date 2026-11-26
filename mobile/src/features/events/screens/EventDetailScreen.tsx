@@ -15,7 +15,7 @@ import {
   defaultEventRepository,
   MockEventRepository,
 } from '../../../data/mock/MockEventRepository';
-import { isHttpMode, isMockMode } from '../../../app/configuration/dataMode';
+import { isMockMode } from '../../../app/configuration/dataMode';
 import { useRepositories } from '../../../app/RepositoryProvider';
 import {
   CHARITY_CATEGORIES,
@@ -33,11 +33,13 @@ import {
   AppInput,
   AppText,
   ErrorState,
+  KeyboardLiftView,
   LoadingState,
   SectionHeader,
   StatusBadge,
 } from '../../../shared';
 import { useAppTheme } from '../../../theme';
+import { EventMapView } from '../components/EventMapView';
 import { EventPostCard } from '../components/EventPostCard';
 
 export interface EventDetailScreenProps
@@ -163,11 +165,7 @@ export function EventDetailScreen({
       );
 
       if (result.success) {
-        setFeedbackBanner(
-          isMockMode()
-            ? `Application recorded locally (${result.message})`
-            : result.message,
-        );
+        setFeedbackBanner(result.message);
         setSelectedPostForApply(null);
         setModalError(null);
         // Refresh detail to get updated application and capacity
@@ -214,6 +212,12 @@ export function EventDetailScreen({
           title="Event Not Found"
           description={errorMessage ?? 'Could not find the requested event.'}
           onRetry={fetchDetail}
+          templateFields={[
+            { label: 'Event Title', placeholder: 'Volunteer Event' },
+            { label: 'Schedule', placeholder: 'Start – End date & time' },
+            { label: 'Location', placeholder: 'Address / Venue' },
+            { label: 'Open Roles', placeholder: 'Role positions & capacity', multiline: true },
+          ]}
         />
       </View>
     );
@@ -224,7 +228,7 @@ export function EventDetailScreen({
     statusStr === 'completed' ||
       statusStr === 'ended' ||
       statusStr === 'cancelled' ||
-      (isHttpMode() &&
+      (!(isMockMode() || repository instanceof MockEventRepository) &&
         Boolean(event.endAt && new Date(event.endAt).getTime() < Date.now())),
   );
   const isLive = !isEnded && event.status === 'active';
@@ -363,8 +367,7 @@ export function EventDetailScreen({
               </AppText>
               <AppText variant="caption" color={theme.colors.textSecondary}>
                 Submitted on{' '}
-                {new Date(userApplication.appliedAt).toLocaleDateString()} • Demo
-                mode
+                {new Date(userApplication.appliedAt).toLocaleDateString()}
               </AppText>
               {userApplication.volunteerNote ? (
                 <AppText
@@ -451,38 +454,14 @@ export function EventDetailScreen({
             </View>
           </View>
 
-          {/* Map Preview Placeholder Box */}
-          <View
-            style={[
-              styles.mapPreviewBox,
-              {
-                backgroundColor: theme.colors.surfaceRaised,
-                borderColor: theme.colors.border,
-                borderRadius: theme.radius.md,
-              },
-            ]}
-          >
-            <AppIcon name="map" size={28} color={theme.colors.primary} />
-            <AppText
-              variant="caption"
-              weight="bold"
-              color={theme.colors.textPrimary}
-              style={styles.mapTitle}
-            >
-              OpenStreetMap Geographic Preview
-            </AppText>
-            <AppText variant="caption" color={theme.colors.textSecondary}>
-              Coordinates: {event.latitude ?? 16.8000}°,{' '}
-              {event.longitude ?? 96.1500}°
-            </AppText>
-            <AppText
-              variant="caption"
-              color={theme.colors.muted}
-              style={styles.mapDisclaimer}
-            >
-              Interactive map SDK not connected in UI preview
-            </AppText>
-          </View>
+          {/* Connected Interactive MapLibre Map */}
+          <EventMapView
+            mode="detail"
+            latitude={event.latitude}
+            longitude={event.longitude}
+            title={event.title}
+            locationName={event.locationName}
+          />
         </AppCard>
 
         {/* Description & Purpose */}
@@ -576,24 +555,28 @@ export function EventDetailScreen({
         })}
       </ScrollView>
 
-      {/* Demo Apply Confirmation Modal */}
+      {/* Apply Confirmation Modal */}
       <Modal
         visible={Boolean(selectedPostForApply)}
         transparent
         animationType="fade"
         onRequestClose={() => setSelectedPostForApply(null)}
       >
-        <View style={styles.modalBackdrop}>
-          <View
-            style={[
-              styles.modalCard,
-              {
-                backgroundColor: theme.colors.surface,
-                borderRadius: theme.radius.lg,
-                borderColor: theme.colors.border,
-              },
-            ]}
+        <KeyboardLiftView inModal>
+          <ScrollView
+            contentContainerStyle={styles.modalScrollBackdrop}
+            keyboardShouldPersistTaps="handled"
           >
+            <View
+              style={[
+                styles.modalCard,
+                {
+                  backgroundColor: theme.colors.surface,
+                  borderRadius: theme.radius.lg,
+                  borderColor: theme.colors.border,
+                },
+              ]}
+            >
             <View style={styles.modalHeader}>
               <AppText variant="title" weight="bold" color={theme.colors.textPrimary}>
                 Apply for Volunteer Role
@@ -607,32 +590,6 @@ export function EventDetailScreen({
                 <AppIcon name="close" size={20} color={theme.colors.textSecondary} />
               </Pressable>
             </View>
-
-            {/* Prominent Demo Warning */}
-            {isMockMode() ? (
-              <View
-                style={[
-                  styles.demoAlertBox,
-                  {
-                    backgroundColor: theme.colors.surfaceRaised,
-                    borderColor: theme.colors.warning,
-                  },
-                ]}
-              >
-                <AppText
-                  variant="caption"
-                  weight="bold"
-                  color={theme.colors.warning}
-                  style={styles.demoWarningTitle}
-                >
-                  ⚠️ Demo only — not submitted to server
-                </AppText>
-                <AppText variant="caption" color={theme.colors.textSecondary}>
-                  This is a UI preview. Your application will be stored in local
-                  mock state for this session.
-                </AppText>
-              </View>
-            ) : null}
 
             {/* Selected Post Summary */}
             <View style={styles.modalPostSummary}>
@@ -697,8 +654,9 @@ export function EventDetailScreen({
                 />
               </View>
             </View>
-          </View>
-        </View>
+            </View>
+          </ScrollView>
+        </KeyboardLiftView>
       </Modal>
     </View>
   );
@@ -802,6 +760,13 @@ const styles = StyleSheet.create({
   },
   modalBackdrop: {
     flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  modalScrollBackdrop: {
+    flexGrow: 1,
     backgroundColor: 'rgba(0,0,0,0.6)',
     alignItems: 'center',
     justifyContent: 'center',

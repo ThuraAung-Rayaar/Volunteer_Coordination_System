@@ -2,7 +2,7 @@
  * @format
  */
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Pressable,
   StyleProp,
@@ -12,9 +12,17 @@ import {
 } from 'react-native';
 import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
 import { NavigationContext } from '@react-navigation/native';
+import {
+  addDataModeListener,
+  DataMode,
+  getDataMode,
+} from '../../app/configuration/dataMode';
+import { discoverAndConnectBff } from '../../core/api/bffDiscovery';
+import { queryCache } from '../../data/cache';
 import { useAppTheme } from '../../theme';
 import { AppIcon } from '../components/AppIcon';
 import { AppText } from '../components/AppText';
+import { OfflineBanner } from '../components/OfflineBanner';
 
 export interface AppHeaderProps {
   title: string;
@@ -23,6 +31,7 @@ export interface AppHeaderProps {
   onBackPress?: () => void;
   rightAction?: React.ReactNode;
   showNotificationBell?: boolean;
+  showOfflineBanner?: boolean;
   onNotificationPress?: () => void;
   style?: StyleProp<ViewStyle>;
 }
@@ -40,6 +49,7 @@ export function AppHeader({
   onBackPress,
   rightAction,
   showNotificationBell = true,
+  showOfflineBanner = true,
   onNotificationPress,
   style,
 }: AppHeaderProps): React.JSX.Element {
@@ -47,6 +57,23 @@ export function AppHeader({
   const insets = React.useContext(SafeAreaInsetsContext);
   const navigation = React.useContext(NavigationContext);
   const topInset = insets?.top ?? 0;
+  const [dataMode, setDataMode] = useState<DataMode>(() => getDataMode());
+  const [isReconnecting, setIsReconnecting] = useState(false);
+
+  useEffect(() => {
+    return addDataModeListener(mode => {
+      setDataMode(mode);
+    });
+  }, []);
+
+  const handleReconnect = async () => {
+    setIsReconnecting(true);
+    try {
+      await discoverAndConnectBff();
+    } finally {
+      setIsReconnecting(false);
+    }
+  };
 
   const handleNotificationPress =
     onNotificationPress ??
@@ -55,20 +82,21 @@ export function AppHeader({
     });
 
   return (
-    <View
-      accessibilityRole="header"
-      style={[
-        styles.container,
-        {
-          backgroundColor: theme.colors.surface,
-          borderBottomColor: theme.colors.border,
-          paddingHorizontal: 16,
-          paddingTop: topInset > 0 ? topInset + 6 : 12,
-          paddingBottom: 12,
-        },
-        style,
-      ]}
-    >
+    <View style={styles.wrapper}>
+      <View
+        accessibilityRole="header"
+        style={[
+          styles.container,
+          {
+            backgroundColor: theme.colors.surface,
+            borderBottomColor: theme.colors.border,
+            paddingHorizontal: 16,
+            paddingTop: topInset > 0 ? topInset + 6 : 12,
+            paddingBottom: 12,
+          },
+          style,
+        ]}
+      >
       <View style={styles.leftContainer}>
         {onMenuPress ? (
           <Pressable
@@ -174,11 +202,23 @@ export function AppHeader({
           />
         </Pressable>
       ) : null}
+      </View>
+
+      {showOfflineBanner && dataMode === 'offline' ? (
+        <OfflineBanner
+          cachedCount={queryCache.size}
+          isReconnecting={isReconnecting}
+          onReconnect={handleReconnect}
+        />
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  wrapper: {
+    width: '100%',
+  },
   container: {
     minHeight: 64,
     flexDirection: 'row',

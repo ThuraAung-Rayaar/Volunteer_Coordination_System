@@ -12,7 +12,10 @@ import {
 } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { CoordinatorRepository } from '../../../data/contracts/coordinatorRepository';
-import { defaultCoordinatorRepository } from '../../../data/mock/MockCoordinatorRepository';
+import {
+  defaultCoordinatorRepository,
+  MockCoordinatorRepository,
+} from '../../../data/mock/MockCoordinatorRepository';
 import { useRepositories } from '../../../app/RepositoryProvider';
 import { isMockMode } from '../../../app/configuration/dataMode';
 import type {
@@ -30,6 +33,7 @@ import {
   AppText,
   EmptyState,
   FilterChip,
+  KeyboardLiftView,
   LoadingState,
   SectionHeader,
   StatusBadge,
@@ -101,12 +105,13 @@ export function CoordinatorAttendanceScreen({
       setIsLoading(true);
       try {
         const evList = await repo.getMyEvents();
+        const isMockRepo = isMockMode() || repo instanceof MockCoordinatorRepository;
         const operationalEvents = evList.filter(
           e =>
             e.status !== 'cancelled' &&
             e.status !== 'completed' &&
             e.status !== 'ended' &&
-            (isMockMode() || !e.endAt || new Date(e.endAt).getTime() >= Date.now()),
+            (isMockRepo || !e.endAt || new Date(e.endAt).getTime() >= Date.now()),
         );
         setEvents(operationalEvents);
 
@@ -358,7 +363,7 @@ export function CoordinatorAttendanceScreen({
               <AppText variant="caption" weight="bold" color={theme.colors.textPrimary}>Created Token #{createdQrToken.id}</AppText>
               <AppText variant="caption" color={theme.colors.textSecondary}>
                 {repositories.dataMode === 'mock'
-                  ? 'Local template token only — it is not saved on the server.'
+                  ? 'Offline preview token — connect to server to save.'
                   : 'Server-issued token value — handle securely.'}
               </AppText>
               {isQrExpired ? (
@@ -482,8 +487,7 @@ export function CoordinatorAttendanceScreen({
     <View style={styles.footerContainer}>
       <AppText variant="caption" color={theme.colors.muted} style={styles.privacyNote}>
         Operational Notice: Authoritative distance calculated on server. Raw GPS
-        coordinates and device telemetry are hidden per Privacy Rule BR-PRIV-T4. Real
-        location permission and GPS capture are not active in this UI preview.
+        coordinates and device telemetry are hidden per Privacy Rule BR-PRIV-T4.
       </AppText>
     </View>
   );
@@ -602,28 +606,31 @@ export function CoordinatorAttendanceScreen({
         ) : isLoading ? (
           <LoadingState label="Loading attendance records..." />
         ) : (
-          <FlatList
-            data={filteredRoster}
-            keyExtractor={item => item.id}
-            ListHeaderComponent={renderHeader}
-            renderItem={({ item }) => (
-              <AttendanceRow
-                attendance={item}
-                isMonitorMode={isMonitorMode}
-                onConfirmGeo={handleConfirmGeo}
-                onRejectGeo={handleRejectGeo}
-                onManualCheckIn={handleManualCheckIn}
-              />
-            )}
-            ListFooterComponent={renderFooter}
-            contentContainerStyle={styles.listContent}
-            ListEmptyComponent={
-              <EmptyState
-                title="No Records Found"
-                description={`No attendance records found matching the "${activeFilter}" filter.`}
-              />
-            }
-          />
+          <KeyboardLiftView>
+            <FlatList
+              data={filteredRoster}
+              keyExtractor={item => item.id}
+              keyboardShouldPersistTaps="handled"
+              ListHeaderComponent={renderHeader}
+              renderItem={({ item }) => (
+                <AttendanceRow
+                  attendance={item}
+                  isMonitorMode={isMonitorMode}
+                  onConfirmGeo={handleConfirmGeo}
+                  onRejectGeo={handleRejectGeo}
+                  onManualCheckIn={handleManualCheckIn}
+                />
+              )}
+              ListFooterComponent={renderFooter}
+              contentContainerStyle={styles.listContent}
+              ListEmptyComponent={
+                <EmptyState
+                  title="No Records Found"
+                  description={`No attendance records found matching the "${activeFilter}" filter.`}
+                />
+              }
+            />
+          </KeyboardLiftView>
         )}
 
         <CoordinatorDynamicIsland
