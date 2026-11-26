@@ -9,33 +9,70 @@
     <script src="https://cdn.tailwindcss.com"></script>
 
     <style>
-        :root { color-scheme: light; }
+        :root {
+            color-scheme: light;
+            --vcs-bg: #FAF4E8;
+            --vcs-surface: #FFFDF8;
+            --vcs-surface-raised: #F3EAD8;
+            --vcs-text: #0E1A33;
+            --vcs-text-muted: #56607A;
+            --vcs-text-subtle: #737C91;
+            --vcs-border: #E7DCC4;
+            --vcs-primary: #2563EB;
+        }
+
+        html.theme-dark,
+        html.admin-login.theme-dark,
+        body.admin-login.theme-dark {
+            color-scheme: dark;
+            --vcs-bg: #070B14;
+            --vcs-surface: #0F172A;
+            --vcs-surface-raised: #151F33;
+            --vcs-text: #F8FAFC;
+            --vcs-text-muted: #94A3B8;
+            --vcs-text-subtle: #64748B;
+            --vcs-border: #1E293B;
+            --vcs-primary: #3B82F6;
+        }
+
         html.admin-login, body.admin-login {
-            background: #FAF4E8 !important;
-            color: #0E1A33 !important;
+            background: var(--vcs-bg) !important;
+            color: var(--vcs-text) !important;
         }
         .admin-login .text-white,
         .admin-login .text-slate-100,
-        .admin-login .text-slate-200 { color: #0E1A33 !important; }
+        .admin-login .text-slate-200 { color: var(--vcs-text) !important; }
         .admin-login .text-slate-300,
-        .admin-login .text-slate-400 { color: #56607A !important; }
-        .admin-login .text-slate-500 { color: #737C91 !important; }
+        .admin-login .text-slate-400 { color: var(--vcs-text-muted) !important; }
+        .admin-login .text-slate-500 { color: var(--vcs-text-subtle) !important; }
         .admin-login .bg-gradient-to-tr .text-white,
         .admin-login button.bg-blue-600.text-white { color: #fff !important; }
         .admin-login input {
-            background: #FFFDF8 !important;
-            color: #0E1A33 !important;
-            border-color: #E7DCC4 !important;
+            background: var(--vcs-surface) !important;
+            color: var(--vcs-text) !important;
+            border-color: var(--vcs-border) !important;
         }
-        .admin-login input::placeholder { color: #8E92A0 !important; }
+        .admin-login input::placeholder { color: var(--vcs-text-subtle) !important; }
         .admin-login input:focus {
-            border-color: #2563EB !important;
+            border-color: var(--vcs-primary) !important;
             box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
         }
         .admin-login .bg-slate-900,
-        .admin-login .bg-slate-950 { background-color: #FFFDF8 !important; }
-        .admin-login .border-slate-700 { border-color: #E7DCC4 !important; }
+        .admin-login .bg-slate-950 { background-color: var(--vcs-surface) !important; }
+        .admin-login .border-slate-700,
+        .admin-login .border-slate-800 { border-color: var(--vcs-border) !important; }
     </style>
+
+    <script>
+        (function() {
+            try {
+                var saved = localStorage.getItem('vcs_theme_mode');
+                if (saved === 'dark') {
+                    document.documentElement.classList.add('theme-dark');
+                }
+            } catch(e) {}
+        })();
+    </script>
 
 </head>
 <body class="min-h-full bg-slate-950 text-slate-100 flex flex-col justify-center items-center p-4 font-sans antialiased selection:bg-blue-600 selection:text-white">
@@ -118,7 +155,6 @@
                         <label for="password-input" class="block text-xs font-semibold uppercase tracking-wider text-slate-300">
                             Password
                         </label>
-                        <span class="text-[10px] text-slate-500 font-mono">Demo: AdminDemo123!</span>
                     </div>
                     <input
                         type="password"

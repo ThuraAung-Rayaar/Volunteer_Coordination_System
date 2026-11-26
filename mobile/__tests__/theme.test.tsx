@@ -261,6 +261,45 @@ describe('ThemeProvider & Flash Prevention', () => {
     const textNode = renderer.root.findByProps({ testID: 'fallback-content' });
     expect(textNode.props.children).toBe('Content Loaded');
   });
+
+  it('defaults to light theme when no initialMode or saved preference exists, and allows switching later', async () => {
+    const memoryStorage = new MemoryThemeStorage();
+    let capturedContext!: ThemeContextValue;
+
+    function TestConsumer(): React.JSX.Element {
+      return (
+        <ThemeContext.Consumer>
+          {val => {
+            if (val) {
+              capturedContext = val;
+            }
+            return <Text testID="default-mode">{val?.themeMode}</Text>;
+          }}
+        </ThemeContext.Consumer>
+      );
+    }
+
+    let renderer!: ReactTestRenderer.ReactTestRenderer;
+    await ReactTestRenderer.act(async () => {
+      renderer = ReactTestRenderer.create(
+        <ThemeProvider storage={memoryStorage}>
+          <TestConsumer />
+        </ThemeProvider>,
+      );
+    });
+
+    expect(capturedContext.themeMode).toBe('light');
+    expect(capturedContext.isDark).toBe(false);
+    expect(renderer.root.findByProps({ testID: 'default-mode' }).props.children).toBe('light');
+
+    await ReactTestRenderer.act(async () => {
+      capturedContext.setThemeMode('dark');
+    });
+
+    expect(capturedContext.themeMode).toBe('dark');
+    expect(capturedContext.isDark).toBe(true);
+    expect(await memoryStorage.getThemeMode()).toBe('dark');
+  });
 });
 
 describe('AppIcon Adapter & Accessibility', () => {

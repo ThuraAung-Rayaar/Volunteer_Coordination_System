@@ -12,9 +12,9 @@
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
-  Linking,
   Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
   View,
 } from 'react-native';
@@ -25,9 +25,11 @@ import {
   AppIcon,
   AppInput,
   AppText,
+  KeyboardLiftView,
 } from '../../../shared';
 import { useAppTheme } from '../../../theme';
 import { mapApi, MapCatalogResponseDto } from '../../../data/endpoints/mapApi';
+import { openDirectionsInSystemMap } from '../../../core/location/externalMaps';
 import {
   defaultLocationProvider,
   defaultNativeLocationProvider,
@@ -75,7 +77,6 @@ export function MapLocationPickerModal({
   const [lat, setLat] = useState<string>(String(initialLatitude || 16.8));
   const [lng, setLng] = useState<string>(String(initialLongitude || 96.15));
   const [catalog, setCatalog] = useState<MapCatalogResponseDto | null>(null);
-  const [isLoadingCatalog, setIsLoadingCatalog] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
 
   useEffect(() => {
@@ -87,7 +88,6 @@ export function MapLocationPickerModal({
   }, [visible, initialLatitude, initialLongitude]);
 
   const loadCatalog = async () => {
-    setIsLoadingCatalog(true);
     try {
       const res = await mapApi.getMapCatalog();
       if (res.ok) {
@@ -95,8 +95,6 @@ export function MapLocationPickerModal({
       }
     } catch {
       // In template mode or offline, catalog remains null
-    } finally {
-      setIsLoadingCatalog(false);
     }
   };
 
@@ -134,11 +132,11 @@ export function MapLocationPickerModal({
     const numericLng = Number(lng);
     if (Number.isNaN(numericLat) || Number.isNaN(numericLng)) return;
 
-    const url = `https://www.google.com/maps/search/?api=1&query=${numericLat},${numericLng}`;
-    const canOpen = await Linking.canOpenURL(url);
-    if (canOpen) {
-      await Linking.openURL(url);
-    }
+    await openDirectionsInSystemMap({
+      latitude: numericLat,
+      longitude: numericLng,
+      label: venueName || 'Event Venue',
+    });
   };
 
   const handleConfirm = () => {
@@ -176,7 +174,11 @@ export function MapLocationPickerModal({
           onBackPress={onClose}
         />
 
-        <View style={styles.content}>
+        <KeyboardLiftView inModal>
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={styles.content}
+          >
           {/* Catalog & Provider Status Notice */}
           {catalog?.tile_provider_configured ? (
             <View
@@ -225,7 +227,11 @@ export function MapLocationPickerModal({
           >
             <Map
               style={StyleSheet.absoluteFill}
-              mapStyle={catalog?.style_url || (DEFAULT_MAP_STYLE as any)}
+              mapStyle={
+                catalog?.tile_provider_configured && catalog?.style_url
+                  ? catalog.style_url
+                  : (DEFAULT_MAP_STYLE as any)
+              }
               onPress={(e: any) => {
                 const coords =
                   e?.lngLat ||
@@ -377,7 +383,8 @@ export function MapLocationPickerModal({
               onPress={onClose}
             />
           </View>
-        </View>
+          </ScrollView>
+        </KeyboardLiftView>
       </View>
     </Modal>
   );
@@ -389,7 +396,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 16,
-    flex: 1,
+    flexGrow: 1,
     gap: 12,
   },
   noticeBox: {

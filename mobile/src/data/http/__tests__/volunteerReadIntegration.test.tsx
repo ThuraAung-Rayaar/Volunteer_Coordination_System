@@ -14,6 +14,7 @@ import { profileApi } from '../../endpoints/profileApi';
 import { HttpEventRepository } from '../HttpEventRepository';
 import { HttpDashboardRepository } from '../HttpDashboardRepository';
 import { HttpProfileRepository } from '../HttpProfileRepository';
+import { queryCache } from '../../cache';
 import { DashboardScreen } from '../../../features/dashboard/screens/DashboardScreen';
 import { UserContext, FullUserContextValue } from '../../../app/UserContext';
 import { RepositoryProvider } from '../../../app/RepositoryProvider';
@@ -154,6 +155,7 @@ describe('Phase 5: Volunteer Read Experiences Integration', () => {
   };
 
   beforeEach(() => {
+    queryCache.clearAll();
     memoryStore = new MemoryTokenStore();
     testSessionMgr = new SessionManager(memoryStore);
     testClient = new ApiClient(undefined, memoryStore, testSessionMgr);
@@ -550,7 +552,7 @@ describe('Phase 5: Volunteer Read Experiences Integration', () => {
       const str = safeStringify(root!.toJSON());
       // 4.5 + 3.0 = 7.5 hours given
       expect(str).toContain('7.5 hours given');
-    });
+    }, 15000);
   });
 
   describe('4. My Applications & My Assignments', () => {

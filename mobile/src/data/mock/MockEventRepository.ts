@@ -9,6 +9,7 @@ import {
   type EventDetail,
   type EventFilters,
   type EventSummary,
+  type RecommendedEvent,
   type VolunteerApplicationItem,
   type VolunteerAssignmentItem,
 } from '../../domain/models/event';
@@ -169,7 +170,7 @@ export class MockEventRepository implements EventRepository {
     this.clock = clock;
   }
 
-  public async getEvents(filters?: EventFilters): Promise<EventSummary[]> {
+  public async getEvents(filters?: EventFilters, _forceRefresh?: boolean): Promise<EventSummary[]> {
     let result = [...this.events];
 
     if (!filters) {
@@ -653,6 +654,32 @@ export class MockEventRepository implements EventRepository {
         }
       });
     }
+  }
+
+  public async getRecommendations(
+    limit: number = 10,
+  ): Promise<RecommendedEvent[]> {
+    const list = this.events.slice(0, limit);
+    return list.map((ev, idx) => ({
+      event: {
+        eventId: Number(ev.id),
+        title: ev.title,
+        startAt: ev.startAt,
+        endAt: ev.endAt,
+        locationName: ev.locationName || '',
+        charityFields: (ev.charityFields || []).map(String),
+        spotsRemaining: ev.spotsRemaining,
+      },
+      matchScore: Math.max(88 - idx * 10, 50),
+      matchLabel: idx === 0 ? 'strong' : 'moderate',
+      reasons: [
+        'Matches your selected charity interests',
+        'Your profile skills overlap with required posts',
+        'Your saved availability covers this event shift',
+      ],
+      matchedPostIds: ev.posts && ev.posts[0] ? [Number(ev.posts[0].id)] : [],
+      policyVersion: 'recommendation-v1',
+    }));
   }
 }
 

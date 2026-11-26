@@ -7,6 +7,7 @@ import {
   Alert,
   Modal,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   View,
@@ -17,6 +18,7 @@ import { useRepositories } from '../../../app/RepositoryProvider';
 import type {
   CoordinatorEventDetail,
   CoordinatorEventStatus,
+  EventStaffingInsight,
 } from '../../../domain/models/coordinator';
 import type { EventPost, PhysicalLevel, PostStatus } from '../../../domain/models/event';
 import type { MainDrawerScreenProps } from '../../../navigation/navigationTypes';
@@ -29,6 +31,7 @@ import {
   AppText,
   ErrorState,
   FilterChip,
+  KeyboardLiftView,
   LoadingState,
   SectionHeader,
   StatusBadge,
@@ -55,7 +58,9 @@ export function CoordinatorEventDetailScreen({
   const eventId = propEventId ?? route?.params?.eventId;
 
   const [event, setEvent] = useState<CoordinatorEventDetail | null>(null);
+  const [staffingInsight, setStaffingInsight] = useState<EventStaffingInsight | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [feedbackBanner, setFeedbackBanner] = useState<string | null>(null);
 
@@ -78,7 +83,7 @@ export function CoordinatorEventDetailScreen({
   const [postStatus, setPostStatus] = useState<PostStatus>('open');
   const [isSavingPost, setIsSavingPost] = useState(false);
 
-  const loadDetail = useCallback(async () => {
+  const loadDetail = useCallback(async (forceRefresh = false) => {
     if (!eventId) {
       setErrorMessage('No event ID provided');
       setIsLoading(false);
@@ -87,11 +92,17 @@ export function CoordinatorEventDetailScreen({
 
     try {
       setErrorMessage(null);
-      const data = await repository.getEventDetail(eventId);
+      const [data, insightData] = await Promise.all([
+        repository.getEventDetail(eventId, forceRefresh),
+        repository.getStaffingInsight
+          ? repository.getStaffingInsight(eventId, forceRefresh).catch(() => null)
+          : null,
+      ]);
       if (!data) {
         setErrorMessage('Coordinator event not found');
       } else {
         setEvent(data);
+        setStaffingInsight(insightData);
       }
     } catch (err) {
       setErrorMessage(
@@ -104,6 +115,12 @@ export function CoordinatorEventDetailScreen({
 
   useEffect(() => {
     loadDetail();
+  }, [loadDetail]);
+
+  const onRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    await loadDetail(true);
+    setIsRefreshing(false);
   }, [loadDetail]);
 
   const isMonitorMode = event?.isOwnerAsMonitor ?? false;
@@ -285,12 +302,21 @@ export function CoordinatorEventDetailScreen({
           onBackPress={handleBack}
         />
 
-        <ScrollView
-          contentContainerStyle={[
-            styles.scrollContent,
-            { padding: theme.spacing.md },
-          ]}
-        >
+        <KeyboardLiftView>
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            refreshControl={
+              <RefreshControl
+                refreshing={isRefreshing}
+                onRefresh={onRefresh}
+                colors={[theme.colors.primary]}
+              />
+            }
+            contentContainerStyle={[
+              styles.scrollContent,
+              { padding: theme.spacing.md },
+            ]}
+          >
           {/* Feedback Banner */}
           {feedbackBanner ? (
             <View
@@ -425,6 +451,202 @@ export function CoordinatorEventDetailScreen({
               ))}
             </View>
           </AppCard>
+
+          {/* Staffing Health & Coverage Insight Card (Feature 2) */}
+          {staffingInsight ? (
+            <AppCard style={styles.cardSpacing}>
+              <View style={styles.staffingHeaderRow}>
+                <View style={styles.staffingTitleRow}>
+                  <AppIcon name="spark" size={16} color={theme.colors.accent} />
+                  <AppText variant="title" weight="bold" color={theme.colors.textPrimary}>
+                    Staffing Health & Coverage
+                  </AppText>
+                </View>
+                <StatusBadge
+                  status={
+                    staffingInsight.readinessStatus === 'healthy'
+                      ? 'success'
+                      : staffingInsight.readinessStatus === 'warning'
+                      ? 'warning'
+                      : 'danger'
+                  }
+                  label={staffingInsight.readinessStatus.toUpperCase()}
+                />
+              </View>
+
+              {/* Coverage Progress Bar */}
+              <View style={styles.coverageRow}>
+                <View style={styles.coverageTextRow}>
+                  <AppText variant="caption" color={theme.colors.textSecondary}>
+                    Overall Coverage
+                  </AppText>
+                  <AppText variant="caption" weight="bold" color={theme.colors.textPrimary}>
+                    {staffingInsight.summary.coveragePercent}% ({staffingInsight.summary.assignedCount}/{staffingInsight.summary.requiredHeadcount})
+                  </AppText>
+                </View>
+                <View style={[styles.progressBarTrack, { backgroundColor: theme.colors.surfaceRaised }]}>
+                  <View
+                    style={[
+                      styles.progressBarFill,
+                      {
+                        width: `${Math.min(staffingInsight.summary.coveragePercent, 100)}%`,
+                        backgroundColor:
+                          staffingInsight.summary.coveragePercent >= 80
+                            ? theme.colors.success
+                            : staffingInsight.summary.coveragePercent >= 50
+                            ? theme.colors.accent
+                            : theme.colors.danger,
+                      },
+                    ]}
+                  />
+                </View>
+              </View>
+
+              {/* Metrics Grid */}
+              <View style={styles.staffingMetricsGrid}>
+                <View
+                  style={[
+                    styles.staffingMetricCard,
+                    { backgroundColor: theme.colors.surfaceRaised },
+                  ]}
+                >
+                  <AppText variant="caption" color={theme.colors.textSecondary}>
+                    Open Slots
+                  </AppText>
+                  <AppText
+                    variant="title"
+                    weight="bold"
+                    color={
+                      staffingInsight.summary.openSlots > 0
+                        ? theme.colors.accent
+                        : theme.colors.success
+                    }
+                  >
+                    {staffingInsight.summary.openSlots}
+                  </AppText>
+                </View>
+
+                <View
+                  style={[
+                    styles.staffingMetricCard,
+                    { backgroundColor: theme.colors.surfaceRaised },
+                  ]}
+                >
+                  <AppText variant="caption" color={theme.colors.textSecondary}>
+                    Unassigned
+                  </AppText>
+                  <AppText
+                    variant="title"
+                    weight="bold"
+                    color={
+                      staffingInsight.summary.acceptedUnassigned > 0
+                        ? theme.colors.primary
+                        : theme.colors.textPrimary
+                    }
+                  >
+                    {staffingInsight.summary.acceptedUnassigned}
+                  </AppText>
+                </View>
+
+                <View
+                  style={[
+                    styles.staffingMetricCard,
+                    { backgroundColor: theme.colors.surfaceRaised },
+                  ]}
+                >
+                  <AppText variant="caption" color={theme.colors.textSecondary}>
+                    Pending Review
+                  </AppText>
+                  <AppText
+                    variant="title"
+                    weight="bold"
+                    color={
+                      staffingInsight.summary.pendingApplications > 0
+                        ? theme.colors.accent
+                        : theme.colors.textPrimary
+                    }
+                  >
+                    {staffingInsight.summary.pendingApplications}
+                  </AppText>
+                </View>
+
+                <View
+                  style={[
+                    styles.staffingMetricCard,
+                    { backgroundColor: theme.colors.surfaceRaised },
+                  ]}
+                >
+                  <AppText variant="caption" color={theme.colors.textSecondary}>
+                    Checked In
+                  </AppText>
+                  <AppText
+                    variant="title"
+                    weight="bold"
+                    color={theme.colors.success}
+                  >
+                    {staffingInsight.summary.checkedInCount}
+                  </AppText>
+                </View>
+              </View>
+
+              {/* Operational Signals */}
+              {staffingInsight.signals && staffingInsight.signals.length > 0 ? (
+                <View style={styles.staffingSignalsSection}>
+                  <AppText
+                    variant="caption"
+                    weight="bold"
+                    color={theme.colors.textSecondary}
+                    style={{ marginBottom: 6 }}
+                  >
+                    Operational Signals ({staffingInsight.signals.length})
+                  </AppText>
+                  {staffingInsight.signals.map((sig, idx) => (
+                    <View
+                      key={idx}
+                      style={[
+                        styles.signalRow,
+                        {
+                          backgroundColor:
+                            sig.severity === 'high'
+                              ? '#FEF2F2'
+                              : sig.severity === 'medium'
+                              ? '#FFFBEB'
+                              : theme.colors.surfaceRaised,
+                          borderColor:
+                            sig.severity === 'high'
+                              ? theme.colors.danger
+                              : sig.severity === 'medium'
+                              ? theme.colors.accent
+                              : theme.colors.border,
+                        },
+                      ]}
+                    >
+                      <AppIcon
+                        name={sig.severity === 'high' ? 'alert' : 'info'}
+                        size={14}
+                        color={
+                          sig.severity === 'high'
+                            ? theme.colors.danger
+                            : sig.severity === 'medium'
+                            ? theme.colors.accent
+                            : theme.colors.textSecondary
+                        }
+                      />
+                      <View style={{ flex: 1 }}>
+                        <AppText
+                          variant="caption"
+                          weight="semibold"
+                          color={theme.colors.textPrimary}
+                        >
+                          {sig.title}
+                        </AppText>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+            </AppCard>
+          ) : null}
 
           {/* Lifecycle Transitions Control Bar */}
           <SectionHeader title="Event Lifecycle Actions" />
@@ -769,6 +991,7 @@ export function CoordinatorEventDetailScreen({
             </View>
           </AppCard>
         </ScrollView>
+        </KeyboardLiftView>
 
         {/* Consequential Transition Confirmation Modal */}
         <Modal
@@ -816,14 +1039,10 @@ export function CoordinatorEventDetailScreen({
                   weight="bold"
                   color={theme.colors.warning}
                 >
-                  {repositories.dataMode === 'mock'
-                    ? 'Template Preview — local state only'
-                    : 'HTTP Mode — the BFF will process this transition'}
+                  Confirm Lifecycle Update
                 </AppText>
                 <AppText variant="caption" color={theme.colors.textSecondary}>
-                  {repositories.dataMode === 'mock'
-                    ? 'This transition updates local mock state for this preview session.'
-                    : 'This request will be sent to the backend and may change the event status in PostgreSQL.'}
+                  This action updates the event status and visibility for volunteers.
                 </AppText>
               </View>
 
@@ -849,7 +1068,7 @@ export function CoordinatorEventDetailScreen({
                 </View>
                 <View style={styles.modalButtonWrap}>
                   <AppButton
-                    label={repositories.dataMode === 'mock' ? 'Confirm (Template)' : 'Confirm Transition'}
+                    label="Confirm Transition"
                     variant={
                       pendingTargetStatus === 'cancelled'
                         ? 'danger'
@@ -1009,5 +1228,60 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
+  },
+  staffingHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  staffingTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  coverageRow: {
+    marginBottom: 14,
+    gap: 6,
+  },
+  coverageTextRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  progressBarTrack: {
+    height: 8,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  staffingMetricsGrid: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  staffingMetricCard: {
+    flex: 1,
+    padding: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+    gap: 4,
+  },
+  staffingSignalsSection: {
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+    paddingTop: 10,
+    gap: 6,
+  },
+  signalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 8,
+    borderRadius: 6,
+    borderWidth: 1,
   },
 });

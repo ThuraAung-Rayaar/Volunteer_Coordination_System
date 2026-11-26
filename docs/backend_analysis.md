@@ -1,5 +1,5 @@
 # Backend Analysis — Volunteer HR Management System
-> **Generated:** 2026-11-15 | **Updated:** 2026-11-22 | **Target folder:** `python_stack/backend/` | **Framework:** Django 5.1 / DRF 3.15 | **Release:** v0.12.0 Stabilization (Verified & Complete)
+> **Generated:** 2026-11-15 | **Updated:** 2026-11-25 | **Target folder:** `python_stack/backend/` | **Framework:** Django 5.1 / DRF 3.15 | **Release:** v0.12.2 + AI/ML Integration (`feature/ai-chat-cache-ml-insights`)
 
 ---
 
@@ -26,6 +26,7 @@
 ```
 python_stack/backend/
 ├── admin_portal/           # Web UI for administrators (HTML templates + API views)
+├── ai/                     # Role-scoped AI Assistant (providers, prompts, security, tools, smoke test)
 ├── apps/                   # Django application packages
 │   ├── accounts/           # User identity, OTP auth, verification, availability
 │   ├── audit/              # Audit logs, feedback, moderation actions, app settings
@@ -33,20 +34,21 @@ python_stack/backend/
 │   ├── coordination/       # Coordinator profiles, assignments, event handover history
 │   └── events/             # Events, event posts, applications, charity field taxonomy
 ├── bff/                    # Backend-For-Frontend: mobile-oriented REST API
-│   ├── auth/               # OTP login/logout endpoints
-│   ├── volunteer/          # Volunteer self-service (profile, events, applications)
+│   ├── assistant/          # AI Assistant chat endpoint (/api/v1/assistant/chat/)
+│   ├── auth/               # OTP login/logout & tokenized OTP endpoints
+│   ├── volunteer/          # Volunteer self-service (profile, events, applications, recommendations)
 │   ├── checkin/            # Attendance, QR, geo check-in, feedback, onboarding
-│   └── coordinator/        # Coordinator event CRUD, assignments, application review
+│   └── coordinator/        # Coordinator event CRUD, assignments, application review, staffing insight
 ├── common/                 # Cross-cutting: auth, DB context, permissions, exceptions
 ├── config/                 # Django project settings and URL router
 │   ├── settings/
-│   │   ├── base.py         # Shared settings (apps, DB, DRF, middleware, media)
+│   │   ├── base.py         # Shared settings (apps, DB, DRF, AI, middleware, media)
 │   │   ├── local.py        # Dev overrides
 │   │   └── production.py   # Production overrides
 │   ├── urls.py             # Root URL dispatcher
 │   ├── asgi.py / wsgi.py   # ASGI/WSGI entry points
-│   └── test_runner.py      # Custom test runner (SQL file fixtures)
-├── services/               # Business logic layer (~19 service modules)
+│   └── test_runner.py      # Custom test runner (executes postgres_sql/VCS_db.sql)
+├── services/               # Business logic layer (22 service modules, incl. recommendation & staffing_insight)
 ├── tests/                  # Cross-phase capability parity tests (test_v0_11_0_capability_parity.py)
 ├── tests_e2e/              # End-to-end lifecycle tests
 ├── media/                  # Uploaded media (public)
@@ -71,7 +73,7 @@ python_stack/backend/
 |---|---|
 | **Django built-ins** | `django.contrib.admin`, `auth`, `contenttypes`, `sessions`, `messages`, `staticfiles`, `postgres` |
 | **Third-party** | `rest_framework`, `rest_framework.authtoken`, `corsheaders`, `django_filters`, `drf_spectacular` |
-| **Local apps** | `apps.accounts`, `apps.events`, `apps.coordination`, `apps.attendance`, `apps.audit`, `admin_portal`, `bff` |
+| **Local apps** | `apps.accounts`, `apps.events`, `apps.coordination`, `apps.attendance`, `apps.audit`, `admin_portal`, `bff`, `ai` |
 
 ### Key Settings
 
@@ -760,6 +762,14 @@ CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
 | `SMS_PROVIDER_SENDER_ID` | `VOLUNTEER` | SMS alphanumeric sender identifier |
 | `ALLOW_DEV_CODE_IN_AUTH_RESPONSE` | `True` (dev) / `False` (prod) | Guard controlling inclusion of `dev_code` in OTP challenge responses |
 | `CARTO_API_KEY` | (dev key) | External map/tile API key |
+| `AI_ENABLED` | `true` | Enable/disable `/api/v1/assistant/chat/` |
+| `AI_PROVIDER` | `mock` (or `gemini` if key set) | Active AI provider (`mock`, `ollama`, `gemini`) |
+| `AI_MODEL` | `gemini-3.5-flash-lite` / `qwen3.5:4b` | Model identifier for active provider |
+| `AI_API_KEY` / `GEMINI_API_KEY` | (empty) | Google Gemini API key (server-side `.env` only) |
+| `AI_TIMEOUT_SECONDS` | `45` | Provider HTTP request timeout |
+| `AI_OLLAMA_BASE_URL` | `http://127.0.0.1:11434` | Local Ollama endpoint |
+| `AI_MAX_OUTPUT_TOKENS` | `800` | Max tokens per assistant response |
+| `AI_RATE_LIMIT_PER_MINUTE` | `20` | `assistant` DRF throttle scope rate |
 | `DB_NAME` | `volunteer_coordination_db` | PostgreSQL database name |
 | `DB_USER` | `postgres` | DB user |
 | `DB_PASSWORD` | `postgres` | DB password |
@@ -811,10 +821,12 @@ CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
 | Unified API routing (`/api/v1/`, `/api/bff/mobile/`, `/api/`) | — | All map to `bff.urls` with identical view resolution |
 | AES-256-GCM Verification Image Encryption | Phase C1 / C2 | Encrypts uploaded images on disk with versioned binary envelope (`VIMG\x01`); admin file streaming decrypts in-memory; in-place conversion command `encrypt_verification_images` |
 | Authoritative Business Contracts & Safety Guards | Phase D1 / A | Cross-event manual assignment validation, `checked_in_today_count` attendance metric, 8-case donation PATCH matrix, script guards against `volunteer_coordination_db` |
+| Role-Scoped AI Assistant (`backend/ai/`, `bff/assistant/`) | AI/ML Integration | Multi-provider (`Mock`/`Ollama`/`Gemini`), versioned role prompts (`vcs.*.v1`), PII redaction, bounded tool execution; see [ai_ml_integration.md](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/docs/ai_ml_integration.md) |
+| Explainable Recommendations & Staffing Insights | AI/ML Integration | `recommendation_service.py` (`recommendation-v1`) and `staffing_insight_service.py` (DB-view-backed readiness & gap signals) |
 
 ### ✅ Completed Stabilization Execution Phases (v0.12.0 Master Plan)
 
-As governed by [V0_12_0_STABILIZATION_MASTER_PLAN.md](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/reference/V0_12_0_STABILIZATION_MASTER_PLAN.md) and verified on candidate Git SHA `99db25a7ba26d26ad5d803e028ce405b827e926d`:
+As governed by the v0.12.0 Stabilization Master Plan (summarized in [old_doc/README.md](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/old_doc/README.md)) and verified on candidate Git SHA `99db25a7ba26d26ad5d803e028ce405b827e926d`:
 
 | Phase | Title | Focus & Delivered Requirements | Status |
 |---|---|---|---|
@@ -826,8 +838,8 @@ As governed by [V0_12_0_STABILIZATION_MASTER_PLAN.md](file:///c:/Users/USER/Docu
 | **Phase E** | Full Verification, Real-HTTP Gate & Release Report | 662 backend tests passing, 588 mobile tests passing, TypeScript 0 errors, 14 real HTTP integration tests passing over TCP socket, clean Android Gradle build, and release decision `CONDITIONAL PASS` documented in `v0_12_0_stabilization_report.md`. | ✅ COMPLETE |
 
 > [!NOTE]
-> All software engineering, contract alignment, encryption, and automated test tasks are 100% complete. Remaining operational tasks (remote CI trigger, physical Android/iOS device hardware QA, production carrier SMS account binding, and live image storage conversion runbook execution) are documented in [v0_12_0_unfinished_remaining_operations.md](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/reference/v0_12_0_unfinished_remaining_operations.md).
+> All software engineering, contract alignment, encryption, AI/ML integration, and automated test tasks are complete. Remaining operational tasks (remote CI trigger, production carrier SMS account binding, and live image storage conversion runbook execution) are summarized in [old_doc/README.md](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/old_doc/README.md).
 
 ---
 
-*Analysis updated: 2026-11-22 against active branch `main` and candidate commit `99db25a7ba26d26ad5d803e028ce405b827e926d`.*
+*Analysis updated: 2026-11-25 against active branch `feature/ai-chat-cache-ml-insights`.*

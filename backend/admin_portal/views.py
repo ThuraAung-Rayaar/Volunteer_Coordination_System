@@ -1,5 +1,6 @@
 import logging
 
+from django.conf import settings
 from django.http import FileResponse, JsonResponse
 from django.shortcuts import render, redirect
 from django.utils import timezone
@@ -154,9 +155,10 @@ def admin_login_view(request):
     if raw_user_pw.startswith(("pbkdf2_", "argon2", "bcrypt")):
         password_valid = user.check_password(password)
     elif raw_user_pw and not raw_user_pw.startswith("!"):
-        # Only allow AdminDemo123! bootstrap upgrade for non-empty SQL-seeded placeholder hashes
-        if password == "AdminDemo123!":
-            user.set_password("AdminDemo123!")
+        # Optional DI-configured bootstrap password upgrade for SQL-seeded placeholder hashes
+        bootstrap_password = str(getattr(settings, "ADMIN_BOOTSTRAP_PASSWORD", "") or "")
+        if bootstrap_password and password == bootstrap_password:
+            user.set_password(bootstrap_password)
             user.save(update_fields=["password"])
             password_valid = True
 
@@ -393,35 +395,41 @@ def dashboard_view(request):
     for e in past_events:
         e.feedback_count = feedback_counts.get(e.event_id, 0)
 
-    # 4. Feedback Summary Dashboard
-    all_feedback = list(Feedback.objects.all())
-    total_feedback_count = len(all_feedback)
-    total_active_fb = sum(1 for f in all_feedback if f.status == "active")
-    total_hidden_fb = sum(1 for f in all_feedback if f.status == "hidden")
-
-    active_scores = [f.score for f in all_feedback if f.status == "active" and f.score is not None]
-    avg_score = round(sum(active_scores) / len(active_scores), 2) if active_scores else 0.0
+    # 4. Feedback Summary Dashboard (Optimized Database Aggregation)
+    from django.db.models import Avg, Count, Q
+    fb_agg = Feedback.objects.aggregate(
+        total_active=Count("id", filter=Q(status="active")),
+        total_hidden=Count("id", filter=Q(status="hidden")),
+        avg_score=Avg("score", filter=Q(status="active", score__isnull=False)),
+    )
+    total_active_fb = fb_agg["total_active"] or 0
+    total_hidden_fb = fb_agg["total_hidden"] or 0
+    avg_score = round(float(fb_agg["avg_score"]), 2) if fb_agg["avg_score"] is not None else 0.0
 
     directions = ["volunteer_to_event", "volunteer_to_coordinator", "coordinator_to_volunteer"]
+    dir_aggs = (
+        Feedback.objects.filter(status="active")
+        .values("direction")
+        .annotate(c=Count("id"), avg=Avg("score"))
+    )
+    dir_map = {row["direction"]: row for row in dir_aggs}
     by_direction = {}
     for d in directions:
-        d_feedbacks = [f for f in all_feedback if f.direction == d and f.status == "active"]
-        d_count = len(d_feedbacks)
-        d_scores = [f.score for f in d_feedbacks if f.score is not None]
-        d_avg = round(sum(d_scores) / len(d_scores), 2) if d_scores else 0.0
+        row = dir_map.get(d, {})
         by_direction[d] = {
-            "count": d_count,
-            "avg_score": d_avg,
+            "count": row.get("c", 0),
+            "avg_score": round(float(row.get("avg")), 2) if row.get("avg") is not None else 0.0,
         }
 
-    star_counts = {star: 0 for star in (5, 4, 3, 2, 1)}
-    for f in all_feedback:
-        if f.status == "active" and f.score in star_counts:
-            star_counts[f.score] += 1
-
+    star_aggs = (
+        Feedback.objects.filter(status="active", score__isnull=False)
+        .values("score")
+        .annotate(cnt=Count("id"))
+    )
+    star_map = {row["score"]: row["cnt"] for row in star_aggs}
     star_distribution = []
     for star in [5, 4, 3, 2, 1]:
-        cnt = star_counts[star]
+        cnt = star_map.get(star, 0)
         pct = round((cnt / total_active_fb) * 100, 1) if total_active_fb else 0.0
         star_distribution.append({
             "star": star,
@@ -793,6 +801,83 @@ def events_detail_and_geo_view(request):
 @extend_schema(exclude=True)
 @api_view(["GET"])
 @permission_classes([AllowAny])
+def event_detail_partial_view(request, event_id):
+    """Card-level partial HTML endpoint for inspecting an event without full-page reload."""
+    guard = _guard_admin_html(request)
+    if guard:
+        return guard
+
+    from apps.attendance.models import VGeoAttemptsReview
+    from apps.coordination.models import Assignments
+    from apps.events.models import EventApplications, Events, VEventPostCapacity
+
+    selected_event = Events.objects.filter(id=event_id).first()
+    if not selected_event:
+        return HttpResponse("<div class='p-6 text-slate-400 text-xs font-mono'>Event not found.</div>", status=404)
+
+    selected_posts = list(VEventPostCapacity.objects.filter(event_id=event_id))
+    selected_applications = list(
+        EventApplications.objects.select_related("user", "post")
+        .filter(event_id=event_id)
+        .order_by("-applied_at")[:50]
+    )
+    selected_assignments = list(
+        Assignments.objects.select_related("user", "post")
+        .filter(event_id=event_id)
+        .order_by("-created_at")[:50]
+    )
+    selected_geo_attempts = list(
+        VGeoAttemptsReview.objects.filter(event_id=event_id).order_by("-attempted_at")[:50]
+    )
+
+    from services.staffing_insight_service import get_staffing_insight
+    try:
+        staffing_insight = get_staffing_insight(event_id)
+    except Exception:
+        staffing_insight = None
+
+    context = {
+        "selected_event": selected_event,
+        "selected_posts": selected_posts,
+        "selected_applications": selected_applications,
+        "selected_assignments": selected_assignments,
+        "selected_geo_attempts": selected_geo_attempts,
+        "staffing_insight": staffing_insight,
+        "is_superuser": bool(request.user.is_superuser),
+    }
+    return render(request, "admin_portal/partials/event_detail_panel.html", context)
+
+
+@extend_schema(exclude=True)
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def event_staffing_partial_view(request, event_id):
+    """Card-level partial HTML endpoint for inspecting event staffing insight."""
+    guard = _guard_admin_html(request)
+    if guard:
+        return guard
+    from services.staffing_insight_service import get_staffing_insight
+    try:
+        insight = get_staffing_insight(event_id)
+    except Exception:
+        return HttpResponse("<div class='p-4 text-xs font-mono text-slate-400'>Event staffing data unavailable.</div>", status=404)
+    return render(request, "admin_portal/partials/event_staffing_panel.html", {"insight": insight})
+
+
+@extend_schema(exclude=True)
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def admin_event_staffing_insight_api(request, event_id):
+    """GET /api/v1/admin/events/{event_id}/staffing-insight/ — JSON staffing insights for admins."""
+    ensure_admin(request)
+    from services.staffing_insight_service import get_staffing_insight
+    insight = get_staffing_insight(event_id)
+    return Response(insight)
+
+
+@extend_schema(exclude=True)
+@api_view(["GET"])
+@permission_classes([AllowAny])
 def geo_monitoring_view(request):
     guard = _guard_admin_html(request)
     if guard:
@@ -923,7 +1008,6 @@ def users_directory_view(request):
     }
 
     for u in users_list:
-        u.decrypted_phone = decrypt_phone(u.phone_enc) or u.phone_enc or ""
         u.coordinator_status = coords_map.get(u.id)
         u.moderation_summary = mod_summaries_map.get(u.id)
 
@@ -963,6 +1047,46 @@ def users_directory_view(request):
         "error_message": error_message,
     }
     return render(request, "admin_portal/users.html", context)
+
+
+@extend_schema(exclude=True)
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def user_detail_partial_view(request, user_id):
+    """Card-level partial HTML endpoint for inspecting a user without full-page reload."""
+    guard = _guard_admin_html(request)
+    if guard:
+        return guard
+
+    from apps.accounts.models import Users, UserVerificationImages
+    from apps.attendance.models import Attendance
+    from apps.audit.models import ModerationActions, VUserModerationSummary
+    from apps.coordination.models import Assignments, CoordinatorProfiles
+    from common.security import decrypt_phone
+
+    selected_user = Users.objects.filter(id=user_id).first()
+    if not selected_user:
+        return HttpResponse("<div class='p-6 text-slate-400 text-xs font-mono'>User not found.</div>", status=404)
+
+    # Authorized admin inspection: decrypt phone only for the single inspected user
+    selected_user.decrypted_phone = decrypt_phone(selected_user.phone_enc) or selected_user.phone_enc or ""
+    selected_user.coordinator_status = CoordinatorProfiles.objects.filter(user_id=user_id).values_list("status", flat=True).first()
+    selected_images = list(UserVerificationImages.objects.filter(user_id=user_id).order_by("-created_at"))
+    selected_assignments = list(Assignments.objects.select_related("event", "post").filter(user_id=user_id).order_by("-created_at")[:30])
+    selected_attendance = list(Attendance.objects.select_related("event").filter(user_id=user_id).order_by("-created_at")[:30])
+    selected_moderations = list(ModerationActions.objects.select_related("admin_user").filter(target_user_id=user_id).order_by("-created_at")[:30])
+    selected_user_summary = VUserModerationSummary.objects.filter(user_id=user_id).first()
+
+    context = {
+        "selected_user": selected_user,
+        "selected_images": selected_images,
+        "selected_assignments": selected_assignments,
+        "selected_attendance": selected_attendance,
+        "selected_moderations": selected_moderations,
+        "selected_user_summary": selected_user_summary,
+        "is_superuser": bool(request.user.is_superuser),
+    }
+    return render(request, "admin_portal/partials/user_detail_panel.html", context)
 
 
 @extend_schema(exclude=True)
@@ -1032,8 +1156,12 @@ def user_provision_view(request):
                         skills=normalize_tags(skills_list),
                     )
 
-                    password_to_set = password or "AdminDemo123!"
-                    new_user.set_password(password_to_set)
+                    bootstrap_password = str(getattr(settings, "ADMIN_BOOTSTRAP_PASSWORD", "") or "")
+                    password_to_set = password or bootstrap_password
+                    if password_to_set:
+                        new_user.set_password(password_to_set)
+                    else:
+                        new_user.set_unusable_password()
                     new_user.save(update_fields=["password"])
 
                     if assign_role == "coordinator":
@@ -1375,6 +1503,11 @@ def admin_settings_view(request):
     from apps.accounts.models import Users
     from apps.audit.models import AppSettings, AuditLogs
     from common.map_engine import get_map_catalog_status, seed_region_tiles
+    from common.runtime_config import (
+        get_client_runtime_config,
+        is_consumer_only_mode,
+        set_dev_options_enabled,
+    )
     from common.security import compute_phone_hash, decrypt_phone, encrypt_phone
     from services import maintenance_service
     from .phone_utils import normalize_myanmar_phone, resolve_user_by_phone_or_hash
@@ -1489,6 +1622,31 @@ def admin_settings_view(request):
                 maintenance_result = maintenance_service.run_all_maintenance()
                 success_message = "PostgreSQL database maintenance routines executed successfully."
 
+            elif form_action == "toggle_dev_options":
+                raw_enabled = (
+                    request.POST.get("dev_options_enabled")
+                    or getattr(request, "data", {}).get("dev_options_enabled")
+                    or "0"
+                )
+                target_enabled = str(raw_enabled).strip().lower() in ("1", "true", "yes", "on")
+                before_cfg = get_client_runtime_config()
+                updated_cfg = set_dev_options_enabled(
+                    target_enabled,
+                    updated_by=f"user#{request.user.id}",
+                )
+                AuditLogs.objects.create(
+                    actor_user=request.user,
+                    action="admin.dev_options_toggled",
+                    entity_type="runtime_config",
+                    entity_id=0,
+                    before_data={"dev_options_enabled": before_cfg["dev_options_enabled"]},
+                    after_data={"dev_options_enabled": updated_cfg["dev_options_enabled"]},
+                )
+                if updated_cfg["consumer_only"]:
+                    success_message = "Consumer-Only Mode enabled: developer options and diagnostic errors are hidden."
+                else:
+                    success_message = "Developer Options enabled for local diagnostics."
+
             elif form_action == "sync_offline_maps":
                 region_code = request.POST.get("region_code") or getattr(request, "data", {}).get("region_code") or "yangon"
                 fetch_remote_raw = request.POST.get("fetch_remote") or getattr(request, "data", {}).get("fetch_remote") or "0"
@@ -1500,7 +1658,11 @@ def admin_settings_view(request):
             else:
                 error_message = f"Unknown form action '{form_action}'."
         except Exception as exc:
-            error_message = str(exc)
+            error_message = (
+                "Unable to complete action. Please review the form inputs and try again."
+                if is_consumer_only_mode() and not isinstance(exc, DomainError)
+                else str(exc)
+            )
 
         if request.headers.get("accept") == "application/json" or "application/json" in request.META.get("HTTP_ACCEPT", ""):
             if error_message:
@@ -1509,6 +1671,7 @@ def admin_settings_view(request):
                 "status": "ok",
                 "message": success_message,
                 "maintenance_result": maintenance_result,
+                "client_config": get_client_runtime_config(),
             })
 
     all_users = list(Users.objects.all().order_by("id")[:200])
@@ -1516,6 +1679,7 @@ def admin_settings_view(request):
         u.decrypted_phone = decrypt_phone(u.phone_enc) or u.phone_enc or ""
 
     app_settings = list(AppSettings.objects.all().order_by("key"))
+    client_config = get_client_runtime_config()
 
     context = {
         "active_tab": "settings",
@@ -1526,6 +1690,7 @@ def admin_settings_view(request):
         "success_message": success_message,
         "error_message": error_message,
         "map_catalog": get_map_catalog_status(),
+        "client_config": client_config,
     }
     return render(request, "admin_portal/settings.html", context)
 

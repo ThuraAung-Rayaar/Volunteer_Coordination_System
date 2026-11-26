@@ -10,6 +10,7 @@ import type {
 export type MainDrawerParamList = {
   Dashboard: undefined;
   Events: undefined;
+  Assistant: undefined;
   Notifications: undefined;
   Friends: undefined;
   MyApplications: undefined;

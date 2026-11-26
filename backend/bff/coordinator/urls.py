@@ -25,6 +25,7 @@ from .views import (
     EventPostDetailView,
     EventPublishView,
     EventRetakeView,
+    EventStaffingInsightView,
     EventSummaryView,
     EventUnassignedView,
 )
@@ -36,6 +37,8 @@ urlpatterns = [
     # Summary (backward compatible with Phase 2)
     path("events/<int:event_id>/summary/", EventSummaryView.as_view(), name="event-summary"),
     path("coordinator/events/<int:event_id>/summary/", EventSummaryView.as_view(), name="coordinator-event-summary"),
+    path("events/<int:event_id>/staffing-insight/", EventStaffingInsightView.as_view(), name="event-staffing-insight"),
+    path("coordinator/events/<int:event_id>/staffing-insight/", EventStaffingInsightView.as_view(), name="coordinator-event-staffing-insight"),
 
     # Event CRUD & lifecycle
     path("coordinator/events/", CoordinatorEventListCreateView.as_view(), name="coordinator-event-list-create"),

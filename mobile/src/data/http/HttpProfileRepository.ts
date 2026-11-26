@@ -2,7 +2,15 @@
  * @format
  */
 
+import { isOfflineMode } from '../../app/configuration/dataMode';
 import { ApiClient, defaultApiClient } from '../../core/api/apiClient';
+import {
+  CACHE_SCOPE,
+  CACHE_TTL,
+  cacheKeys,
+  cacheTags,
+  queryCache,
+} from '../cache';
 import type {
   AvailabilityException,
   VolunteerAvailability,
@@ -53,31 +61,47 @@ export class HttpProfileRepository implements ProfileRepository {
   }
 
   public async getProfile(): Promise<VolunteerProfile> {
-    const [profRes, coordRes, feedbackRes, interestsRes] = await Promise.all([
-      profileApi.getProfile(this.client),
-      profileApi.getCoordinatorProfile(this.client),
-      profileApi.getFeedbackSummary(this.client),
-      profileApi.getCharityInterests(this.client),
-    ]);
+    return queryCache.getOrFetch(
+      cacheKeys.volunteerProfile('me'),
+      async () => {
+        const [profRes, coordRes, feedbackRes, interestsRes] = await Promise.all([
+          profileApi.getProfile(this.client),
+          profileApi.getCoordinatorProfile(this.client),
+          profileApi.getFeedbackSummary(this.client),
+          profileApi.getCharityInterests(this.client),
+        ]);
 
-    if (!profRes.ok) {
-      throw new Error(`Failed to load profile: ${profRes.error.message}`);
-    }
+        if (!profRes.ok) {
+          throw new Error(`Failed to load profile: ${profRes.error.message}`);
+        }
 
-    if (interestsRes.ok && interestsRes.data.field_codes) {
-      profRes.data.charity_interests = interestsRes.data.field_codes;
-    }
+        if (interestsRes.ok && interestsRes.data.field_codes) {
+          profRes.data.charity_interests = interestsRes.data.field_codes;
+        }
 
-    return mapUserProfile(
-      profRes.data,
-      coordRes.ok ? coordRes.data : null,
-      feedbackRes.ok ? feedbackRes.data : null,
+        return mapUserProfile(
+          profRes.data,
+          coordRes.ok ? coordRes.data : null,
+          feedbackRes.ok ? feedbackRes.data : null,
+        );
+      },
+      {
+        ttlMs: CACHE_TTL.VOLUNTEER_PROFILE,
+        tags: [cacheTags.profile],
+        scope: CACHE_SCOPE.ACCOUNT,
+      },
     );
   }
 
   public async updateProfile(
     updates: Partial<VolunteerProfile>,
   ): Promise<ProfileOperationResult<VolunteerProfile>> {
+    if (isOfflineMode()) {
+      return {
+        success: false,
+        message: 'Offline Mode: reconnect to the BFF to update your profile.',
+      };
+    }
     const dto = mapProfileUpdateRequest(updates);
 
     if (updates.charityInterests) {
@@ -103,6 +127,7 @@ export class HttpProfileRepository implements ProfileRepository {
       }
     }
 
+    queryCache.invalidateTag(cacheTags.profile);
     const updatedProfile = await this.getProfile();
     return {
       success: true,
@@ -112,17 +137,33 @@ export class HttpProfileRepository implements ProfileRepository {
   }
 
   public async getAvailability(): Promise<VolunteerAvailability> {
-    const res = await profileApi.getAvailability(this.client);
-    if (!res.ok) {
-      throw new Error(`Failed to load availability: ${res.error.message}`);
-    }
+    return queryCache.getOrFetch(
+      cacheKeys.volunteerAvailability('me'),
+      async () => {
+        const res = await profileApi.getAvailability(this.client);
+        if (!res.ok) {
+          throw new Error(`Failed to load availability: ${res.error.message}`);
+        }
 
-    return mapAvailability(res.data);
+        return mapAvailability(res.data);
+      },
+      {
+        ttlMs: CACHE_TTL.VOLUNTEER_AVAILABILITY,
+        tags: [cacheTags.availability],
+        scope: CACHE_SCOPE.ACCOUNT,
+      },
+    );
   }
 
   public async saveWeeklyRule(
     rule: Omit<WeeklyAvailabilityRule, 'id'>,
   ): Promise<ProfileOperationResult<WeeklyAvailabilityRule>> {
+    if (isOfflineMode()) {
+      return {
+        success: false,
+        message: 'Offline Mode: reconnect to the BFF to save availability rules.',
+      };
+    }
     const curr = await this.getAvailability();
     const weekdayName =
       rule.weekdayName || WEEKDAY_NAMES[rule.weekday] || `Day ${rule.weekday}`;
@@ -155,6 +196,7 @@ export class HttpProfileRepository implements ProfileRepository {
       };
     }
 
+    queryCache.invalidateTag(cacheTags.availability);
     return {
       success: true,
       message: 'Rule saved successfully',
@@ -165,6 +207,12 @@ export class HttpProfileRepository implements ProfileRepository {
   public async deleteWeeklyRule(
     ruleId: string,
   ): Promise<ProfileOperationResult> {
+    if (isOfflineMode()) {
+      return {
+        success: false,
+        message: 'Offline Mode: reconnect to the BFF to delete availability rules.',
+      };
+    }
     const curr = await this.getAvailability();
     const remaining = curr.weeklyRules.filter(r => r.id !== ruleId);
     const payload = mapAvailabilityRulesReplaceRequest(remaining);
@@ -177,6 +225,7 @@ export class HttpProfileRepository implements ProfileRepository {
       };
     }
 
+    queryCache.invalidateTag(cacheTags.availability);
     return {
       success: true,
       message: 'Rule deleted successfully',
@@ -186,6 +235,12 @@ export class HttpProfileRepository implements ProfileRepository {
   public async saveException(
     exception: Omit<AvailabilityException, 'id'>,
   ): Promise<ProfileOperationResult<AvailabilityException>> {
+    if (isOfflineMode()) {
+      return {
+        success: false,
+        message: 'Offline Mode: reconnect to the BFF to save availability exceptions.',
+      };
+    }
     const dto: AvailabilityExceptionDto = {
       date: exception.date,
       is_available: exception.isAvailable,
@@ -208,6 +263,7 @@ export class HttpProfileRepository implements ProfileRepository {
       };
     }
 
+    queryCache.invalidateTag(cacheTags.availability);
     return {
       success: true,
       message: 'Exception saved successfully',
@@ -221,6 +277,12 @@ export class HttpProfileRepository implements ProfileRepository {
   public async deleteException(
     exceptionId: string,
   ): Promise<ProfileOperationResult> {
+    if (isOfflineMode()) {
+      return {
+        success: false,
+        message: 'Offline Mode: reconnect to the BFF to delete availability exceptions.',
+      };
+    }
     const res = await profileApi.deleteAvailabilityException(
       exceptionId,
       this.client,
@@ -232,6 +294,7 @@ export class HttpProfileRepository implements ProfileRepository {
       };
     }
 
+    queryCache.invalidateTag(cacheTags.availability);
     return {
       success: true,
       message: 'Exception deleted successfully',
@@ -239,75 +302,95 @@ export class HttpProfileRepository implements ProfileRepository {
   }
 
   public async getVerificationStatus(): Promise<VerificationCoordinatorData> {
-    const [verRes, coordRes] = await Promise.all([
-      profileApi.getVerificationStatus(this.client),
-      profileApi.getCoordinatorProfile(this.client),
-    ]);
+    return queryCache.getOrFetch(
+      cacheKeys.volunteerVerification('me'),
+      async () => {
+        const [verRes, coordRes] = await Promise.all([
+          profileApi.getVerificationStatus(this.client),
+          profileApi.getCoordinatorProfile(this.client),
+        ]);
 
-    if (!verRes.ok) {
-      throw new Error(
-        `Failed to load verification status: ${verRes.error.message}`,
-      );
-    }
+        if (!verRes.ok) {
+          throw new Error(
+            `Failed to load verification status: ${verRes.error.message}`,
+          );
+        }
 
-    return mapVerificationCoordinatorData(
-      verRes.data,
-      coordRes.ok ? coordRes.data : null,
+        return mapVerificationCoordinatorData(
+          verRes.data,
+          coordRes.ok ? coordRes.data : null,
+        );
+      },
+      {
+        ttlMs: CACHE_TTL.VOLUNTEER_VERIFICATION,
+        tags: [cacheTags.verification, cacheTags.profile],
+        scope: CACHE_SCOPE.ACCOUNT,
+      },
     );
   }
 
   public async getCoordinatorEligibility(): Promise<CoordinatorEligibilityData> {
-    const [verRes, coordRes, attendanceRes, feedbackRes] = await Promise.all([
-      profileApi.getVerificationStatus(this.client),
-      profileApi.getCoordinatorProfile(this.client),
-      profileApi.getAttendanceHistory(this.client),
-      profileApi.getFeedbackSummary(this.client),
-    ]);
+    return queryCache.getOrFetch(
+      cacheKeys.coordinatorEligibility('me'),
+      async () => {
+        const [verRes, coordRes, attendanceRes, feedbackRes] = await Promise.all([
+          profileApi.getVerificationStatus(this.client),
+          profileApi.getCoordinatorProfile(this.client),
+          profileApi.getAttendanceHistory(this.client),
+          profileApi.getFeedbackSummary(this.client),
+        ]);
 
-    const verificationStatus = verRes.ok
-      ? (verRes.data.verification_status as any) || 'unverified'
-      : 'unverified';
-    const isVerified =
-      verificationStatus === 'approved' || verificationStatus === 'verified';
+        const verificationStatus = verRes.ok
+          ? (verRes.data.verification_status as any) || 'unverified'
+          : 'unverified';
+        const isVerified =
+          verificationStatus === 'approved' || verificationStatus === 'verified';
 
-    const attendanceRecords =
-      attendanceRes.ok && attendanceRes.data.results
-        ? attendanceRes.data.results
-        : [];
-    const completedAttendance = attendanceRecords.filter(
-      att => att.status === 'completed',
+        const attendanceRecords =
+          attendanceRes.ok && attendanceRes.data.results
+            ? attendanceRes.data.results
+            : [];
+        const completedAttendance = attendanceRecords.filter(
+          att => att.status === 'completed',
+        );
+        const completedAttendanceEventsCount = completedAttendance.length;
+        const meetsCompletedEventsRequirement =
+          isVerified || completedAttendanceEventsCount >= 5;
+
+        const summary = feedbackRes.ok ? feedbackRes.data.summary : null;
+        const ratingAvg =
+          summary?.volunteer_avg_rating ?? summary?.overall_avg_rating ?? null;
+        const ratingCount =
+          summary?.volunteer_rating_count ?? summary?.total_count ?? 0;
+        const meetsGoodRatingRequirement = isVerified
+          ? true
+          : ratingAvg !== null
+          ? ratingAvg >= 4.0
+          : null;
+
+        let coordinatorStatus: CoordinatorStatus = 'none';
+        if (coordRes.ok && coordRes.data.coordinator) {
+          coordinatorStatus = coordRes.data.coordinator
+            .status as CoordinatorStatus;
+        }
+
+        return {
+          verificationStatus,
+          isVerified,
+          completedAttendanceEventsCount,
+          meetsCompletedEventsRequirement,
+          meetsGoodRatingRequirement,
+          ratingAverage: ratingAvg,
+          ratingCount,
+          coordinatorStatus,
+        };
+      },
+      {
+        ttlMs: CACHE_TTL.VOLUNTEER_VERIFICATION,
+        tags: [cacheTags.verification],
+        scope: CACHE_SCOPE.ACCOUNT,
+      },
     );
-    const completedAttendanceEventsCount = completedAttendance.length;
-    const meetsCompletedEventsRequirement =
-      isVerified || completedAttendanceEventsCount >= 5;
-
-    const summary = feedbackRes.ok ? feedbackRes.data.summary : null;
-    const ratingAvg =
-      summary?.volunteer_avg_rating ?? summary?.overall_avg_rating ?? null;
-    const ratingCount =
-      summary?.volunteer_rating_count ?? summary?.total_count ?? 0;
-    const meetsGoodRatingRequirement = isVerified
-      ? true
-      : ratingAvg !== null
-      ? ratingAvg >= 4.0
-      : null;
-
-    let coordinatorStatus: CoordinatorStatus = 'none';
-    if (coordRes.ok && coordRes.data.coordinator) {
-      coordinatorStatus = coordRes.data.coordinator
-        .status as CoordinatorStatus;
-    }
-
-    return {
-      verificationStatus,
-      isVerified,
-      completedAttendanceEventsCount,
-      meetsCompletedEventsRequirement,
-      meetsGoodRatingRequirement,
-      ratingAverage: ratingAvg,
-      ratingCount,
-      coordinatorStatus,
-    };
   }
 
   public async submitCoordinatorApplication(
@@ -439,45 +522,69 @@ export class HttpProfileRepository implements ProfileRepository {
   }
 
   public async getAttendanceHistory(): Promise<AttendanceHistoryItem[]> {
-    const res = await profileApi.getAttendanceHistory(this.client);
-    if (!res.ok) {
-      throw new Error(`Failed to load attendance history: ${res.error.message}`);
-    }
-    const items = res.data.results || [];
-    return items.map(dto => ({
-      id: String(dto.id),
-      assignmentId:
-        dto.assignment_id !== null && dto.assignment_id !== undefined
-          ? String(dto.assignment_id)
-          : null,
-      eventId: String(dto.event_id),
-      eventTitle: dto.event_title ?? null,
-      locationName: dto.location_name ?? null,
-      postId:
-        dto.post_id !== null && dto.post_id !== undefined
-          ? String(dto.post_id)
-          : null,
-      postTitle: dto.post_title ?? null,
-      scheduleStart: dto.schedule_start ?? null,
-      scheduleEnd: dto.schedule_end ?? null,
-      status: String(dto.status),
-      method: dto.method ? String(dto.method) : null,
-      checkinAt: dto.checkin_at,
-      checkoutAt: dto.checkout_at,
-      confirmationStatus: dto.confirmation_status
-        ? String(dto.confirmation_status)
-        : null,
-      walkInFlag: dto.walk_in_flag ?? false,
-      verifiedHours: dto.verified_hours ?? null,
-    }));
+    return queryCache.getOrFetch(
+      cacheKeys.volunteerAttendance('me'),
+      async () => {
+        const res = await profileApi.getAttendanceHistory(this.client);
+        if (!res.ok) {
+          throw new Error(
+            `Failed to load attendance history: ${res.error.message}`,
+          );
+        }
+        const items = res.data.results || [];
+        return items.map(dto => ({
+          id: String(dto.id),
+          assignmentId:
+            dto.assignment_id !== null && dto.assignment_id !== undefined
+              ? String(dto.assignment_id)
+              : null,
+          eventId: String(dto.event_id),
+          eventTitle: dto.event_title ?? null,
+          locationName: dto.location_name ?? null,
+          postId:
+            dto.post_id !== null && dto.post_id !== undefined
+              ? String(dto.post_id)
+              : null,
+          postTitle: dto.post_title ?? null,
+          scheduleStart: dto.schedule_start ?? null,
+          scheduleEnd: dto.schedule_end ?? null,
+          status: String(dto.status),
+          method: dto.method ? String(dto.method) : null,
+          checkinAt: dto.checkin_at,
+          checkoutAt: dto.checkout_at,
+          confirmationStatus: dto.confirmation_status
+            ? String(dto.confirmation_status)
+            : null,
+          walkInFlag: dto.walk_in_flag ?? false,
+          verifiedHours: dto.verified_hours ?? null,
+        }));
+      },
+      {
+        ttlMs: CACHE_TTL.VOLUNTEER_ATTENDANCE,
+        tags: [cacheTags.profile, cacheTags.dashboard],
+        scope: CACHE_SCOPE.ACCOUNT,
+      },
+    );
   }
 
   public async getOwnFeedback(): Promise<MyFeedbackResponse> {
-    const res = await profileApi.getFeedbackSummary(this.client);
-    if (!res.ok) {
-      throw new Error(`Failed to load feedback summary: ${res.error.message}`);
-    }
-    return mapMyFeedbackResponse(res.data);
+    return queryCache.getOrFetch(
+      cacheKeys.volunteerFeedback('me'),
+      async () => {
+        const res = await profileApi.getFeedbackSummary(this.client);
+        if (!res.ok) {
+          throw new Error(
+            `Failed to load feedback summary: ${res.error.message}`,
+          );
+        }
+        return mapMyFeedbackResponse(res.data);
+      },
+      {
+        ttlMs: CACHE_TTL.VOLUNTEER_FEEDBACK,
+        tags: [cacheTags.profile],
+        scope: CACHE_SCOPE.ACCOUNT,
+      },
+    );
   }
 }
 

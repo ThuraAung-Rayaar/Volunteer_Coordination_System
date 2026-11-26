@@ -298,6 +298,47 @@ class CoordinatorAssignmentListSerializer(serializers.Serializer):
     confirmed_at = serializers.DateTimeField(read_only=True, allow_null=True)
 
 
+class StaffingSummarySerializer(serializers.Serializer):
+    required_headcount = serializers.IntegerField(read_only=True)
+    assigned_count = serializers.IntegerField(read_only=True)
+    open_slots = serializers.IntegerField(read_only=True)
+    accepted_unassigned = serializers.IntegerField(read_only=True)
+    pending_applications = serializers.IntegerField(read_only=True)
+    waitlisted_applications = serializers.IntegerField(read_only=True)
+    checked_in_count = serializers.IntegerField(read_only=True)
+    pending_confirmations = serializers.IntegerField(read_only=True)
+    coverage_percent = serializers.FloatField(read_only=True)
+    readiness_status = serializers.CharField(read_only=True, required=False)
+
+
+class StaffingPostBreakdownSerializer(serializers.Serializer):
+    post_id = serializers.IntegerField(read_only=True)
+    title = serializers.CharField(read_only=True)
+    status = serializers.CharField(read_only=True)
+    required_headcount = serializers.IntegerField(read_only=True)
+    assigned_count = serializers.IntegerField(read_only=True)
+    remaining = serializers.IntegerField(read_only=True)
+
+
+class StaffingSignalSerializer(serializers.Serializer):
+    code = serializers.CharField(read_only=True)
+    severity = serializers.CharField(read_only=True)
+    title = serializers.CharField(read_only=True)
+    evidence = serializers.DictField(read_only=True, required=False)
+
+
+class StaffingInsightSerializer(serializers.Serializer):
+    event_id = serializers.IntegerField(read_only=True)
+    event_title = serializers.CharField(read_only=True)
+    event_status = serializers.CharField(read_only=True)
+    start_at = serializers.CharField(read_only=True, allow_null=True)
+    readiness_status = serializers.CharField(read_only=True, required=False)
+    summary = StaffingSummarySerializer(read_only=True)
+    posts = StaffingPostBreakdownSerializer(many=True, read_only=True)
+    signals = StaffingSignalSerializer(many=True, read_only=True)
+    generated_at = serializers.CharField(read_only=True)
+
+
 __all__ = [
     "AutoAssignResultSerializer",
     "CancelEventSerializer",
@@ -315,4 +356,8 @@ __all__ = [
     "CoordinatorHandoverSerializer",
     "ManualAssignSerializer",
     "RetakeSerializer",
+    "StaffingInsightSerializer",
+    "StaffingSummarySerializer",
+    "StaffingPostBreakdownSerializer",
+    "StaffingSignalSerializer",
 ]

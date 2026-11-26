@@ -308,3 +308,43 @@ export interface GeoAttemptReview {
   resultCode: string;
 }
 
+export interface StaffingPostCapacity {
+  postId: number;
+  title: string;
+  status: string;
+  requiredHeadcount: number;
+  assignedCount: number;
+  remaining: number;
+}
+
+export interface StaffingSignal {
+  code: string;
+  severity: 'high' | 'medium' | 'low';
+  title: string;
+  evidence?: Record<string, any>;
+}
+
+export interface EventStaffingInsight {
+  eventId: number;
+  eventTitle: string;
+  eventStatus: string;
+  startAt: string | null;
+  readinessStatus: 'critical' | 'warning' | 'healthy';
+  summary: {
+    requiredHeadcount: number;
+    assignedCount: number;
+    openSlots: number;
+    acceptedUnassigned: number;
+    pendingApplications: number;
+    waitlistedApplications: number;
+    checkedInCount: number;
+    pendingConfirmations: number;
+    coveragePercent: number;
+    readinessStatus: 'critical' | 'warning' | 'healthy';
+  };
+  posts: StaffingPostCapacity[];
+  signals: StaffingSignal[];
+  generatedAt: string;
+}
+
+

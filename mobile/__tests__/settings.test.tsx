@@ -15,7 +15,12 @@ import {
   resetDataMode,
   setDataMode,
 } from '../src/app/configuration/dataMode';
-import { eventApi } from '../src/data/endpoints/eventApi';
+import {
+  resetConsumerModeState,
+  setConsumerModeState,
+} from '../src/app/configuration/consumerMode';
+import { defaultApiClient } from '../src/core/api/apiClient';
+import { resetBffConnectionState } from '../src/core/api/bffDiscovery';
 
 const initialMetrics = {
   frame: { x: 0, y: 0, width: 390, height: 844 },
@@ -46,9 +51,7 @@ function createMockDrawerProps() {
   return {
     state: {
       index: 0,
-      routes: [
-        { key: 'Settings-key', name: 'Settings' },
-      ],
+      routes: [{ key: 'Settings-key', name: 'Settings' }],
       routeNames: ['Settings'],
       type: 'drawer',
       stale: false,
@@ -84,6 +87,31 @@ function safeStringify(obj: unknown): string {
 }
 
 describe('SettingsScreen', () => {
+  let activeRenderer: ReactTestRenderer.ReactTestRenderer | null = null;
+
+  beforeEach(() => {
+    resetDataMode();
+    resetBffConnectionState();
+    setConsumerModeState({ devOptionsEnabled: true });
+    jest.restoreAllMocks();
+  });
+
+  afterEach(async () => {
+    if (activeRenderer) {
+      const toUnmount = activeRenderer;
+      activeRenderer = null;
+      await ReactTestRenderer.act(async () => {
+        toUnmount.unmount();
+      });
+    }
+    await ReactTestRenderer.act(async () => {
+      resetDataMode();
+      resetBffConnectionState();
+      resetConsumerModeState();
+    });
+    jest.restoreAllMocks();
+  });
+
   it('renders appearance options (System, Light, Dark) and changes theme mode', async () => {
     const nav = createMockNavigation();
 
@@ -92,6 +120,7 @@ describe('SettingsScreen', () => {
       renderer = ReactTestRenderer.create(
         renderWithTheme(<SettingsScreen navigation={nav} />),
       );
+      activeRenderer = renderer;
     });
 
     let json = safeStringify(renderer.toJSON());
@@ -100,7 +129,6 @@ describe('SettingsScreen', () => {
     expect(json).toContain('Light');
     expect(json).toContain('Dark');
 
-    // Switch to dark
     const darkButton = renderer.root
       .findAllByProps({ accessibilityRole: 'button' })
       .find(b => b.props.accessibilityLabel === 'Dark');
@@ -115,7 +143,7 @@ describe('SettingsScreen', () => {
     expect(json).toContain('Active: DARK (Dark Theme)');
   });
 
-  it('does NOT render the Volunteer/Coordinator role switch in Settings', async () => {
+  it('does NOT render Template Mode or QA profile switchers in Settings', async () => {
     const nav = createMockNavigation();
 
     let renderer!: ReactTestRenderer.ReactTestRenderer;
@@ -123,298 +151,182 @@ describe('SettingsScreen', () => {
       renderer = ReactTestRenderer.create(
         renderWithTheme(<SettingsScreen navigation={nav} />),
       );
+      activeRenderer = renderer;
     });
 
     const json = safeStringify(renderer.toJSON());
-
-    // Role switcher should NOT exist in Settings
+    expect(json).not.toContain('Template Mode');
+    expect(json).not.toContain('Template & API Diagnostics');
     expect(json).not.toContain('QA DEMO PROFILE SWITCHER');
     expect(json).not.toContain('Switch to Ordinary Volunteer');
     expect(json).not.toContain('Switch to Approved Coordinator');
-    expect(json).not.toContain('DEMO FIXTURE SWITCHER');
-    expect(json).not.toContain('Current Mock Account');
   });
 
-  it('renders application information and demo logout action with feedback', async () => {
+  it('renders application information and Log Out action', async () => {
     const nav = createMockNavigation();
+    const mockLogout = jest.fn().mockResolvedValue(undefined);
+    const mockUserCtx: UserContextValue = {
+      currentUser: ordinaryVolunteerUser,
+      setCurrentUser: jest.fn(),
+      isCoordinator: false,
+      switchUserPreset: jest.fn(),
+      logout: mockLogout,
+    };
 
     let renderer!: ReactTestRenderer.ReactTestRenderer;
     await ReactTestRenderer.act(async () => {
       renderer = ReactTestRenderer.create(
-        renderWithTheme(<SettingsScreen navigation={nav} />),
+        renderWithTheme(
+          <UserContext.Provider value={mockUserCtx}>
+            <SettingsScreen navigation={nav} />
+          </UserContext.Provider>,
+        ),
       );
+      activeRenderer = renderer;
     });
 
-    let json = safeStringify(renderer.toJSON());
+    const json = safeStringify(renderer.toJSON());
     expect(json).toContain('About Application');
     expect(json).toContain('Volunteer Coordination System');
-    expect(json).toContain('Version: 0.8.1');
+    expect(json).toContain('Mode: Live BFF');
 
-    // Logout button
     const logoutButton = renderer.root
       .findAllByProps({ accessibilityRole: 'button' })
-      .find(b => b.props.accessibilityLabel === 'Log Out (Demo)');
+      .find(b => b.props.accessibilityLabel === 'Log Out');
 
     expect(logoutButton).toBeDefined();
 
     await ReactTestRenderer.act(async () => {
-      logoutButton!.props.onPress();
+      await logoutButton!.props.onPress();
     });
 
-    json = safeStringify(renderer.toJSON());
-    expect(json).toContain(
-      'Demo only — session logout will be handled by authentication provider in production.',
-    );
+    expect(mockLogout).toHaveBeenCalledTimes(1);
   });
 
-  describe('Connection & DataMode Diagnostics (Phase 9)', () => {
-    beforeEach(async () => {
+  describe('BFF Connection & Offline Mode Diagnostics', () => {
+    it('renders BFF Connection & Offline Mode card without exposing secrets', async () => {
+      const nav = createMockNavigation();
+      let renderer!: ReactTestRenderer.ReactTestRenderer;
       await ReactTestRenderer.act(async () => {
-        resetDataMode();
+        renderer = ReactTestRenderer.create(
+          renderWithTheme(<SettingsScreen navigation={nav} />),
+        );
       });
-      jest.restoreAllMocks();
-    });
 
-    afterEach(async () => {
+      const json = safeStringify(renderer.toJSON());
+      expect(json).toContain('BFF Connection & Offline Mode');
+      expect(json).toContain('Active Endpoint:');
+      expect(json).toContain('Test BFF');
+      expect(json).toContain('Auto-Detect & Connect');
+      expect(json).not.toMatch(/auth_token|password|secret/i);
+      expect(json).not.toMatch(/\+?[0-9]{10,}/);
+
       await ReactTestRenderer.act(async () => {
-        resetDataMode();
+        renderer.unmount();
       });
-      jest.restoreAllMocks();
     });
 
-    it('renders API diagnostics panel in development mode without exposing secrets', async () => {
-      const originalDev = (globalThis as any).__DEV__;
-      (globalThis as any).__DEV__ = true;
+    it('switches to Offline Mode and clears cached data cleanly', async () => {
+      const nav = createMockNavigation();
+      let renderer!: ReactTestRenderer.ReactTestRenderer;
+      await ReactTestRenderer.act(async () => {
+        renderer = ReactTestRenderer.create(
+          renderWithTheme(<SettingsScreen navigation={nav} />),
+        );
+      });
 
-      try {
-        const nav = createMockNavigation();
-        let renderer!: ReactTestRenderer.ReactTestRenderer;
-        await ReactTestRenderer.act(async () => {
-          renderer = ReactTestRenderer.create(
-            renderWithTheme(<SettingsScreen navigation={nav} />),
-          );
-        });
+      expect(getDataMode()).toBe('http');
 
-        const json = safeStringify(renderer.toJSON());
-        expect(json).toContain('Template & API Diagnostics');
-        expect(json).toContain('Active Data Mode: TEMPLATE');
-        expect(json).toContain('API Base URL:');
-        expect(json).toContain('Test BFF Connection');
+      const offlineBtn = renderer.root
+        .findAllByProps({ accessibilityRole: 'button' })
+        .find(b => b.props.accessibilityLabel === 'Switch to Offline Mode');
+      expect(offlineBtn).toBeDefined();
 
-        // STRICT CONSTRAINT 1: NEVER display tokens, phone numbers, or secrets
-        expect(json).not.toMatch(/token/i);
-        expect(json).not.toMatch(/\+?[0-9]{10,}/);
-        expect(json).not.toContain('password');
-        expect(json).not.toContain('secret');
+      await ReactTestRenderer.act(async () => {
+        offlineBtn!.props.onPress();
+      });
 
-        await ReactTestRenderer.act(async () => {
-          renderer.unmount();
-        });
-      } finally {
-        (globalThis as any).__DEV__ = originalDev;
-      }
-    });
+      expect(getDataMode()).toBe('offline');
+      const json = safeStringify(renderer.toJSON());
+      expect(json).toContain('Offline Mode Active');
 
-    it('hides API diagnostics panel in production mode (__DEV__ = false)', async () => {
-      const originalDev = (globalThis as any).__DEV__;
-      (globalThis as any).__DEV__ = false;
-
-      try {
-        const nav = createMockNavigation();
-        let renderer!: ReactTestRenderer.ReactTestRenderer;
-        await ReactTestRenderer.act(async () => {
-          renderer = ReactTestRenderer.create(
-            renderWithTheme(<SettingsScreen navigation={nav} />),
-          );
-        });
-
-        const json = safeStringify(renderer.toJSON());
-        expect(json).not.toContain('Template & API Diagnostics');
-        expect(json).not.toContain('Test BFF Connection');
-
-        await ReactTestRenderer.act(async () => {
-          renderer.unmount();
-        });
-      } finally {
-        (globalThis as any).__DEV__ = originalDev;
-      }
-    });
-
-    it('switches data mode between mock and http safely via diagnostic buttons', async () => {
-      const originalDev = (globalThis as any).__DEV__;
-      (globalThis as any).__DEV__ = true;
-
-      try {
-        const nav = createMockNavigation();
-        let renderer!: ReactTestRenderer.ReactTestRenderer;
-        await ReactTestRenderer.act(async () => {
-          renderer = ReactTestRenderer.create(
-            renderWithTheme(<SettingsScreen navigation={nav} />),
-          );
-        });
-
-        expect(getDataMode()).toBe('mock');
-
-        // Switch to HTTP
-        const httpButton = renderer.root
-          .findAllByProps({ accessibilityRole: 'button' })
-          .find(b => b.props.accessibilityLabel === 'Switch to HTTP');
-        expect(httpButton).toBeDefined();
-
-        await ReactTestRenderer.act(async () => {
-          httpButton!.props.onPress();
-        });
-
-        expect(getDataMode()).toBe('http');
-        let json = safeStringify(renderer.toJSON());
-        expect(json).toContain('Active Data Mode: HTTP');
-
-        // Switch back to Template Mode
-        const mockButton = renderer.root
-          .findAllByProps({ accessibilityRole: 'button' })
-          .find(b => b.props.accessibilityLabel === 'Switch to Template Mode');
-        expect(mockButton).toBeDefined();
-
-        await ReactTestRenderer.act(async () => {
-          mockButton!.props.onPress();
-        });
-
-        expect(getDataMode()).toBe('mock');
-        json = safeStringify(renderer.toJSON());
-        expect(json).toContain('Active Data Mode: TEMPLATE');
-
-        await ReactTestRenderer.act(async () => {
-          renderer.unmount();
-        });
-      } finally {
-        (globalThis as any).__DEV__ = originalDev;
-      }
+      await ReactTestRenderer.act(async () => {
+        renderer.unmount();
+      });
     });
 
     it('pings BFF and displays reachability and latency', async () => {
-      const originalDev = (globalThis as any).__DEV__;
-      (globalThis as any).__DEV__ = true;
-
-      jest.spyOn(eventApi, 'getCharityFields').mockResolvedValueOnce({
+      jest.spyOn(defaultApiClient, 'get').mockResolvedValue({
         ok: true,
         status: 200,
-        data: [],
+        data: { dev_options_enabled: true },
       });
 
-      try {
-        const nav = createMockNavigation();
-        let renderer!: ReactTestRenderer.ReactTestRenderer;
-        await ReactTestRenderer.act(async () => {
-          renderer = ReactTestRenderer.create(
-            renderWithTheme(<SettingsScreen navigation={nav} />),
-          );
-        });
+      const nav = createMockNavigation();
+      let renderer!: ReactTestRenderer.ReactTestRenderer;
+      await ReactTestRenderer.act(async () => {
+        renderer = ReactTestRenderer.create(
+          renderWithTheme(<SettingsScreen navigation={nav} />),
+        );
+      });
 
-        const pingButton = renderer.root
-          .findAllByProps({ accessibilityRole: 'button' })
-          .find(b => b.props.accessibilityLabel === 'Test BFF Connection');
-        expect(pingButton).toBeDefined();
+      const pingButton = renderer.root
+        .findAllByProps({ accessibilityRole: 'button' })
+        .find(b => b.props.accessibilityLabel === 'Test BFF Connection');
+      expect(pingButton).toBeDefined();
 
-        await ReactTestRenderer.act(async () => {
-          pingButton!.props.onPress();
-        });
+      await ReactTestRenderer.act(async () => {
+        await pingButton!.props.onPress();
+      });
 
-        const json = safeStringify(renderer.toJSON());
-        expect(json).toContain('BFF Reachable: HTTP 200');
+      const json = safeStringify(renderer.toJSON());
+      expect(json).toContain('BFF Reachable:');
 
-        await ReactTestRenderer.act(async () => {
-          renderer.unmount();
-        });
-      } finally {
-        (globalThis as any).__DEV__ = originalDev;
-      }
+      await ReactTestRenderer.act(async () => {
+        renderer.unmount();
+      });
     });
   });
-});
 
-describe('Production Safety: Side-Drawer QA Demo Switcher', () => {
-  it('excludes QA profile switcher from drawer when __DEV__ is false (production)', async () => {
-    const originalDev = (globalThis as any).__DEV__;
-    (globalThis as any).__DEV__ = false;
+  it('excludes QA profile switcher from drawer in all builds', async () => {
+    const mockValue: UserContextValue = {
+      currentUser: ordinaryVolunteerUser,
+      setCurrentUser: jest.fn(),
+      isCoordinator: false,
+      switchUserPreset: jest.fn(),
+    };
+    const drawerProps = createMockDrawerProps();
 
-    try {
-      const mockValue: UserContextValue = {
-        currentUser: ordinaryVolunteerUser,
-        setCurrentUser: jest.fn(),
-        isCoordinator: false,
-        switchUserPreset: jest.fn(),
-      };
-      const drawerProps = createMockDrawerProps();
+    let renderer!: ReactTestRenderer.ReactTestRenderer;
+    await ReactTestRenderer.act(async () => {
+      renderer = ReactTestRenderer.create(
+        <SafeAreaProvider initialMetrics={initialMetrics}>
+          <ThemeProvider>
+            <UserContext.Provider value={mockValue}>
+              <MainDrawerContent {...drawerProps} />
+            </UserContext.Provider>
+          </ThemeProvider>
+        </SafeAreaProvider>,
+      );
+      activeRenderer = renderer;
+    });
 
-      let renderer!: ReactTestRenderer.ReactTestRenderer;
-      await ReactTestRenderer.act(async () => {
-        renderer = ReactTestRenderer.create(
-          <SafeAreaProvider initialMetrics={initialMetrics}>
-            <ThemeProvider>
-              <UserContext.Provider value={mockValue}>
-                <MainDrawerContent {...drawerProps} />
-              </UserContext.Provider>
-            </ThemeProvider>
-          </SafeAreaProvider>,
-        );
-      });
-
-      const json = safeStringify(renderer.toJSON());
-      expect(json).not.toContain('QA DEMO PROFILE SWITCHER');
-      expect(json).not.toContain('Switch to ordinary volunteer');
-      expect(json).not.toContain('Switch to coordinator');
-    } finally {
-      (globalThis as any).__DEV__ = originalDev;
-    }
-  });
-
-  it('includes QA profile switcher in drawer when __DEV__ is true (development)', async () => {
-    const originalDev = (globalThis as any).__DEV__;
-    (globalThis as any).__DEV__ = true;
-
-    try {
-      const mockValue: UserContextValue = {
-        currentUser: ordinaryVolunteerUser,
-        setCurrentUser: jest.fn(),
-        isCoordinator: false,
-        switchUserPreset: jest.fn(),
-      };
-      const drawerProps = createMockDrawerProps();
-
-      let renderer!: ReactTestRenderer.ReactTestRenderer;
-      await ReactTestRenderer.act(async () => {
-        renderer = ReactTestRenderer.create(
-          <SafeAreaProvider initialMetrics={initialMetrics}>
-            <ThemeProvider>
-              <UserContext.Provider value={mockValue}>
-                <MainDrawerContent {...drawerProps} />
-              </UserContext.Provider>
-            </ThemeProvider>
-          </SafeAreaProvider>,
-        );
-      });
-
-      const json = safeStringify(renderer.toJSON());
-      expect(json).toContain('QA DEMO PROFILE SWITCHER');
-      expect(json).toContain('Volunteer');
-      expect(json).toContain('Coordinator');
-    } finally {
-      (globalThis as any).__DEV__ = originalDev;
-    }
+    const json = safeStringify(renderer.toJSON());
+    expect(json).not.toContain('QA DEMO PROFILE SWITCHER');
+    expect(json).not.toContain('Switch to ordinary volunteer');
+    expect(json).not.toContain('Switch to coordinator');
   });
 
   it('renders Notifications section in SettingsScreen and navigates to Notifications', async () => {
+    setDataMode('http');
     const nav = createMockNavigation();
     let renderer!: ReactTestRenderer.ReactTestRenderer;
 
     await ReactTestRenderer.act(async () => {
       renderer = ReactTestRenderer.create(
-        <SafeAreaProvider initialMetrics={initialMetrics}>
-          <ThemeProvider>
-            <SettingsScreen navigation={nav} />
-          </ThemeProvider>
-        </SafeAreaProvider>,
+        renderWithTheme(<SettingsScreen navigation={nav} />),
       );
+      activeRenderer = renderer;
     });
 
     const json = safeStringify(renderer.toJSON());

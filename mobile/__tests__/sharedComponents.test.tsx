@@ -19,6 +19,10 @@ import {
   SectionHeader,
   StatusBadge,
 } from '../src/shared';
+import {
+  resetConsumerModeState,
+  setConsumerModeState,
+} from '../src/app/configuration/consumerMode';
 import { ThemeProvider } from '../src/theme/ThemeProvider';
 
 async function renderWithTheme(ui: React.ReactElement): Promise<ReactTestRenderer.ReactTestRenderer> {
@@ -242,6 +246,7 @@ describe('Shared UI Components', () => {
     });
 
     it('renders ErrorState with retry button', async () => {
+      setConsumerModeState({ devOptionsEnabled: true });
       const tree = await renderWithTheme(
         <ErrorState
           description="Failed to load assignments"
@@ -253,6 +258,7 @@ describe('Shared UI Components', () => {
       expect(str).toContain('Something went wrong');
       expect(str).toContain('Failed to load assignments');
       expect(str).toContain('Retry');
+      resetConsumerModeState();
     });
 
     it('renders LoadingState with label', async () => {

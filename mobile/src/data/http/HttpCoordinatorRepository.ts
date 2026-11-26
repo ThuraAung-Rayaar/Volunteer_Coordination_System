@@ -18,6 +18,7 @@ import type {
   CreateEventWizardDraft,
   EventPostCapacity,
   EventPurposeType,
+  EventStaffingInsight,
   GeoAttemptReview,
   VolunteerUuidLookup,
 } from '../../domain/models/coordinator';
@@ -43,6 +44,13 @@ import {
   mapVolunteerUuidLookup,
 } from '../mappers/coordinatorMapper';
 import { mapPublicEventPost } from '../mappers/eventMapper';
+import {
+  queryCache,
+  cacheKeys,
+  cacheTags,
+  CACHE_TTL,
+  CACHE_SCOPE,
+} from '../cache';
 import type { PublicEventPostDto } from '../dto/eventDto';
 import type { PostStatus } from '../../domain/models/event';
 import type {
@@ -93,13 +101,11 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
     return { ...this.coordinatorIdentity };
   }
 
-  public async getMyEvents(): Promise<CoordinatorEventSummary[]> {
-    if (this.inFlightMyEventsPromise) {
-      return this.inFlightMyEventsPromise;
-    }
-
-    this.inFlightMyEventsPromise = (async () => {
-      try {
+  public async getMyEvents(forceRefresh?: boolean): Promise<CoordinatorEventSummary[]> {
+    const key = cacheKeys.coordinatorEvents('me');
+    return queryCache.getOrFetch(
+      key,
+      async () => {
         const res = await coordinatorApi.getMyEvents(this.client);
         if (!res.ok) {
           throw new Error(`Failed to load events: ${res.error.message}`);
@@ -118,12 +124,14 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
             summaryRes && summaryRes.ok ? summaryRes.data : null;
           return mapCoordinatorEventSummary(e, summaryDto);
         });
-      } finally {
-        this.inFlightMyEventsPromise = null;
-      }
-    })();
-
-    return this.inFlightMyEventsPromise;
+      },
+      {
+        ttlMs: CACHE_TTL.COORDINATOR_EVENTS,
+        tags: [cacheTags.coordinator],
+        scope: CACHE_SCOPE.ACCOUNT,
+        forceRefresh,
+      },
+    );
   }
 
   public async getOverviewMetrics(): Promise<CoordinatorOverviewMetrics> {
@@ -164,97 +172,110 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
 
   public async getEventDetail(
     eventId: string,
+    forceRefresh?: boolean,
   ): Promise<CoordinatorEventDetail | null> {
-    const [summaryRes, postsRes, eventsRes, configurationRes] = await Promise.all([
-      coordinatorApi.getEventSummary(eventId, this.client),
-      coordinatorApi.getEventPosts(eventId, this.client),
-      coordinatorApi.getMyEvents(this.client),
-      coordinatorApi.getEventConfiguration(eventId, this.client),
-    ]);
+    const key = cacheKeys.coordinatorEventDetail(eventId);
+    return queryCache.getOrFetch(
+      key,
+      async () => {
+        const [summaryRes, postsRes, eventsRes, configurationRes] = await Promise.all([
+          coordinatorApi.getEventSummary(eventId, this.client),
+          coordinatorApi.getEventPosts(eventId, this.client),
+          coordinatorApi.getMyEvents(this.client),
+          coordinatorApi.getEventConfiguration(eventId, this.client),
+        ]);
 
-    if (!summaryRes.ok) {
-      if (summaryRes.status === 404) return null;
-      throw new Error(`Failed to load event summary: ${summaryRes.error.message}`);
-    }
-    if (!configurationRes || !configurationRes.ok) {
-      if (configurationRes?.status === 404) return null;
-      throw new Error(
-        `Failed to load manager event configuration: ${configurationRes?.error?.message ?? 'Unknown error'}`,
-      );
-    }
+        if (!summaryRes.ok) {
+          if (summaryRes.status === 404) return null;
+          throw new Error(`Failed to load event summary: ${summaryRes.error.message}`);
+        }
+        if (!configurationRes || !configurationRes.ok) {
+          if (configurationRes?.status === 404) return null;
+          throw new Error(
+            `Failed to load manager event configuration: ${configurationRes?.error?.message ?? 'Unknown error'}`,
+          );
+        }
 
-    if (!eventsRes.ok) {
-      throw new Error(
-        `Failed to verify coordinator event permissions: ${eventsRes.error.message}`,
-      );
-    }
-    if (!postsRes.ok) {
-      throw new Error(
-        `Failed to load event posts: ${postsRes.error.message}`,
-      );
-    }
+        if (!eventsRes.ok) {
+          throw new Error(
+            `Failed to verify coordinator event permissions: ${eventsRes.error.message}`,
+          );
+        }
+        if (!postsRes.ok) {
+          throw new Error(
+            `Failed to load event posts: ${postsRes.error.message}`,
+          );
+        }
 
-    const summary = summaryRes.data;
-    const configuration = configurationRes.data;
-    const events: CoordinatorEventListItemDto[] = eventsRes.data?.results ?? [];
-    const currentEventItem = events.find(e => String(e.id) === String(eventId));
-    if (!currentEventItem) {
-      throw new Error('Cannot verify event manager/monitor permissions for this event.');
-    }
+        const summary = summaryRes.data;
+        const configuration = configurationRes.data;
+        const events: CoordinatorEventListItemDto[] = eventsRes.data?.results ?? [];
+        const currentEventItem = events.find(e => String(e.id) === String(eventId));
+        if (!currentEventItem) {
+          throw new Error('Cannot verify event manager/monitor permissions for this event.');
+        }
 
-    const rawPosts: PublicEventPostDto[] = Array.isArray(postsRes.data)
-      ? postsRes.data
-      : postsRes.data?.results || [];
+        const rawPosts: PublicEventPostDto[] = Array.isArray(postsRes.data)
+          ? postsRes.data
+          : postsRes.data?.results || [];
 
-    const toCoordinate = (value: string | number | null | undefined): number | null => {
-      if (value === null || value === undefined || value === '') return null;
-      const parsed = Number(value);
-      return Number.isFinite(parsed) ? parsed : null;
-    };
+        const toCoordinate = (value: string | number | null | undefined): number | null => {
+          if (value === null || value === undefined || value === '') return null;
+          const parsed = Number(value);
+          return Number.isFinite(parsed) ? parsed : null;
+        };
 
-    return {
-      id: String(configuration.id),
-      title: configuration.title,
-      description: configuration.description ?? '',
-      status: configuration.status as CoordinatorEventStatus,
-      purposeType: configuration.purpose_type as EventPurposeType,
-      startAt: configuration.start_at,
-      endAt: configuration.end_at,
-      applicationDeadline: configuration.application_deadline ?? undefined,
-      locationName: configuration.location_name ?? '',
-      landmarkText: configuration.landmark_text ?? undefined,
-      charityFields: (currentEventItem.charity_fields || []) as CharityCategoryCode[],
-      ownerId: String(configuration.owner_id),
-      currentCoordinatorId: String(configuration.current_coordinator_id),
-      coordinatorName: currentEventItem.coordinator_name || this.coordinatorIdentity.displayName,
-      isOwnerAsMonitor: currentEventItem.is_read_only_monitor,
-      pendingApplicationCount: summary.pending_count || 0,
-      acceptedApplicantCount: summary.accepted_count || 0,
-      assignedCount: summary.assignment_count || 0,
-      checkedInCount: summary.checked_in_count || 0,
-      latitude: toCoordinate(configuration.latitude),
-      longitude: toCoordinate(configuration.longitude),
-      geoRadiusM: configuration.geo_radius_m ?? 200,
-      geoCheckinEnabled: configuration.geo_checkin_enabled,
-      geoCheckinOpensBeforeMin: configuration.geo_checkin_opens_before_min,
-      requireCheckinConfirmation: configuration.require_checkin_confirmation,
-      mapProvider: configuration.map_provider,
-      acceptanceMode: configuration.acceptance_mode,
-      autoAssignEnabled: configuration.auto_assign_enabled,
-      groupSize: configuration.group_size ?? undefined,
-      leaderStrategy: configuration.leader_strategy,
-      maxParticipants: configuration.max_participants ?? 0,
-      mealsProvided: configuration.meals_provided,
-      lodgingProvided: configuration.lodging_provided,
-      travelSupportProvided: configuration.travel_support_provided,
-      compensationKind: configuration.compensation_kind,
-      compensationNote: configuration.compensation_note ?? undefined,
-      onboardingText: configuration.onboarding_text ?? undefined,
-      onboardingVersion: configuration.onboarding_version,
-      requireOnboardingAck: configuration.require_onboarding_ack,
-      qrRegistrationEnabled: configuration.qr_registration_enabled,
-      posts: rawPosts.map(post => mapPublicEventPost(post, configuration.id)),
-    };
+        return {
+          id: String(configuration.id),
+          title: configuration.title,
+          description: configuration.description ?? '',
+          status: configuration.status as CoordinatorEventStatus,
+          purposeType: configuration.purpose_type as EventPurposeType,
+          startAt: configuration.start_at,
+          endAt: configuration.end_at,
+          applicationDeadline: configuration.application_deadline ?? undefined,
+          locationName: configuration.location_name ?? '',
+          landmarkText: configuration.landmark_text ?? undefined,
+          charityFields: (currentEventItem.charity_fields || []) as CharityCategoryCode[],
+          ownerId: String(configuration.owner_id),
+          currentCoordinatorId: String(configuration.current_coordinator_id),
+          coordinatorName: currentEventItem.coordinator_name || this.coordinatorIdentity.displayName,
+          isOwnerAsMonitor: currentEventItem.is_read_only_monitor,
+          pendingApplicationCount: summary.pending_count || 0,
+          acceptedApplicantCount: summary.accepted_count || 0,
+          assignedCount: summary.assignment_count || 0,
+          checkedInCount: summary.checked_in_count || 0,
+          latitude: toCoordinate(configuration.latitude),
+          longitude: toCoordinate(configuration.longitude),
+          geoRadiusM: configuration.geo_radius_m ?? 200,
+          geoCheckinEnabled: configuration.geo_checkin_enabled,
+          geoCheckinOpensBeforeMin: configuration.geo_checkin_opens_before_min,
+          requireCheckinConfirmation: configuration.require_checkin_confirmation,
+          mapProvider: configuration.map_provider,
+          acceptanceMode: configuration.acceptance_mode,
+          autoAssignEnabled: configuration.auto_assign_enabled,
+          groupSize: configuration.group_size ?? undefined,
+          leaderStrategy: configuration.leader_strategy,
+          maxParticipants: configuration.max_participants ?? 0,
+          mealsProvided: configuration.meals_provided,
+          lodgingProvided: configuration.lodging_provided,
+          travelSupportProvided: configuration.travel_support_provided,
+          compensationKind: configuration.compensation_kind,
+          compensationNote: configuration.compensation_note ?? undefined,
+          onboardingText: configuration.onboarding_text ?? undefined,
+          onboardingVersion: configuration.onboarding_version,
+          requireOnboardingAck: configuration.require_onboarding_ack,
+          qrRegistrationEnabled: configuration.qr_registration_enabled,
+          posts: rawPosts.map(post => mapPublicEventPost(post, configuration.id)),
+        };
+      },
+      {
+        ttlMs: CACHE_TTL.COORDINATOR_EVENT_DETAIL,
+        tags: [cacheTags.coordinator, cacheTags.event(eventId)],
+        scope: CACHE_SCOPE.ACCOUNT,
+        forceRefresh,
+      },
+    );
   }
 
   public async createDraftEvent(
@@ -270,7 +291,9 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
       };
     }
 
-    const created = await this.getEventDetail(String(res.data.id));
+    queryCache.invalidateTag(cacheTags.coordinator);
+    queryCache.invalidateTag(cacheTags.events);
+    const created = await this.getEventDetail(String(res.data.id), true);
     return {
       success: true,
       message: 'Draft event created successfully',
@@ -290,7 +313,11 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
         message: res.error.message,
       };
     }
-    const updated = await this.getEventDetail(eventId);
+    queryCache.invalidateTag(cacheTags.coordinator);
+    queryCache.invalidateTag(cacheTags.event(eventId));
+    queryCache.invalidateTag(cacheTags.events);
+    queryCache.invalidatePrefix('account:me:staffing:');
+    const updated = await this.getEventDetail(eventId, true);
     return {
       success: true,
       message: 'Event updated successfully',
@@ -344,12 +371,17 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
       defaultDashboardRepository.removeCommitmentsForEvent(eventId);
     }
 
+    queryCache.invalidateTag(cacheTags.coordinator);
+    queryCache.invalidateTag(cacheTags.event(eventId));
+    queryCache.invalidateTag(cacheTags.events);
+    queryCache.invalidatePrefix('account:me:staffing:');
+
     appEventBus.emit(AppEvents.EVENT_STATUS_CHANGED, {
       eventId,
       status: targetStatus,
     });
 
-    const updated = await this.getEventDetail(eventId);
+    const updated = await this.getEventDetail(eventId, true);
     return {
       success: true,
       message: `Event transitioned to ${targetStatus}`,
@@ -428,6 +460,10 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
     if (!res.ok) {
       return { success: false, message: res.error.message };
     }
+    queryCache.invalidateTag(cacheTags.coordinator);
+    queryCache.invalidateTag(cacheTags.event(eventId));
+    queryCache.invalidateTag(cacheTags.events);
+    queryCache.invalidatePrefix('account:me:staffing:');
     return {
       success: true,
       message: 'Post created successfully',
@@ -467,6 +503,9 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
     if (!res.ok) {
       return { success: false, message: res.error.message };
     }
+    queryCache.invalidateTag(cacheTags.coordinator);
+    queryCache.invalidateTag(cacheTags.events);
+    queryCache.invalidatePrefix('account:me:staffing:');
     return {
       success: true,
       message: 'Post updated successfully',
@@ -484,6 +523,9 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
         message: res.error.message,
       };
     }
+    queryCache.invalidateTag(cacheTags.coordinator);
+    queryCache.invalidateTag(cacheTags.events);
+    queryCache.invalidatePrefix('account:me:staffing:');
     return {
       success: true,
       message: 'Post closed successfully',
@@ -503,30 +545,43 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
 
   public async getApplications(
     eventId?: string,
+    forceRefresh?: boolean,
   ): Promise<CoordinatorApplicationItem[]> {
     if (eventId) {
-      const res = await coordinatorApi.getApplications(
-        eventId,
-        undefined,
-        this.client,
+      const key = cacheKeys.coordinatorApplications(eventId);
+      return queryCache.getOrFetch(
+        key,
+        async () => {
+          const res = await coordinatorApi.getApplications(
+            eventId,
+            undefined,
+            this.client,
+          );
+          if (!res.ok) {
+            throw new Error(`Failed to load applications: ${res.error.message}`);
+          }
+          const list: CoordinatorApplicationDto[] = res.data.results || [];
+          const items = list.map(a => {
+            const mapped = mapCoordinatorApplication(a, eventId);
+            this.appToEventMap.set(mapped.id, String(eventId));
+            this.applicationCache.set(mapped.id, mapped);
+            return mapped;
+          });
+          return items;
+        },
+        {
+          ttlMs: CACHE_TTL.COORDINATOR_APPLICATIONS,
+          tags: [cacheTags.coordinator, cacheTags.eventApplications(eventId)],
+          scope: CACHE_SCOPE.ACCOUNT,
+          forceRefresh,
+        },
       );
-      if (!res.ok) {
-        throw new Error(`Failed to load applications: ${res.error.message}`);
-      }
-      const list: CoordinatorApplicationDto[] = res.data.results || [];
-      const items = list.map(a => {
-        const mapped = mapCoordinatorApplication(a, eventId);
-        this.appToEventMap.set(mapped.id, String(eventId));
-        this.applicationCache.set(mapped.id, mapped);
-        return mapped;
-      });
-      return items;
     }
 
     // If no eventId, aggregate over coordinator's events
-    const events = await this.getMyEvents();
+    const events = await this.getMyEvents(forceRefresh);
     const appLists = await Promise.all(
-      events.map(e => this.getApplications(e.id).catch(() => [])),
+      events.map(e => this.getApplications(e.id, forceRefresh).catch(() => [])),
     );
     return appLists.flat();
   }
@@ -594,6 +649,14 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
       this.applicationCache.set(applicationId, updatedItem);
     }
 
+    queryCache.invalidateTag(cacheTags.coordinator);
+    const linkedEventId = this.appToEventMap.get(applicationId);
+    if (linkedEventId) {
+      queryCache.invalidateTag(cacheTags.eventApplications(linkedEventId));
+      queryCache.invalidateTag(cacheTags.event(linkedEventId));
+      queryCache.invalidateTag(cacheTags.staffing(linkedEventId));
+    }
+
     return {
       success: true,
       message: `Application ${status} successfully`,
@@ -638,6 +701,10 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
     const item = mapCoordinatorApplication(res.data, eventId);
     this.applicationCache.set(item.id, item);
     this.appToEventMap.set(item.id, eventId);
+
+    queryCache.invalidateTag(cacheTags.coordinator);
+    queryCache.invalidateTag(cacheTags.eventApplications(eventId));
+    queryCache.invalidateTag(cacheTags.staffing(eventId));
 
     return {
       success: true,
@@ -705,6 +772,11 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
       };
     }
 
+    queryCache.invalidateTag(cacheTags.coordinator);
+    queryCache.invalidateTag(cacheTags.assignments);
+    queryCache.invalidateTag(cacheTags.event(eventId));
+    queryCache.invalidateTag(cacheTags.staffing(eventId));
+
     const assignments = await this.getAssignments(eventId);
     return {
       success: true,
@@ -750,6 +822,11 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
       };
     }
 
+    queryCache.invalidateTag(cacheTags.coordinator);
+    queryCache.invalidateTag(cacheTags.assignments);
+    queryCache.invalidateTag(cacheTags.event(eventId));
+    queryCache.invalidateTag(cacheTags.staffing(eventId));
+
     // P1-03: Deterministically refetch assignments from server; do not fabricate fake assignment fallback
     const assignments = await this.getAssignments(eventId);
     const returnedAssignmentId =
@@ -793,6 +870,10 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
         message: res.error.message,
       };
     }
+
+    queryCache.invalidateTag(cacheTags.coordinator);
+    queryCache.invalidateTag(cacheTags.assignments);
+    queryCache.invalidatePrefix('account:me:staffing:');
 
     return {
       success: true,
@@ -1192,6 +1273,68 @@ export class HttpCoordinatorRepository implements CoordinatorRepository {
       success: true,
       message: 'Coordinator feedback submitted successfully',
     };
+  }
+
+  public async getStaffingInsight(
+    eventId: string,
+    forceRefresh?: boolean,
+  ): Promise<EventStaffingInsight> {
+    const key = cacheKeys.staffingInsight(eventId);
+    return queryCache.getOrFetch(
+      key,
+      async () => {
+        const res = await coordinatorApi.getStaffingInsight(eventId, this.client);
+        if (!res.ok) {
+          throw new Error(res.error?.message || 'Failed to load staffing insight');
+        }
+        const data = res.data;
+        return {
+          eventId: data.event_id,
+          eventTitle: data.event_title,
+          eventStatus: data.event_status,
+          startAt: data.start_at,
+          readinessStatus: data.readiness_status || 'warning',
+          summary: {
+            requiredHeadcount: data.summary?.required_headcount ?? 0,
+            assignedCount: data.summary?.assigned_count ?? 0,
+            openSlots: data.summary?.open_slots ?? 0,
+            acceptedUnassigned: data.summary?.accepted_unassigned ?? 0,
+            pendingApplications: data.summary?.pending_applications ?? 0,
+            waitlistedApplications: data.summary?.waitlisted_applications ?? 0,
+            checkedInCount: data.summary?.checked_in_count ?? 0,
+            pendingConfirmations: data.summary?.pending_confirmations ?? 0,
+            coveragePercent: data.summary?.coverage_percent ?? 0,
+            readinessStatus:
+              data.summary?.readiness_status || data.readiness_status || 'warning',
+          },
+          posts: (data.posts || []).map((p: any) => ({
+            postId: p.post_id,
+            title: p.title,
+            status: p.status,
+            requiredHeadcount: p.required_headcount,
+            assignedCount: p.assigned_count,
+            remaining: p.remaining,
+          })),
+          signals: (data.signals || []).map((s: any) => ({
+            code: s.code,
+            severity: s.severity,
+            title: s.title,
+            evidence: s.evidence,
+          })),
+          generatedAt: data.generated_at,
+        };
+      },
+      {
+        ttlMs: CACHE_TTL.STAFFING_INSIGHT,
+        tags: [
+          cacheTags.staffing(eventId),
+          cacheTags.events,
+          cacheTags.assignments,
+        ],
+        scope: CACHE_SCOPE.ACCOUNT,
+        forceRefresh,
+      },
+    );
   }
 }
 

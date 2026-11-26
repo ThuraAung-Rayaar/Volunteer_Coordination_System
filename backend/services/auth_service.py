@@ -24,6 +24,7 @@ from rest_framework.authtoken.models import Token
 
 from apps.accounts.models import AuthOtp, AuthOtpChallenge, Users
 from common.exceptions import DomainError, translate_db_exception
+from common.runtime_config import is_dev_options_enabled
 from common.security import (
     compute_challenge_token_hash,
     compute_otp_hash,
@@ -73,6 +74,9 @@ def can_expose_dev_code() -> bool:
     env = str(getattr(settings, "ENVIRONMENT", "") or "").lower()
     settings_mod = str(getattr(settings, "SETTINGS_MODULE", "") or os.environ.get("DJANGO_SETTINGS_MODULE", "") or "").lower()
     if env == "production" or "production" in settings_mod:
+        return False
+
+    if not is_dev_options_enabled():
         return False
 
     if not getattr(settings, "DEBUG", False):

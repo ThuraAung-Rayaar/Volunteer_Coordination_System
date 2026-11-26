@@ -811,4 +811,4 @@ To ensure zero regression of existing functionality while rolling out tokenizati
 - Gated `dev_code` behind explicit development flags (`ALLOW_DEV_CODE_IN_AUTH_RESPONSE=False` and `ENVIRONMENT=production`); verified complete absence over real HTTP sockets.
 - Verified zero session clearing on non-401 errors (403, 404, 409, 429, timeouts).
 - Real HTTP integration test suite (`v0_12_0_realHttpIntegration.test.ts`) executed over TCP sockets against Django + PostgreSQL 18.6 with 14/14 tests passing.
-- Operational requirements for final release (carrier account binding and physical device Keystore/Keychain persistence) documented in [v0_12_0_unfinished_remaining_operations.md](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/reference/v0_12_0_unfinished_remaining_operations.md).
+- Operational requirements for final release (carrier account binding and physical device Keystore/Keychain persistence) are summarized in [old_doc/README.md](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/old_doc/README.md).

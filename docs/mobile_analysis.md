@@ -1,5 +1,5 @@
 # Mobile Client Analysis — Volunteer HR Management System
-> **Generated:** 2026-11-15 | **Updated:** 2026-11-23 | **Target folder:** `python_stack/mobile/` | **Stack:** React Native 0.88.1 / React 19.3 / TypeScript 6.0 | **Version:** v0.12.2 Stabilization (Session Signed Off & Verified)
+> **Generated:** 2026-11-15 | **Updated:** 2026-11-25 | **Target folder:** `python_stack/mobile/` | **Stack:** React Native 0.88.1 / React 19.3 / TypeScript 6.0 | **Version:** v0.12.2 + AI Assistant & QueryCache (`feature/ai-chat-cache-ml-insights`)
 
 ---
 
@@ -565,9 +565,10 @@ The integration between the mobile client and the Django BFF was executed across
 | **Phase 10 (v0.11.1)** | 82-Capability Role Parity & Use Cases | Domain Use Cases (`volunteerUseCases`, `coordinatorUseCases`), `locationProvider`, 32 test suites (511 tests) | ✅ COMPLETE |
 | **Phase 11 (v0.12.0)** | Tokenized Challenge Handshake & Real-HTTP Suite | Two-step tokenized OTP handshake (`auth_session_token`), canonical check-in routing, 36 test suites (588 tests), and live real HTTP integration suite (`v0_12_0_realHttpIntegration.test.ts` 14/14 passed) | ✅ COMPLETE |
 | **Phase 12 (v0.12.2)** | Mobile UX, Hardware Integration & Session Sign-Off | `VolunteerDynamicIsland` and `CoordinatorDynamicIsland`, permanent drawer menu access across tabs (`AppHeader`), front-camera selfie verification, multi-event card picker, ended event rules, 39 test suites (621 tests passing) | ✅ COMPLETE |
+| **Phase 13 (AI/ML & Cache)** | AI Assistant, Recommendations, Staffing Insights & QueryCache | `AssistantScreen` (`features/assistant/`), `HttpAssistantRepository` / `MockAssistantRepository`, `EventDiscoveryScreen` recommendations, `CoordinatorEventDetailScreen` staffing insights, bounded `QueryCache` (`data/cache/`) with TTLs & tag/prefix invalidation | ✅ COMPLETE |
 
 ### ✅ Completed v0.12.0 Stabilization Milestones (Phases A–E)
-As specified in [V0_12_0_STABILIZATION_MASTER_PLAN.md](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/reference/V0_12_0_STABILIZATION_MASTER_PLAN.md) and verified on candidate Git SHA `99db25a7ba26d26ad5d803e028ce405b827e926d`:
+As specified in the v0.12.0 Stabilization Master Plan (summarized in [old_doc/README.md](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/old_doc/README.md)) and verified on candidate Git SHA `99db25a7ba26d26ad5d803e028ce405b827e926d`:
 - **Phase A (DB Freeze & CI Alignment):** Preserved frozen PostgreSQL 18 schema contract; restored `.github/workflows/v0_12_0_integration.yml` and script safety guards.
 - **Phase B (Auth Stabilization & Delivery Adapter):** Enforced three-credential boundaries; verified `requestTokenizedOtp()` and `verifyTokenizedOtp()`; mapped truthful delivery status.
 - **Phase C (Server-Side Encrypted Verification Images):** Implemented AES-256-GCM image file encryption with streaming admin decrypt; mobile upload contract preserved.
@@ -575,7 +576,7 @@ As specified in [V0_12_0_STABILIZATION_MASTER_PLAN.md](file:///c:/Users/USER/Doc
 - **Phase E (Full Verification & Release Gate):** 36 Jest suites passed (588 tests), TypeScript passed with 0 errors, Gradle clean build, 14 real HTTP integration tests passed. Release recommendation: `CONDITIONAL PASS` documented in `v0_12_0_stabilization_report.md`.
 
 > [!NOTE]
-> All software and test suites are complete. Operational tasks remaining before production rollout (physical device Keystore/Keychain persistence and carrier SMS credentials) are documented in [v0_12_0_unfinished_remaining_operations.md](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/reference/v0_12_0_unfinished_remaining_operations.md).
+> All software and test suites are complete. Operational tasks remaining before production rollout (physical device Keystore/Keychain persistence and carrier SMS credentials) are summarized in [old_doc/README.md](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/old_doc/README.md). For AI Assistant, Recommendation, Staffing Insight, and `QueryCache` details, see [ai_ml_integration.md](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/docs/ai_ml_integration.md).
 
 ---
 

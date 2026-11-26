@@ -31,7 +31,6 @@ import {
   UpcomingCommitmentCard,
 } from '../components';
 import { useRepositories } from '../../../app/RepositoryProvider';
-import { isMockMode } from '../../../app/configuration/dataMode';
 import { useDashboard } from '../hooks/useDashboard';
 
 export interface DashboardScreenProps
@@ -338,6 +337,11 @@ export function DashboardScreen({
               description={error}
               retryLabel="Retry Dashboard"
               onRetry={refresh}
+              templateFields={[
+                { label: 'Upcoming Shifts', placeholder: 'No upcoming shifts yet' },
+                { label: 'Active Applications', placeholder: '—' },
+                { label: 'Recent Activity', placeholder: 'Activity records will appear here.' },
+              ]}
             />
           </View>
         ) : (
@@ -400,32 +404,6 @@ export function DashboardScreen({
                 <AppIcon name="close" size={14} color={theme.colors.textSecondary} />
               </Pressable>
             </View>
-
-            {/* Prominent Demo Warning */}
-            {isMockMode() ? (
-              <View
-                style={[
-                  styles.demoAlertBox,
-                  {
-                    backgroundColor: hexToRgba(theme.colors.warning, isDark ? 0.16 : 0.10),
-                    borderColor: hexToRgba(theme.colors.warning, isDark ? 0.40 : 0.28),
-                  },
-                ]}
-              >
-                <AppText
-                  variant="caption"
-                  weight="bold"
-                  color={theme.colors.warning}
-                  style={styles.demoWarningTitle}
-                >
-                  ⚠️ Demo only — not submitted to server
-                </AppText>
-                <AppText variant="caption" color={theme.colors.textSecondary}>
-                  Cancelling will update your local session preview only. The
-                  event itself remains active for other volunteers.
-                </AppText>
-              </View>
-            ) : null}
 
             {/* Commitment Context */}
             {commitmentToCancel ? (

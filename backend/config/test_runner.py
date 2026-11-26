@@ -8,6 +8,7 @@ class SqlFileTestRunner(DiscoverRunner):
         from django.db import connection
 
         candidates = [
+            Path(settings.BASE_DIR).parent / "postgres_sql" / "VCS_db.sql",
             Path(settings.BASE_DIR).parent / "postgres_sql" / "updated_volunteer_coordination_system_Database.sql",
             Path(settings.BASE_DIR).parent / "postgres sql" / "updated_volunteer_coordination_system_Database.sql",
             Path(settings.BASE_DIR).parent / "prompt code" / "spec" / "updated_volunteer_coordination_system_Database.sql",

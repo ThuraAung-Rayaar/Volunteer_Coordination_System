@@ -444,3 +444,29 @@ class UserBootstrapResponseSerializer(serializers.Serializer):
     capabilities = BootstrapCapabilitiesSerializer(read_only=True)
 
 
+class RecommendedEventDetailsSerializer(serializers.Serializer):
+    event_id = serializers.IntegerField()
+    id = serializers.IntegerField(source="event_id", required=False)
+    title = serializers.CharField()
+    start_at = serializers.CharField(allow_null=True)
+    end_at = serializers.CharField(allow_null=True)
+    location_name = serializers.CharField(allow_blank=True)
+    charity_fields = serializers.ListField(child=serializers.CharField(), default=list)
+    spots_remaining = serializers.IntegerField(required=False)
+
+
+class EventRecommendationItemSerializer(serializers.Serializer):
+    event = RecommendedEventDetailsSerializer()
+    match_score = serializers.IntegerField()
+    match_label = serializers.CharField()
+    reasons = serializers.ListField(child=serializers.CharField())
+    matched_post_ids = serializers.ListField(child=serializers.IntegerField(), default=list)
+    policy_version = serializers.CharField()
+
+
+class VolunteerRecommendationsResponseSerializer(serializers.Serializer):
+    results = EventRecommendationItemSerializer(many=True)
+    policy_version = serializers.CharField()
+
+
+

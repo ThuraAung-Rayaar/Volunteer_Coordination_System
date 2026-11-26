@@ -5,27 +5,41 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useCurrentUser } from '../../../app/UserContext';
+import { useConsumerMode } from '../../../app/configuration/consumerMode';
 import {
   addDataModeListener,
   DataMode,
   getDataMode,
-  isHttpMode,
+  isOfflineMode,
   setDataMode,
 } from '../../../app/configuration/dataMode';
 import {
   addApiConfigListener,
   API_HOST_PRESETS,
   getApiConfig,
+  normalizeBaseUrlInput,
   setApiHostPreset,
 } from '../../../core/api/apiConfig';
-import { eventApi } from '../../../data/endpoints/eventApi';
+import {
+  addBffConnectionListener,
+  BffConnectionState,
+  discoverAndConnectBff,
+  getBffConnectionState,
+  testCurrentBffConnection,
+} from '../../../core/api/bffDiscovery';
+import {
+  clearOfflineCacheAll,
+  queryCache,
+} from '../../../data/cache';
 import {
   AppButton,
   AppCard,
   AppHeader,
+  AppInput,
   AppText,
   ScreenContainer,
   SectionHeader,
+  StatusBadge,
 } from '../../../shared';
 import { ThemeMode, useAppTheme } from '../../../theme';
 import type { MainDrawerScreenProps } from '../../../navigation/navigationTypes';
@@ -38,18 +52,23 @@ export function SettingsScreen({
 }: SettingsScreenProps): React.JSX.Element {
   const { theme, themeMode, setThemeMode, isDark } = useAppTheme();
   const { logout } = useCurrentUser();
-  const [logoutFeedback, setLogoutFeedback] = useState<string | null>(null);
+  const { consumerOnly } = useConsumerMode();
 
   const [currentMode, setCurrentMode] = useState<DataMode>(() => getDataMode());
+  const [apiConfig, setApiConfigState] = useState(() => getApiConfig());
+  const [bffState, setBffState] = useState<BffConnectionState>(() =>
+    getBffConnectionState(),
+  );
+  const [customHostInput, setCustomHostInput] = useState<string>(
+    () => getApiConfig().baseUrl,
+  );
   const [isPinging, setIsPinging] = useState<boolean>(false);
   const [pingResult, setPingResult] = useState<{
-    status?: number;
-    durationMs?: number;
     success: boolean;
     message: string;
   } | null>(null);
-
-  const [apiConfig, setApiConfigState] = useState(() => getApiConfig());
+  const [cacheCount, setCacheCount] = useState<number>(() => queryCache.size);
+  const [cacheFeedback, setCacheFeedback] = useState<string | null>(null);
 
   useEffect(() => {
     const unsubData = addDataModeListener(mode => {
@@ -57,50 +76,85 @@ export function SettingsScreen({
     });
     const unsubConfig = addApiConfigListener(cfg => {
       setApiConfigState(cfg);
+      setCustomHostInput(cfg.baseUrl);
+    });
+    const unsubBff = addBffConnectionListener(state => {
+      setBffState(state);
+    });
+    const unsubCache = queryCache.subscribe(() => {
+      setCacheCount(queryCache.size);
     });
     return () => {
       unsubData();
       unsubConfig();
+      unsubBff();
+      unsubCache();
     };
   }, []);
 
-  const handleSetDataMode = (mode: DataMode) => {
-    setDataMode(mode);
-    setCurrentMode(mode);
-  };
-
-  const handleTestConnection = async () => {
+  const handleAutoDetectBff = async () => {
     setIsPinging(true);
     setPingResult(null);
-    const start = Date.now();
     try {
-      const res = await eventApi.getCharityFields();
-      const durationMs = Date.now() - start;
-      if (res.ok) {
+      const normalized = customHostInput.trim()
+        ? normalizeBaseUrlInput(customHostInput)
+        : undefined;
+      const result = await discoverAndConnectBff({
+        customBaseUrl: normalized,
+      });
+      if (result.status === 'online') {
         setPingResult({
-          status: res.status,
-          durationMs,
           success: true,
-          message: `BFF Reachable: HTTP ${res.status} (${durationMs}ms)`,
+          message: `BFF Connected: ${result.activeBaseUrl} (${result.latencyMs ?? 0}ms)`,
         });
       } else {
         setPingResult({
-          status: res.status,
-          durationMs,
           success: false,
-          message: `BFF Responded with Error (HTTP ${res.status} - ${durationMs}ms): ${res.error.message}`,
+          message:
+            result.errorMessage ||
+            `BFF Unreachable on ${result.activeBaseUrl}`,
         });
       }
-    } catch (err: any) {
-      const durationMs = Date.now() - start;
-      setPingResult({
-        durationMs,
-        success: false,
-        message: `BFF Unreachable (${durationMs}ms): ${err?.message || 'Network error'}`,
-      });
     } finally {
       setIsPinging(false);
     }
+  };
+
+  const handleTestCurrentConnection = async () => {
+    setIsPinging(true);
+    setPingResult(null);
+    try {
+      const result = await testCurrentBffConnection();
+      if (result.status === 'online') {
+        setPingResult({
+          success: true,
+          message: `BFF Reachable: ${result.activeBaseUrl} (${result.latencyMs ?? 0}ms)`,
+        });
+      } else {
+        setPingResult({
+          success: false,
+          message:
+            result.errorMessage ||
+            `BFF Unreachable (${result.activeBaseUrl})`,
+        });
+      }
+    } finally {
+      setIsPinging(false);
+    }
+  };
+
+  const handleEnterOfflineMode = () => {
+    setDataMode('offline');
+    setPingResult({
+      success: true,
+      message: `Switched to Offline Mode (${cacheCount} cached item${cacheCount === 1 ? '' : 's'} available).`,
+    });
+  };
+
+  const handleClearCache = async () => {
+    await clearOfflineCacheAll();
+    setCacheCount(0);
+    setCacheFeedback('Local cached data cleared.');
   };
 
   const themeOptions: { mode: ThemeMode; label: string }[] = [
@@ -110,20 +164,18 @@ export function SettingsScreen({
   ];
 
   const handleLogout = async () => {
-    if (isHttpMode()) {
-      await logout();
-    } else {
-      setLogoutFeedback(
-        'Demo only — session logout will be handled by authentication provider in production.',
-      );
-    }
+    await logout();
   };
 
   return (
     <View style={[styles.root, { backgroundColor: theme.colors.background }]}>
       <AppHeader
         title="Settings"
-        subtitle="App preferences & system info"
+        subtitle={
+          consumerOnly
+            ? 'Appearance, notifications & account'
+            : 'Theme, BFF connection & offline cache'
+        }
         onMenuPress={navigation ? () => navigation.openDrawer() : undefined}
       />
 
@@ -164,6 +216,169 @@ export function SettingsScreen({
           </AppText>
         </AppCard>
 
+        {/* BFF Connection & Offline Cache (Developer Options Only) */}
+        {!consumerOnly ? (
+          <>
+            <SectionHeader title="BFF Connection & Offline Mode" />
+            <AppCard style={styles.cardSpacing}>
+          <View style={styles.statusHeaderRow}>
+            <StatusBadge
+              status={
+                isOfflineMode()
+                  ? 'amber'
+                  : bffState.status === 'online'
+                    ? 'emerald'
+                    : 'sky'
+              }
+              label={
+                isOfflineMode()
+                  ? 'Offline Mode'
+                  : bffState.status === 'online'
+                    ? 'Live BFF Online'
+                    : 'Live BFF Mode'
+              }
+            />
+            <AppText variant="caption" color={theme.colors.textSecondary}>
+              {`Cached items: ${cacheCount}`}
+            </AppText>
+          </View>
+
+          <AppText
+            variant="caption"
+            color={theme.colors.textSecondary}
+            style={styles.marginTop}
+          >
+            {`Active Endpoint: ${apiConfig.baseUrl}${apiConfig.apiPrefix}`}
+          </AppText>
+
+          <View style={styles.marginTop}>
+            <AppInput
+              label="BFF Host / Port"
+              placeholder="http://localhost:8000"
+              value={customHostInput}
+              onChangeText={setCustomHostInput}
+              autoCapitalize="none"
+              autoCorrect={false}
+              helperText="Enter localhost, IP:port, or port (e.g. 8000)"
+            />
+          </View>
+
+          <View style={[styles.rowGap, styles.marginTop]}>
+            <AppButton
+              label="USB (localhost:8000)"
+              variant={
+                apiConfig.baseUrl === API_HOST_PRESETS.USB_DEVICE
+                  ? 'primary'
+                  : 'secondary'
+              }
+              onPress={() => {
+                setApiHostPreset('usb');
+                setCustomHostInput(API_HOST_PRESETS.USB_DEVICE);
+              }}
+              style={styles.flexOne}
+              accessibilityLabel="Switch to USB Host"
+            />
+            <AppButton
+              label="Emulator (10.0.2.2)"
+              variant={
+                apiConfig.baseUrl === API_HOST_PRESETS.ANDROID_EMULATOR
+                  ? 'primary'
+                  : 'secondary'
+              }
+              onPress={() => {
+                setApiHostPreset('emulator');
+                setCustomHostInput(API_HOST_PRESETS.ANDROID_EMULATOR);
+              }}
+              style={styles.flexOne}
+              accessibilityLabel="Switch to Emulator Host"
+            />
+          </View>
+
+          <View style={[styles.rowGap, styles.marginTop]}>
+            <AppButton
+              label={isPinging ? 'Testing...' : 'Auto-Detect & Connect'}
+              variant="primary"
+              onPress={handleAutoDetectBff}
+              disabled={isPinging}
+              style={styles.flexOne}
+              accessibilityLabel="Auto-Detect and Connect BFF"
+            />
+            <AppButton
+              label={isPinging ? 'Pinging...' : 'Test BFF'}
+              variant="outline"
+              onPress={handleTestCurrentConnection}
+              disabled={isPinging}
+              style={styles.flexOne}
+              accessibilityLabel="Test BFF Connection"
+            />
+          </View>
+
+          <View style={[styles.rowGap, styles.marginTop]}>
+            <AppButton
+              label={
+                currentMode === 'offline'
+                  ? 'Offline Mode Active'
+                  : 'Use Offline Cache Mode'
+              }
+              variant={currentMode === 'offline' ? 'primary' : 'secondary'}
+              onPress={handleEnterOfflineMode}
+              style={styles.flexOne}
+              accessibilityLabel="Switch to Offline Mode"
+            />
+            <AppButton
+              label="Clear Cache"
+              variant="outline"
+              onPress={handleClearCache}
+              style={styles.flexOne}
+              accessibilityLabel="Clear Cached Data"
+            />
+          </View>
+
+          {pingResult ? (
+            <View
+              style={[
+                styles.feedbackBox,
+                {
+                  backgroundColor: theme.colors.surfaceRaised,
+                  borderColor: pingResult.success
+                    ? theme.colors.success
+                    : theme.colors.danger,
+                },
+              ]}
+            >
+              <AppText
+                variant="caption"
+                weight="medium"
+                color={
+                  pingResult.success
+                    ? theme.colors.success
+                    : theme.colors.danger
+                }
+              >
+                {pingResult.message}
+              </AppText>
+            </View>
+          ) : null}
+
+          {cacheFeedback ? (
+            <View
+              style={[
+                styles.feedbackBox,
+                {
+                  backgroundColor: theme.colors.surfaceRaised,
+                  borderColor: theme.colors.border,
+                },
+              ]}
+            >
+              <AppText variant="caption" color={theme.colors.textSecondary}>
+                {cacheFeedback}
+              </AppText>
+            </View>
+          ) : null}
+        </AppCard>
+          </>
+        ) : null}
+
         {/* Notifications & Activity Alerts */}
         <SectionHeader title="Notifications" />
         <AppCard style={styles.cardSpacing}>
@@ -184,7 +399,7 @@ export function SettingsScreen({
           />
         </AppCard>
 
-        {/* Account & Session Placeholder */}
+        {/* Account & Session */}
         <SectionHeader title="Account & Session" />
         <AppCard style={styles.cardSpacing}>
           <AppText
@@ -192,31 +407,15 @@ export function SettingsScreen({
             color={theme.colors.textSecondary}
             style={styles.subtextSpacing}
           >
-            Manage active user session:
+            Sign out of your active VCS session and return to the login screen:
           </AppText>
 
           <AppButton
-            label={isHttpMode() ? 'Log Out' : 'Log Out (Demo)'}
+            label="Log Out"
             variant="outline"
-            accessibilityLabel={isHttpMode() ? 'Log Out' : 'Log Out (Demo)'}
+            accessibilityLabel="Log Out"
             onPress={handleLogout}
           />
-
-          {logoutFeedback ? (
-            <View
-              style={[
-                styles.feedbackBox,
-                {
-                  backgroundColor: theme.colors.surfaceRaised,
-                  borderColor: theme.colors.border,
-                },
-              ]}
-            >
-              <AppText variant="caption" color={theme.colors.textSecondary}>
-                {logoutFeedback}
-              </AppText>
-            </View>
-          ) : null}
         </AppCard>
 
         {/* Application Info */}
@@ -226,141 +425,16 @@ export function SettingsScreen({
             Volunteer Coordination System
           </AppText>
           <AppText variant="caption" color={theme.colors.textSecondary}>
-            Version: 0.8.1 (React Native 0.88.1 | React 19.3.0)
+            Version: 1.0.0
           </AppText>
           <AppText variant="caption" color={theme.colors.textSecondary}>
-            Build Target: Android First (Fabric / New Architecture)
-          </AppText>
-          <AppText variant="caption" color={theme.colors.textSecondary}>
-            {isHttpMode()
-              ? 'Mode: HTTP Live BFF (Connected to Django Service)'
-              : 'Mode: Template Mode (Local Demo Fixtures Only — No Live API Calls)'}
+            {consumerOnly
+              ? 'Status: Volunteer Coordination Workspace'
+              : isOfflineMode()
+                ? 'Mode: Offline Mode (Serving Local Cached Data)'
+                : 'Mode: Live BFF (Connected to VCS Service)'}
           </AppText>
         </AppCard>
-
-        {/* Development Connection & Mode Diagnostics */}
-        {typeof __DEV__ !== 'undefined' && __DEV__ ? (
-          <>
-            <SectionHeader title="Template & API Diagnostics" />
-            <AppCard style={styles.cardSpacing}>
-              <AppText
-                variant="caption"
-                color={theme.colors.textSecondary}
-                style={styles.subtextSpacing}
-              >
-                Development connection & runtime mode controls:
-              </AppText>
-
-              <AppText
-                variant="body"
-                weight="bold"
-                color={theme.colors.textPrimary}
-              >
-                {`Active Data Mode: ${currentMode === 'mock' ? 'TEMPLATE' : 'HTTP'}`}
-              </AppText>
-
-              <AppText
-                variant="caption"
-                color={theme.colors.textSecondary}
-                style={styles.marginTop}
-              >
-                {`API Base URL: ${apiConfig.baseUrl}`}
-              </AppText>
-              <AppText
-                variant="caption"
-                color={theme.colors.textSecondary}
-              >
-                {`Endpoint Prefix: ${apiConfig.apiPrefix}`}
-              </AppText>
-
-              <AppText
-                variant="caption"
-                color={theme.colors.textSecondary}
-                style={styles.marginTop}
-              >
-                Target Host Preset (USB adb reverse vs Emulator):
-              </AppText>
-
-              <View style={[styles.rowGap, styles.marginTop]}>
-                <AppButton
-                  label="USB (localhost:8000)"
-                  variant={
-                    apiConfig.baseUrl === API_HOST_PRESETS.USB_DEVICE
-                      ? 'primary'
-                      : 'secondary'
-                  }
-                  onPress={() => setApiHostPreset('usb')}
-                  style={styles.flexOne}
-                  accessibilityLabel="Switch to USB Host"
-                />
-                <AppButton
-                  label="Emulator (10.0.2.2)"
-                  variant={
-                    apiConfig.baseUrl === API_HOST_PRESETS.ANDROID_EMULATOR
-                      ? 'primary'
-                      : 'secondary'
-                  }
-                  onPress={() => setApiHostPreset('emulator')}
-                  style={styles.flexOne}
-                  accessibilityLabel="Switch to Emulator Host"
-                />
-              </View>
-
-              <View style={[styles.rowGap, styles.marginTop]}>
-                <AppButton
-                  label="Template Mode"
-                  variant={currentMode === 'mock' ? 'primary' : 'secondary'}
-                  onPress={() => handleSetDataMode('mock')}
-                  style={styles.flexOne}
-                  accessibilityLabel="Switch to Template Mode"
-                />
-                <AppButton
-                  label="HTTP Mode"
-                  variant={currentMode === 'http' ? 'primary' : 'secondary'}
-                  onPress={() => handleSetDataMode('http')}
-                  style={styles.flexOne}
-                  accessibilityLabel="Switch to HTTP"
-                />
-              </View>
-
-              <View style={styles.marginTop}>
-                <AppButton
-                  label={isPinging ? 'Pinging BFF...' : 'Test BFF Connection'}
-                  variant="outline"
-                  onPress={handleTestConnection}
-                  disabled={isPinging}
-                  accessibilityLabel="Test BFF Connection"
-                />
-              </View>
-
-              {pingResult ? (
-                <View
-                  style={[
-                    styles.feedbackBox,
-                    {
-                      backgroundColor: theme.colors.surfaceRaised,
-                      borderColor: pingResult.success
-                        ? theme.colors.success
-                        : theme.colors.danger,
-                    },
-                  ]}
-                >
-                  <AppText
-                    variant="caption"
-                    weight="medium"
-                    color={
-                      pingResult.success
-                        ? theme.colors.success
-                        : theme.colors.danger
-                    }
-                  >
-                    {pingResult.message}
-                  </AppText>
-                </View>
-              ) : null}
-            </AppCard>
-          </>
-        ) : null}
       </ScreenContainer>
     </View>
   );
@@ -381,6 +455,12 @@ const styles = StyleSheet.create({
   },
   subtextSpacing: {
     marginBottom: 12,
+  },
+  statusHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
   },
   rowGap: {
     flexDirection: 'row',

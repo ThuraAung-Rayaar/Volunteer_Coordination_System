@@ -27,6 +27,39 @@
         </div>
     </div>
 
+    <!-- Consumer-Only & Developer Options Toggle Banner -->
+    <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl backdrop-blur flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+            <div class="flex items-center gap-2 mb-1">
+                <h2 class="text-sm font-bold text-white uppercase tracking-wider">Consumer Mode &amp; Developer Options</h2>
+                {% if client_config.consumer_only %}
+                <span class="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">Consumer-Only Active</span>
+                {% else %}
+                <span class="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30">Developer Options Enabled</span>
+                {% endif %}
+            </div>
+            <p class="text-xs text-slate-400">
+                When Consumer-Only Mode is active, mobile dev panels, endpoint diagnostics, OTP dev codes, and technical error details are hidden across mobile and API responses.
+            </p>
+        </div>
+
+        <form method="POST" action="" class="flex items-center gap-2 shrink-0">
+            {% csrf_token %}
+            <input type="hidden" name="form_action" value="toggle_dev_options">
+            {% if client_config.consumer_only %}
+            <input type="hidden" name="dev_options_enabled" value="1">
+            <button type="submit" class="py-2 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition cursor-pointer">
+                Enable Developer Options
+            </button>
+            {% else %}
+            <input type="hidden" name="dev_options_enabled" value="0">
+            <button type="submit" class="py-2 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-lg shadow-emerald-900/20 transition cursor-pointer">
+                Switch to Consumer-Only Mode
+            </button>
+            {% endif %}
+        </form>
+    </div>
+
     <!-- 2x2 Grid of Management Cards -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 

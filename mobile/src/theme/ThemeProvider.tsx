@@ -52,7 +52,7 @@ export function ThemeProvider({
   storage = defaultThemeStorage,
 }: ThemeProviderProps): React.JSX.Element {
   const [themeMode, setThemeModeState] = useState<ThemeMode>(
-    initialMode ?? 'system',
+    initialMode ?? 'light',
   );
   const [isLoaded, setIsLoaded] = useState<boolean>(initialMode !== undefined);
   const systemColorScheme = useColorScheme();

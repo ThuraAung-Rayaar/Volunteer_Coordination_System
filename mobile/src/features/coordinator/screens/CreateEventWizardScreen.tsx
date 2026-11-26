@@ -852,7 +852,7 @@ export function CreateEventWizardScreen({
               </View>
 
               <AppText variant="caption" color={theme.colors.textSecondary} style={styles.stepHint}>
-                Template preview only. Native map display and device geofence execution are not active in this screen.
+                Tap "Pick Pin on Map" to position the venue pin or use your device GPS.
               </AppText>
 
               {/* Geofence Radar Visual Preview (.map, .fence, .pin) */}
@@ -1425,32 +1425,6 @@ export function CreateEventWizardScreen({
                 {isEditMode ? 'Review Event Changes' : 'Review Event Configuration'}
               </AppText>
 
-              {/* Demo-only banner */}
-              <View
-                style={[
-                  styles.demoBanner,
-                  {
-                    backgroundColor: theme.colors.surfaceRaised,
-                    borderColor: theme.colors.warning,
-                  },
-                ]}
-              >
-                <AppText
-                  variant="caption"
-                  weight="bold"
-                  color={theme.colors.warning}
-                >
-                  {repositories.dataMode === 'mock'
-                    ? 'Template Preview — not submitted to server'
-                    : 'HTTP Mode — event draft will be submitted to the BFF'}
-                </AppText>
-                <AppText variant="caption" color={theme.colors.textSecondary}>
-                  {repositories.dataMode === 'mock'
-                    ? 'Saving updates a local in-memory event fixture for this session.'
-                    : 'Saving sends the event draft to the configured Django BFF.'}
-                </AppText>
-              </View>
-
               <View style={styles.reviewSection}>
                 <AppText variant="caption" weight="bold" color={theme.colors.textSecondary}>
                   TITLE & LOCATION
@@ -1558,7 +1532,7 @@ export function CreateEventWizardScreen({
                   </View>
                   <View style={styles.actionButtonWrap}>
                     <AppButton
-                      label={repositories.dataMode === 'mock' ? 'Save Changes (Template)' : 'Save Event Changes'}
+                      label="Save Event Changes"
                       variant="primary"
                       loading={isSubmitting || isLoadingExisting}
                       disabled={isLoadingExisting || existingEventStatus === null}
@@ -1569,7 +1543,7 @@ export function CreateEventWizardScreen({
               ) : (
                 <View style={styles.newActionsContainer}>
                   <AppButton
-                    label={repositories.dataMode === 'mock' ? 'Publish Event (Template)' : 'Publish Event'}
+                    label="Publish Event"
                     variant="primary"
                     loading={isSubmitting}
                     disabled={isLoadingExisting}
@@ -1585,7 +1559,7 @@ export function CreateEventWizardScreen({
                     </View>
                     <View style={styles.actionButtonWrap}>
                       <AppButton
-                        label={repositories.dataMode === 'mock' ? 'Save as Draft (Template)' : 'Save as Draft'}
+                        label="Save as Draft"
                         variant="outline"
                         loading={isSubmitting}
                         disabled={isLoadingExisting}

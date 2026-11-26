@@ -30,6 +30,11 @@ ENV/
 .env
 .env.local
 .local/
+di_config.local.json
+di_config.json
+config_di.local.py
+SEEDED_CREDENTIALS.txt
+SYSTEM_STATUS.md
 
 # Django Media & Static
 media/

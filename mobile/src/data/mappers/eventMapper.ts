@@ -57,6 +57,14 @@ function normalizePhysicalLevel(levelStr: string): PhysicalLevel {
   return 'none';
 }
 
+function parseCoordinate(value: string | number | null | undefined): number | undefined {
+  if (value === null || value === undefined || value === '') {
+    return undefined;
+  }
+  const num = Number(value);
+  return Number.isFinite(num) ? num : undefined;
+}
+
 /**
  * Maps PublicEventDto to domain EventSummary model.
  */
@@ -69,6 +77,8 @@ export function mapPublicEventSummary(dto: PublicEventDto): EventSummary {
     status: normalizeEventStatus(dto.status),
     locationName: dto.location_name ?? '',
     landmarkText: dto.landmark_text ?? undefined,
+    latitude: parseCoordinate(dto.latitude),
+    longitude: parseCoordinate(dto.longitude),
     startAt: dto.start_at,
     endAt: dto.end_at,
     applicationDeadline: dto.application_deadline ?? undefined,
@@ -135,23 +145,13 @@ export function mapPublicEventDetail(
     };
   }
 
-  const lat =
-    dto.latitude !== null && dto.latitude !== undefined && dto.latitude !== ''
-      ? Number(dto.latitude)
-      : undefined;
-
-  const lng =
-    dto.longitude !== null && dto.longitude !== undefined && dto.longitude !== ''
-      ? Number(dto.longitude)
-      : undefined;
-
   return {
     ...summary,
     landmarkText: dto.landmark_text ?? undefined,
     compensationNote: dto.compensation_note ?? undefined,
     onboardingText: dto.onboarding_text ?? undefined,
-    latitude: !isNaN(lat as number) ? lat : undefined,
-    longitude: !isNaN(lng as number) ? lng : undefined,
+    latitude: summary.latitude,
+    longitude: summary.longitude,
     geoCheckinEnabled: Boolean(dto.geo_checkin_enabled),
     posts,
     userApplication,

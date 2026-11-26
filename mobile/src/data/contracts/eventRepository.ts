@@ -8,6 +8,7 @@ import type {
   EventDetail,
   EventFilters,
   EventSummary,
+  RecommendedEvent,
   VolunteerApplicationItem,
   VolunteerAssignmentItem,
 } from '../../domain/models/event';
@@ -78,7 +79,7 @@ export interface EventRepository {
   /**
    * Fetches the list of published/active events matching optional filter criteria.
    */
-  getEvents(filters?: EventFilters): Promise<EventSummary[]>;
+  getEvents(filters?: EventFilters, forceRefresh?: boolean): Promise<EventSummary[]>;
 
   /**
    * Fetches a paginated slice of published/active events (P1-13).
@@ -155,6 +156,14 @@ export interface EventRepository {
   cancelAssignment(
     assignmentId: string,
   ): Promise<{ success: boolean; message: string }>;
+
+  /**
+   * Fetches volunteer-to-event recommendations matching profile and availability (Feature 1).
+   */
+  getRecommendations(
+    limit?: number,
+    forceRefresh?: boolean,
+  ): Promise<RecommendedEvent[]>;
 
   /**
    * Fetches the onboarding briefing status for an event (V-31).

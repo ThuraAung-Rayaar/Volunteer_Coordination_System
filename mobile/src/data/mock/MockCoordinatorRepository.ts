@@ -14,6 +14,7 @@ import type {
   CoordinatorOverviewMetrics,
   CreateEventWizardDraft,
   EventPostCapacity,
+  EventStaffingInsight,
   GeoAttemptReview,
   VolunteerUuidLookup,
 } from '../../domain/models/coordinator';
@@ -1191,6 +1192,56 @@ export class MockCoordinatorRepository implements CoordinatorRepository {
     return {
       success: true,
       message: `Feedback (${score}/5 stars) recorded locally (Demo only)`,
+    };
+  }
+
+  public async getStaffingInsight(
+    eventId: string,
+    _forceRefresh?: boolean,
+  ): Promise<EventStaffingInsight> {
+    const ev = this.events.find(e => e.id === eventId);
+    const posts = ev ? (ev.posts || []).map((p: any) => ({
+      postId: Number(p.id) || 1,
+      title: p.title || 'General Post',
+      status: p.status || 'open',
+      requiredHeadcount: p.requiredHeadcount || 10,
+      assignedCount: p.assignedCount || 0,
+      remaining: Math.max((p.requiredHeadcount || 10) - (p.assignedCount || 0), 0),
+    })) : [];
+
+    const requiredHeadcount = posts.reduce((sum, p) => sum + p.requiredHeadcount, 0) || 10;
+    const assignedCount = posts.reduce((sum, p) => sum + p.assignedCount, 0) || (ev?.assignedCount || 0);
+    const openSlots = posts.reduce((sum, p) => sum + p.remaining, 0);
+    const coveragePercent = requiredHeadcount > 0 ? Math.round((assignedCount / requiredHeadcount) * 100) : 100;
+    const readinessStatus: 'critical' | 'warning' | 'healthy' =
+      coveragePercent < 50 ? 'critical' : coveragePercent < 80 ? 'warning' : 'healthy';
+
+    return {
+      eventId: Number(eventId) || 1,
+      eventTitle: ev?.title || 'Event',
+      eventStatus: ev?.status || 'published',
+      startAt: ev?.startAt || new Date().toISOString(),
+      readinessStatus,
+      summary: {
+        requiredHeadcount,
+        assignedCount,
+        openSlots,
+        acceptedUnassigned: 0,
+        pendingApplications: ev?.pendingApplicationCount || 0,
+        waitlistedApplications: 0,
+        checkedInCount: ev?.checkedInCount || 0,
+        pendingConfirmations: 0,
+        coveragePercent,
+        readinessStatus,
+      },
+      posts,
+      signals: openSlots > 0 ? [{
+        code: 'STAFFING_GAP',
+        severity: 'medium',
+        title: `${openSlots} headcount positions remaining open across posts`,
+        evidence: { open_slots: openSlots },
+      }] : [],
+      generatedAt: new Date().toISOString(),
     };
   }
 }

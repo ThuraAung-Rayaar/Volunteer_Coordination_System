@@ -1,0 +1,5901 @@
+{
+  "server_identity": {
+    "database": "volunteer_coordination_db",
+    "user": "postgres",
+    "current_schema": "public",
+    "search_path": "\"$user\", public",
+    "server_version": "18.6",
+    "server_version_num": 180006,
+    "timezone": "Asia/Rangoon",
+    "read_only": "on",
+    "server_addr": "127.0.0.1/32",
+    "server_port": 5432,
+    "database_size": "30 MB",
+    "extensions": {
+      "btree_gist": "1.8",
+      "plpgsql": "1.0"
+    }
+  },
+  "schema": {
+    "base_tables_count": 31,
+    "base_tables": [
+      "app_settings",
+      "assignments",
+      "attendance",
+      "attendance_geo_attempts",
+      "audit_logs",
+      "auth_group",
+      "auth_group_permissions",
+      "auth_otp",
+      "auth_otp_challenge",
+      "auth_permission",
+      "authtoken_token",
+      "charity_fields",
+      "coordinator_profiles",
+      "django_admin_log",
+      "django_content_type",
+      "django_migrations",
+      "django_session",
+      "event_applications",
+      "event_charity_fields",
+      "event_coordinator_history",
+      "event_posts",
+      "events",
+      "feedback",
+      "moderation_actions",
+      "onboarding_acknowledgments",
+      "qr_tokens",
+      "user_charity_interests",
+      "user_verification_images",
+      "users",
+      "volunteer_availability_exceptions",
+      "volunteer_availability_rules"
+    ],
+    "views_count": 11,
+    "views": [
+      "v_accepted_unassigned",
+      "v_admin_dashboard",
+      "v_event_checkin_board",
+      "v_event_checkin_status",
+      "v_event_coordinator_history",
+      "v_event_post_capacity",
+      "v_event_summary",
+      "v_geo_attempts_review",
+      "v_pending_confirmations",
+      "v_public_events",
+      "v_user_moderation_summary"
+    ]
+  },
+  "columns": {
+    "app_settings": [
+      {
+        "column": "key",
+        "type": "text",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "value_int",
+        "type": "integer",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "description",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      }
+    ],
+    "assignments": [
+      {
+        "column": "id",
+        "type": "bigint",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "event_id",
+        "type": "bigint",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "application_id",
+        "type": "bigint",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "user_id",
+        "type": "bigint",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "post_id",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "group_code",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "is_group_leader",
+        "type": "boolean",
+        "nullable": "NO",
+        "default": "false"
+      },
+      {
+        "column": "status",
+        "type": "text",
+        "nullable": "NO",
+        "default": "'assigned'::text"
+      },
+      {
+        "column": "assigned_by",
+        "type": "text",
+        "nullable": "NO",
+        "default": "'auto'::text"
+      },
+      {
+        "column": "assigned_by_user_id",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "schedule_start",
+        "type": "timestamp with time zone",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "schedule_end",
+        "type": "timestamp with time zone",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "confirmed_at",
+        "type": "timestamp with time zone",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "cancelled_at",
+        "type": "timestamp with time zone",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "cancel_reason",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "conditions_snapshot",
+        "type": "jsonb",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "created_at",
+        "type": "timestamp with time zone",
+        "nullable": "NO",
+        "default": "now()"
+      },
+      {
+        "column": "updated_at",
+        "type": "timestamp with time zone",
+        "nullable": "NO",
+        "default": "now()"
+      }
+    ],
+    "attendance": [
+      {
+        "column": "id",
+        "type": "bigint",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "event_id",
+        "type": "bigint",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "user_id",
+        "type": "bigint",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "assignment_id",
+        "type": "bigint",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "qr_token_id",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "status",
+        "type": "text",
+        "nullable": "NO",
+        "default": "'expected'::text"
+      },
+      {
+        "column": "checkin_at",
+        "type": "timestamp with time zone",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "checkout_at",
+        "type": "timestamp with time zone",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "method",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "recorded_by_user_id",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "walk_in_flag",
+        "type": "boolean",
+        "nullable": "NO",
+        "default": "false"
+      },
+      {
+        "column": "note",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "checkin_latitude",
+        "type": "numeric",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "checkin_longitude",
+        "type": "numeric",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "checkin_accuracy_m",
+        "type": "numeric",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "checkin_distance_m",
+        "type": "numeric",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "geo_verified",
+        "type": "boolean",
+        "nullable": "NO",
+        "default": "false"
+      },
+      {
+        "column": "confirmation_status",
+        "type": "text",
+        "nullable": "NO",
+        "default": "'not_required'::text"
+      },
+      {
+        "column": "confirmed_by_user_id",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "confirmed_at",
+        "type": "timestamp with time zone",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "confirmation_note",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "created_at",
+        "type": "timestamp with time zone",
+        "nullable": "NO",
+        "default": "now()"
+      },
+      {
+        "column": "updated_at",
+        "type": "timestamp with time zone",
+        "nullable": "NO",
+        "default": "now()"
+      }
+    ],
+    "attendance_geo_attempts": [
+      {
+        "column": "id",
+        "type": "bigint",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "event_id",
+        "type": "bigint",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "user_id",
+        "type": "bigint",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "attendance_id",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "attempted_at",
+        "type": "timestamp with time zone",
+        "nullable": "NO",
+        "default": "now()"
+      },
+      {
+        "column": "latitude",
+        "type": "numeric",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "longitude",
+        "type": "numeric",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "accuracy_m",
+        "type": "numeric",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "captured_at",
+        "type": "timestamp with time zone",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "device_mocked",
+        "type": "boolean",
+        "nullable": "NO",
+        "default": "false"
+      },
+      {
+        "column": "distance_m",
+        "type": "numeric",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "radius_m",
+        "type": "integer",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "result",
+        "type": "text",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "review_status",
+        "type": "text",
+        "nullable": "NO",
+        "default": "'none'::text"
+      },
+      {
+        "column": "reviewed_by_user_id",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "reviewed_at",
+        "type": "timestamp with time zone",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "review_note",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      }
+    ],
+    "audit_logs": [
+      {
+        "column": "id",
+        "type": "bigint",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "actor_user_id",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "action",
+        "type": "text",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "entity_type",
+        "type": "text",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "entity_id",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "before_data",
+        "type": "jsonb",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "after_data",
+        "type": "jsonb",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "ip_address",
+        "type": "inet",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "created_at",
+        "type": "timestamp with time zone",
+        "nullable": "NO",
+        "default": "now()"
+      }
+    ],
+    "auth_group": [
+      {
+        "column": "id",
+        "type": "integer",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "name",
+        "type": "character varying",
+        "nullable": "NO",
+        "default": null
+      }
+    ],
+    "auth_group_permissions": [
+      {
+        "column": "id",
+        "type": "bigint",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "group_id",
+        "type": "integer",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "permission_id",
+        "type": "integer",
+        "nullable": "NO",
+        "default": null
+      }
+    ],
+    "auth_otp": [
+      {
+        "column": "id",
+        "type": "bigint",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "phone_hash",
+        "type": "text",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "code_hash",
+        "type": "text",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "purpose",
+        "type": "text",
+        "nullable": "NO",
+        "default": "'login'::text"
+      },
+      {
+        "column": "attempt_count",
+        "type": "integer",
+        "nullable": "NO",
+        "default": "0"
+      },
+      {
+        "column": "expires_at",
+        "type": "timestamp with time zone",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "consumed_at",
+        "type": "timestamp with time zone",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "created_at",
+        "type": "timestamp with time zone",
+        "nullable": "NO",
+        "default": "now()"
+      }
+    ],
+    "auth_otp_challenge": [
+      {
+        "column": "id",
+        "type": "bigint",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "otp_id",
+        "type": "bigint",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "challenge_token_hash",
+        "type": "text",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "purpose",
+        "type": "text",
+        "nullable": "NO",
+        "default": "'login'::text"
+      },
+      {
+        "column": "created_at",
+        "type": "timestamp with time zone",
+        "nullable": "NO",
+        "default": "now()"
+      },
+      {
+        "column": "expires_at",
+        "type": "timestamp with time zone",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "consumed_at",
+        "type": "timestamp with time zone",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "request_id",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "identity_nonce_hash",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      }
+    ],
+    "auth_permission": [
+      {
+        "column": "id",
+        "type": "integer",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "name",
+        "type": "character varying",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "content_type_id",
+        "type": "integer",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "codename",
+        "type": "character varying",
+        "nullable": "NO",
+        "default": null
+      }
+    ],
+    "authtoken_token": [
+      {
+        "column": "key",
+        "type": "character varying",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "created",
+        "type": "timestamp with time zone",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "user_id",
+        "type": "bigint",
+        "nullable": "NO",
+        "default": null
+      }
+    ],
+    "charity_fields": [
+      {
+        "column": "code",
+        "type": "text",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "label",
+        "type": "text",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "active",
+        "type": "boolean",
+        "nullable": "NO",
+        "default": "true"
+      },
+      {
+        "column": "sort_order",
+        "type": "integer",
+        "nullable": "NO",
+        "default": "100"
+      }
+    ],
+    "coordinator_profiles": [
+      {
+        "column": "user_id",
+        "type": "bigint",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "status",
+        "type": "text",
+        "nullable": "NO",
+        "default": "'pending'::text"
+      },
+      {
+        "column": "approved_by_id",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "approved_at",
+        "type": "timestamp with time zone",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "notes",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "created_at",
+        "type": "timestamp with time zone",
+        "nullable": "NO",
+        "default": "now()"
+      },
+      {
+        "column": "updated_at",
+        "type": "timestamp with time zone",
+        "nullable": "NO",
+        "default": "now()"
+      }
+    ],
+    "django_admin_log": [
+      {
+        "column": "id",
+        "type": "integer",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "action_time",
+        "type": "timestamp with time zone",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "object_id",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "object_repr",
+        "type": "character varying",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "action_flag",
+        "type": "smallint",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "change_message",
+        "type": "text",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "content_type_id",
+        "type": "integer",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "user_id",
+        "type": "bigint",
+        "nullable": "NO",
+        "default": null
+      }
+    ],
+    "django_content_type": [
+      {
+        "column": "id",
+        "type": "integer",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "app_label",
+        "type": "character varying",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "model",
+        "type": "character varying",
+        "nullable": "NO",
+        "default": null
+      }
+    ],
+    "django_migrations": [
+      {
+        "column": "id",
+        "type": "bigint",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "app",
+        "type": "character varying",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "name",
+        "type": "character varying",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "applied",
+        "type": "timestamp with time zone",
+        "nullable": "NO",
+        "default": null
+      }
+    ],
+    "django_session": [
+      {
+        "column": "session_key",
+        "type": "character varying",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "session_data",
+        "type": "text",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "expire_date",
+        "type": "timestamp with time zone",
+        "nullable": "NO",
+        "default": null
+      }
+    ],
+    "event_applications": [
+      {
+        "column": "id",
+        "type": "bigint",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "event_id",
+        "type": "bigint",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "post_id",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "user_id",
+        "type": "bigint",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "qr_token_id",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "source",
+        "type": "text",
+        "nullable": "NO",
+        "default": "'browse'::text"
+      },
+      {
+        "column": "status",
+        "type": "text",
+        "nullable": "NO",
+        "default": "'pending'::text"
+      },
+      {
+        "column": "applied_at",
+        "type": "timestamp with time zone",
+        "nullable": "NO",
+        "default": "now()"
+      },
+      {
+        "column": "decided_by_id",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "decided_at",
+        "type": "timestamp with time zone",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "conditions_acknowledged_at",
+        "type": "timestamp with time zone",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "conditions_snapshot",
+        "type": "jsonb",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "note",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "created_at",
+        "type": "timestamp with time zone",
+        "nullable": "NO",
+        "default": "now()"
+      },
+      {
+        "column": "updated_at",
+        "type": "timestamp with time zone",
+        "nullable": "NO",
+        "default": "now()"
+      }
+    ],
+    "event_charity_fields": [
+      {
+        "column": "id",
+        "type": "bigint",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "event_id",
+        "type": "bigint",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "field_code",
+        "type": "text",
+        "nullable": "NO",
+        "default": null
+      }
+    ],
+    "event_coordinator_history": [
+      {
+        "column": "id",
+        "type": "bigint",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "event_id",
+        "type": "bigint",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "from_coordinator_id",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "to_coordinator_id",
+        "type": "bigint",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "changed_by_user_id",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "reason",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "changed_at",
+        "type": "timestamp with time zone",
+        "nullable": "NO",
+        "default": "now()"
+      }
+    ],
+    "event_posts": [
+      {
+        "column": "id",
+        "type": "bigint",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "event_id",
+        "type": "bigint",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "title",
+        "type": "text",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "description",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "required_headcount",
+        "type": "integer",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "physical_level",
+        "type": "text",
+        "nullable": "NO",
+        "default": "'none'::text"
+      },
+      {
+        "column": "required_skills",
+        "type": "ARRAY",
+        "nullable": "NO",
+        "default": "'{}'::text[]"
+      },
+      {
+        "column": "leader_needed",
+        "type": "boolean",
+        "nullable": "NO",
+        "default": "false"
+      },
+      {
+        "column": "new_volunteers_allowed",
+        "type": "boolean",
+        "nullable": "NO",
+        "default": "true"
+      },
+      {
+        "column": "priority",
+        "type": "integer",
+        "nullable": "NO",
+        "default": "100"
+      },
+      {
+        "column": "status",
+        "type": "text",
+        "nullable": "NO",
+        "default": "'open'::text"
+      },
+      {
+        "column": "created_at",
+        "type": "timestamp with time zone",
+        "nullable": "NO",
+        "default": "now()"
+      },
+      {
+        "column": "updated_at",
+        "type": "timestamp with time zone",
+        "nullable": "NO",
+        "default": "now()"
+      }
+    ],
+    "events": [
+      {
+        "column": "id",
+        "type": "bigint",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "owner_id",
+        "type": "bigint",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "current_coordinator_id",
+        "type": "bigint",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "title",
+        "type": "text",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "description",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "purpose_type",
+        "type": "text",
+        "nullable": "NO",
+        "default": "'charity_event'::text"
+      },
+      {
+        "column": "location_name",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "landmark_text",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "latitude",
+        "type": "numeric",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "longitude",
+        "type": "numeric",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "geo_radius_m",
+        "type": "integer",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "geo_checkin_enabled",
+        "type": "boolean",
+        "nullable": "NO",
+        "default": "false"
+      },
+      {
+        "column": "geo_checkin_opens_before_min",
+        "type": "integer",
+        "nullable": "NO",
+        "default": "30"
+      },
+      {
+        "column": "require_checkin_confirmation",
+        "type": "boolean",
+        "nullable": "NO",
+        "default": "true"
+      },
+      {
+        "column": "map_provider",
+        "type": "text",
+        "nullable": "NO",
+        "default": "'openstreetmap'::text"
+      },
+      {
+        "column": "start_at",
+        "type": "timestamp with time zone",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "end_at",
+        "type": "timestamp with time zone",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "application_deadline",
+        "type": "timestamp with time zone",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "status",
+        "type": "text",
+        "nullable": "NO",
+        "default": "'draft'::text"
+      },
+      {
+        "column": "acceptance_mode",
+        "type": "text",
+        "nullable": "NO",
+        "default": "'manual'::text"
+      },
+      {
+        "column": "auto_assign_enabled",
+        "type": "boolean",
+        "nullable": "NO",
+        "default": "true"
+      },
+      {
+        "column": "group_size",
+        "type": "integer",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "leader_strategy",
+        "type": "text",
+        "nullable": "NO",
+        "default": "'none'::text"
+      },
+      {
+        "column": "max_participants",
+        "type": "integer",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "meals_provided",
+        "type": "boolean",
+        "nullable": "NO",
+        "default": "false"
+      },
+      {
+        "column": "lodging_provided",
+        "type": "boolean",
+        "nullable": "NO",
+        "default": "false"
+      },
+      {
+        "column": "travel_support_provided",
+        "type": "boolean",
+        "nullable": "NO",
+        "default": "false"
+      },
+      {
+        "column": "compensation_kind",
+        "type": "text",
+        "nullable": "NO",
+        "default": "'unpaid'::text"
+      },
+      {
+        "column": "compensation_note",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "onboarding_text",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "onboarding_version",
+        "type": "integer",
+        "nullable": "NO",
+        "default": "1"
+      },
+      {
+        "column": "require_onboarding_ack",
+        "type": "boolean",
+        "nullable": "NO",
+        "default": "true"
+      },
+      {
+        "column": "qr_registration_enabled",
+        "type": "boolean",
+        "nullable": "NO",
+        "default": "true"
+      },
+      {
+        "column": "published_at",
+        "type": "timestamp with time zone",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "activated_at",
+        "type": "timestamp with time zone",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "completed_at",
+        "type": "timestamp with time zone",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "cancelled_at",
+        "type": "timestamp with time zone",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "cancel_reason",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "deleted_at",
+        "type": "timestamp with time zone",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "deleted_by_id",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "created_at",
+        "type": "timestamp with time zone",
+        "nullable": "NO",
+        "default": "now()"
+      },
+      {
+        "column": "updated_at",
+        "type": "timestamp with time zone",
+        "nullable": "NO",
+        "default": "now()"
+      }
+    ],
+    "feedback": [
+      {
+        "column": "id",
+        "type": "bigint",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "event_id",
+        "type": "bigint",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "rater_user_id",
+        "type": "bigint",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "target_user_id",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "direction",
+        "type": "text",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "score",
+        "type": "integer",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "tags",
+        "type": "ARRAY",
+        "nullable": "NO",
+        "default": "'{}'::text[]"
+      },
+      {
+        "column": "comment",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "status",
+        "type": "text",
+        "nullable": "NO",
+        "default": "'active'::text"
+      },
+      {
+        "column": "created_at",
+        "type": "timestamp with time zone",
+        "nullable": "NO",
+        "default": "now()"
+      }
+    ],
+    "moderation_actions": [
+      {
+        "column": "id",
+        "type": "bigint",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "admin_user_id",
+        "type": "bigint",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "target_user_id",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "event_id",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "feedback_id",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "action_type",
+        "type": "text",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "reason",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "expires_at",
+        "type": "timestamp with time zone",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "created_at",
+        "type": "timestamp with time zone",
+        "nullable": "NO",
+        "default": "now()"
+      }
+    ],
+    "onboarding_acknowledgments": [
+      {
+        "column": "id",
+        "type": "bigint",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "user_id",
+        "type": "bigint",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "event_id",
+        "type": "bigint",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "onboarding_version",
+        "type": "integer",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "method",
+        "type": "text",
+        "nullable": "NO",
+        "default": "'app_tick'::text"
+      },
+      {
+        "column": "acknowledged_at",
+        "type": "timestamp with time zone",
+        "nullable": "NO",
+        "default": "now()"
+      }
+    ],
+    "qr_tokens": [
+      {
+        "column": "id",
+        "type": "bigint",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "event_id",
+        "type": "bigint",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "created_by_id",
+        "type": "bigint",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "purpose",
+        "type": "text",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "token_hash",
+        "type": "text",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "max_uses",
+        "type": "integer",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "used_count",
+        "type": "integer",
+        "nullable": "NO",
+        "default": "0"
+      },
+      {
+        "column": "expires_at",
+        "type": "timestamp with time zone",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "revoked_at",
+        "type": "timestamp with time zone",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "created_at",
+        "type": "timestamp with time zone",
+        "nullable": "NO",
+        "default": "now()"
+      }
+    ],
+    "user_charity_interests": [
+      {
+        "column": "id",
+        "type": "bigint",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "user_id",
+        "type": "bigint",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "field_code",
+        "type": "text",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "created_at",
+        "type": "timestamp with time zone",
+        "nullable": "NO",
+        "default": "now()"
+      }
+    ],
+    "user_verification_images": [
+      {
+        "column": "id",
+        "type": "bigint",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "user_id",
+        "type": "bigint",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "image_type",
+        "type": "text",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "image_path",
+        "type": "text",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "file_format",
+        "type": "text",
+        "nullable": "NO",
+        "default": "'jpeg'::text"
+      },
+      {
+        "column": "file_sha256",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "status",
+        "type": "text",
+        "nullable": "NO",
+        "default": "'pending'::text"
+      },
+      {
+        "column": "comparison_status",
+        "type": "text",
+        "nullable": "NO",
+        "default": "'pending'::text"
+      },
+      {
+        "column": "comparison_score",
+        "type": "numeric",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "is_current",
+        "type": "boolean",
+        "nullable": "NO",
+        "default": "true"
+      },
+      {
+        "column": "reviewed_by_id",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "reviewed_at",
+        "type": "timestamp with time zone",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "note",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "created_at",
+        "type": "timestamp with time zone",
+        "nullable": "NO",
+        "default": "now()"
+      },
+      {
+        "column": "updated_at",
+        "type": "timestamp with time zone",
+        "nullable": "NO",
+        "default": "now()"
+      }
+    ],
+    "users": [
+      {
+        "column": "id",
+        "type": "bigint",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "phone_hash",
+        "type": "text",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "phone_enc",
+        "type": "text",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "password",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "last_login",
+        "type": "timestamp with time zone",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "display_name",
+        "type": "text",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "is_admin",
+        "type": "boolean",
+        "nullable": "NO",
+        "default": "false"
+      },
+      {
+        "column": "is_staff",
+        "type": "boolean",
+        "nullable": "NO",
+        "default": "false"
+      },
+      {
+        "column": "is_superuser",
+        "type": "boolean",
+        "nullable": "NO",
+        "default": "false"
+      },
+      {
+        "column": "is_active",
+        "type": "boolean",
+        "nullable": "NO",
+        "default": "true"
+      },
+      {
+        "column": "account_status",
+        "type": "text",
+        "nullable": "NO",
+        "default": "'active'::text"
+      },
+      {
+        "column": "blocked_until",
+        "type": "timestamp with time zone",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "preferred_language",
+        "type": "text",
+        "nullable": "NO",
+        "default": "'en'::text"
+      },
+      {
+        "column": "home_area",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "emergency_contact_name",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "emergency_contact_phone_enc",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "blood_type",
+        "type": "text",
+        "nullable": "NO",
+        "default": "'unknown'::text"
+      },
+      {
+        "column": "is_willing_to_donate",
+        "type": "boolean",
+        "nullable": "NO",
+        "default": "false"
+      },
+      {
+        "column": "is_willing_to_donate_blood",
+        "type": "boolean",
+        "nullable": "NO",
+        "default": "false"
+      },
+      {
+        "column": "is_willing_to_donate_items",
+        "type": "boolean",
+        "nullable": "NO",
+        "default": "false"
+      },
+      {
+        "column": "physical_ok",
+        "type": "boolean",
+        "nullable": "NO",
+        "default": "false"
+      },
+      {
+        "column": "good_eyesight",
+        "type": "boolean",
+        "nullable": "NO",
+        "default": "true"
+      },
+      {
+        "column": "needs_glasses",
+        "type": "boolean",
+        "nullable": "NO",
+        "default": "false"
+      },
+      {
+        "column": "can_lift_heavy",
+        "type": "boolean",
+        "nullable": "NO",
+        "default": "false"
+      },
+      {
+        "column": "can_work_outdoor",
+        "type": "boolean",
+        "nullable": "NO",
+        "default": "false"
+      },
+      {
+        "column": "has_leader_experience",
+        "type": "boolean",
+        "nullable": "NO",
+        "default": "false"
+      },
+      {
+        "column": "new_to_volunteer",
+        "type": "boolean",
+        "nullable": "NO",
+        "default": "true"
+      },
+      {
+        "column": "skills",
+        "type": "ARRAY",
+        "nullable": "NO",
+        "default": "'{}'::text[]"
+      },
+      {
+        "column": "needs_meal_support",
+        "type": "boolean",
+        "nullable": "NO",
+        "default": "false"
+      },
+      {
+        "column": "needs_travel_support",
+        "type": "boolean",
+        "nullable": "NO",
+        "default": "false"
+      },
+      {
+        "column": "accepts_unpaid",
+        "type": "boolean",
+        "nullable": "NO",
+        "default": "true"
+      },
+      {
+        "column": "verification_status",
+        "type": "text",
+        "nullable": "NO",
+        "default": "'none'::text"
+      },
+      {
+        "column": "created_at",
+        "type": "timestamp with time zone",
+        "nullable": "NO",
+        "default": "now()"
+      },
+      {
+        "column": "updated_at",
+        "type": "timestamp with time zone",
+        "nullable": "NO",
+        "default": "now()"
+      },
+      {
+        "column": "uuid",
+        "type": "uuid",
+        "nullable": "NO",
+        "default": "uuidv7()"
+      }
+    ],
+    "v_accepted_unassigned": [
+      {
+        "column": "application_id",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "event_id",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "user_id",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "display_name",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "skills",
+        "type": "ARRAY",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "physical_ok",
+        "type": "boolean",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "can_lift_heavy",
+        "type": "boolean",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "has_leader_experience",
+        "type": "boolean",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "new_to_volunteer",
+        "type": "boolean",
+        "nullable": "YES",
+        "default": null
+      }
+    ],
+    "v_admin_dashboard": [
+      {
+        "column": "active_users",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "blocked_users",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "users_pending_verification",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "images_pending_review",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "coordinators_pending_approval",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "coordinators_approved",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "events_draft",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "events_published",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "events_active",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "events_completed",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "events_cancelled",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "events_deleted",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "pending_checkin_confirmations",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "warnings_last_30d",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      }
+    ],
+    "v_event_checkin_board": [
+      {
+        "column": "event_id",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "assignment_id",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "user_id",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "display_name",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "post_id",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "post_title",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "group_code",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "is_group_leader",
+        "type": "boolean",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "assignment_status",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "attendance_id",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "attendance_status",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "method",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "walk_in_flag",
+        "type": "boolean",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "checkin_at",
+        "type": "timestamp with time zone",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "checkin_distance_m",
+        "type": "numeric",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "confirmation_status",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      }
+    ],
+    "v_event_checkin_status": [
+      {
+        "column": "event_id",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "user_id",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "display_name",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "post_id",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "post_title",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "group_code",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "is_group_leader",
+        "type": "boolean",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "attendance_status",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "checkin_at",
+        "type": "timestamp with time zone",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "checkin_method",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "walk_in_flag",
+        "type": "boolean",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "confirmation_status",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "checkin_distance_m",
+        "type": "numeric",
+        "nullable": "YES",
+        "default": null
+      }
+    ],
+    "v_event_coordinator_history": [
+      {
+        "column": "event_id",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "event_title",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "from_coordinator_id",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "from_name",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "to_coordinator_id",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "to_name",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "changed_by_user_id",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "changed_by_name",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "reason",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "changed_at",
+        "type": "timestamp with time zone",
+        "nullable": "YES",
+        "default": null
+      }
+    ],
+    "v_event_post_capacity": [
+      {
+        "column": "post_id",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "event_id",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "title",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "status",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "required_headcount",
+        "type": "integer",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "assigned_count",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "remaining",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      }
+    ],
+    "v_event_summary": [
+      {
+        "column": "event_id",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "title",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "status",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "owner_id",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "current_coordinator_id",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "start_at",
+        "type": "timestamp with time zone",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "end_at",
+        "type": "timestamp with time zone",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "acceptance_mode",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "auto_assign_enabled",
+        "type": "boolean",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "max_participants",
+        "type": "integer",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "geo_checkin_enabled",
+        "type": "boolean",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "map_provider",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "pending_count",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "accepted_count",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "waitlisted_count",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "assignment_count",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "checked_in_count",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "pending_confirmations",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      }
+    ],
+    "v_geo_attempts_review": [
+      {
+        "column": "id",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "event_id",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "event_title",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "user_id",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "display_name",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "attempted_at",
+        "type": "timestamp with time zone",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "result",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "distance_m",
+        "type": "numeric",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "radius_m",
+        "type": "integer",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "accuracy_m",
+        "type": "numeric",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "device_mocked",
+        "type": "boolean",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "review_status",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "reviewed_by_user_id",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "reviewed_at",
+        "type": "timestamp with time zone",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "review_note",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      }
+    ],
+    "v_pending_confirmations": [
+      {
+        "column": "attendance_id",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "event_id",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "event_title",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "owner_id",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "current_coordinator_id",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "user_id",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "volunteer_name",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "checkin_at",
+        "type": "timestamp with time zone",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "checkin_latitude",
+        "type": "numeric",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "checkin_longitude",
+        "type": "numeric",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "checkin_accuracy_m",
+        "type": "numeric",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "checkin_distance_m",
+        "type": "numeric",
+        "nullable": "YES",
+        "default": null
+      }
+    ],
+    "v_public_events": [
+      {
+        "column": "event_id",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "title",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "description",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "purpose_type",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "location_name",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "landmark_text",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "latitude",
+        "type": "numeric",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "longitude",
+        "type": "numeric",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "geo_radius_m",
+        "type": "integer",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "geo_checkin_enabled",
+        "type": "boolean",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "map_provider",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "start_at",
+        "type": "timestamp with time zone",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "end_at",
+        "type": "timestamp with time zone",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "application_deadline",
+        "type": "timestamp with time zone",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "status",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "acceptance_mode",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "max_participants",
+        "type": "integer",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "meals_provided",
+        "type": "boolean",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "lodging_provided",
+        "type": "boolean",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "travel_support_provided",
+        "type": "boolean",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "compensation_kind",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "current_coordinator_id",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "coordinator_name",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "charity_fields",
+        "type": "ARRAY",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "spots_remaining",
+        "type": "numeric",
+        "nullable": "YES",
+        "default": null
+      }
+    ],
+    "v_user_moderation_summary": [
+      {
+        "column": "user_id",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "warning_count",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "last_warning_at",
+        "type": "timestamp with time zone",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "block_count",
+        "type": "bigint",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "last_block_at",
+        "type": "timestamp with time zone",
+        "nullable": "YES",
+        "default": null
+      }
+    ],
+    "volunteer_availability_exceptions": [
+      {
+        "column": "id",
+        "type": "bigint",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "user_id",
+        "type": "bigint",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "date",
+        "type": "date",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "is_available",
+        "type": "boolean",
+        "nullable": "NO",
+        "default": "false"
+      },
+      {
+        "column": "start_time",
+        "type": "time without time zone",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "end_time",
+        "type": "time without time zone",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "note",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "created_at",
+        "type": "timestamp with time zone",
+        "nullable": "NO",
+        "default": "now()"
+      }
+    ],
+    "volunteer_availability_rules": [
+      {
+        "column": "id",
+        "type": "bigint",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "user_id",
+        "type": "bigint",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "weekday",
+        "type": "integer",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "start_time",
+        "type": "time without time zone",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "end_time",
+        "type": "time without time zone",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "valid_from",
+        "type": "date",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "valid_to",
+        "type": "date",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "created_at",
+        "type": "timestamp with time zone",
+        "nullable": "NO",
+        "default": "now()"
+      }
+    ]
+  },
+  "constraints_count": 438,
+  "constraints": [
+    {
+      "table": "app_settings",
+      "name": "ck_app_settings_key",
+      "type": "c",
+      "definition": "CHECK ((key ~ '^[a-z][a-z0-9_]*$'::text))"
+    },
+    {
+      "table": "app_settings",
+      "name": "app_settings_key_not_null",
+      "type": "n",
+      "definition": "NOT NULL key"
+    },
+    {
+      "table": "app_settings",
+      "name": "app_settings_value_int_not_null",
+      "type": "n",
+      "definition": "NOT NULL value_int"
+    },
+    {
+      "table": "app_settings",
+      "name": "app_settings_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (key)"
+    },
+    {
+      "table": "assignments",
+      "name": "ck_assignment_actor",
+      "type": "c",
+      "definition": "CHECK (((assigned_by = 'auto'::text) = (assigned_by_user_id IS NULL)))"
+    },
+    {
+      "table": "assignments",
+      "name": "ck_assignment_assigned_by",
+      "type": "c",
+      "definition": "CHECK ((assigned_by = ANY (ARRAY['auto'::text, 'coordinator'::text, 'admin'::text])))"
+    },
+    {
+      "table": "assignments",
+      "name": "ck_assignment_cancelled_at",
+      "type": "c",
+      "definition": "CHECK (((status = 'cancelled'::text) = (cancelled_at IS NOT NULL)))"
+    },
+    {
+      "table": "assignments",
+      "name": "ck_assignment_confirmed_at",
+      "type": "c",
+      "definition": "CHECK ((((status = ANY (ARRAY['confirmed'::text, 'completed'::text])) AND (confirmed_at IS NOT NULL)) OR (status = ANY (ARRAY['assigned'::text, 'cancelled'::text, 'completed'::text]))))"
+    },
+    {
+      "table": "assignments",
+      "name": "ck_assignment_leader_group",
+      "type": "c",
+      "definition": "CHECK (((NOT is_group_leader) OR (group_code IS NOT NULL)))"
+    },
+    {
+      "table": "assignments",
+      "name": "ck_assignment_schedule",
+      "type": "c",
+      "definition": "CHECK ((schedule_end > schedule_start))"
+    },
+    {
+      "table": "assignments",
+      "name": "ck_assignment_status",
+      "type": "c",
+      "definition": "CHECK ((status = ANY (ARRAY['assigned'::text, 'confirmed'::text, 'completed'::text, 'cancelled'::text])))"
+    },
+    {
+      "table": "assignments",
+      "name": "assignments_assigned_by_user_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (assigned_by_user_id) REFERENCES users(id) ON DELETE RESTRICT"
+    },
+    {
+      "table": "assignments",
+      "name": "fk_assignments_application",
+      "type": "f",
+      "definition": "FOREIGN KEY (application_id, event_id, user_id) REFERENCES event_applications(id, event_id, user_id) ON DELETE RESTRICT"
+    },
+    {
+      "table": "assignments",
+      "name": "fk_assignments_post_event",
+      "type": "f",
+      "definition": "FOREIGN KEY (post_id, event_id) REFERENCES event_posts(id, event_id) ON DELETE RESTRICT"
+    },
+    {
+      "table": "assignments",
+      "name": "assignments_application_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL application_id"
+    },
+    {
+      "table": "assignments",
+      "name": "assignments_assigned_by_not_null",
+      "type": "n",
+      "definition": "NOT NULL assigned_by"
+    },
+    {
+      "table": "assignments",
+      "name": "assignments_created_at_not_null",
+      "type": "n",
+      "definition": "NOT NULL created_at"
+    },
+    {
+      "table": "assignments",
+      "name": "assignments_event_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL event_id"
+    },
+    {
+      "table": "assignments",
+      "name": "assignments_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL id"
+    },
+    {
+      "table": "assignments",
+      "name": "assignments_is_group_leader_not_null",
+      "type": "n",
+      "definition": "NOT NULL is_group_leader"
+    },
+    {
+      "table": "assignments",
+      "name": "assignments_schedule_end_not_null",
+      "type": "n",
+      "definition": "NOT NULL schedule_end"
+    },
+    {
+      "table": "assignments",
+      "name": "assignments_schedule_start_not_null",
+      "type": "n",
+      "definition": "NOT NULL schedule_start"
+    },
+    {
+      "table": "assignments",
+      "name": "assignments_status_not_null",
+      "type": "n",
+      "definition": "NOT NULL status"
+    },
+    {
+      "table": "assignments",
+      "name": "assignments_updated_at_not_null",
+      "type": "n",
+      "definition": "NOT NULL updated_at"
+    },
+    {
+      "table": "assignments",
+      "name": "assignments_user_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL user_id"
+    },
+    {
+      "table": "assignments",
+      "name": "assignments_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "table": "assignments",
+      "name": "uq_assignments_id_event_user",
+      "type": "u",
+      "definition": "UNIQUE (id, event_id, user_id)"
+    },
+    {
+      "table": "assignments",
+      "name": "ex_assignments_no_overlap",
+      "type": "x",
+      "definition": "EXCLUDE USING gist (user_id WITH =, tstzrange(schedule_start, schedule_end, '[)'::text) WITH &&) WHERE ((status <> 'cancelled'::text))"
+    },
+    {
+      "table": "attendance",
+      "name": "ck_attendance_checkin",
+      "type": "c",
+      "definition": "CHECK (((status <> ALL (ARRAY['checked_in'::text, 'completed'::text])) OR ((checkin_at IS NOT NULL) AND (method IS NOT NULL))))"
+    },
+    {
+      "table": "attendance",
+      "name": "ck_attendance_checkout",
+      "type": "c",
+      "definition": "CHECK (((checkout_at IS NULL) OR ((checkin_at IS NOT NULL) AND (checkout_at >= checkin_at))))"
+    },
+    {
+      "table": "attendance",
+      "name": "ck_attendance_confirmation_state",
+      "type": "c",
+      "definition": "CHECK (((confirmation_status = 'not_required'::text) OR ((confirmation_status = ANY (ARRAY['pending'::text, 'confirmed'::text])) AND (method = 'geo'::text) AND (status = ANY (ARRAY['checked_in'::text, 'completed'::text]))) OR ((confirmation_status = 'rejected'::text) AND (status = ANY (ARRAY['expected'::text, 'absent'::text, 'cancelled'::text])))))"
+    },
+    {
+      "table": "attendance",
+      "name": "ck_attendance_confirmation_status",
+      "type": "c",
+      "definition": "CHECK ((confirmation_status = ANY (ARRAY['not_required'::text, 'pending'::text, 'confirmed'::text, 'rejected'::text])))"
+    },
+    {
+      "table": "attendance",
+      "name": "ck_attendance_decision",
+      "type": "c",
+      "definition": "CHECK (((confirmation_status = ANY (ARRAY['confirmed'::text, 'rejected'::text])) = ((confirmed_by_user_id IS NOT NULL) AND (confirmed_at IS NOT NULL))))"
+    },
+    {
+      "table": "attendance",
+      "name": "ck_attendance_geo_columns",
+      "type": "c",
+      "definition": "CHECK ((((method = 'geo'::text) AND geo_verified AND (checkin_accuracy_m IS NOT NULL) AND (checkin_distance_m IS NOT NULL)) OR ((method IS DISTINCT FROM 'geo'::text) AND (NOT geo_verified) AND (checkin_latitude IS NULL) AND (checkin_longitude IS NULL) AND (checkin_accuracy_m IS NULL) AND (checkin_distance_m IS NULL))))"
+    },
+    {
+      "table": "attendance",
+      "name": "ck_attendance_geo_pair",
+      "type": "c",
+      "definition": "CHECK (((checkin_latitude IS NULL) = (checkin_longitude IS NULL)))"
+    },
+    {
+      "table": "attendance",
+      "name": "ck_attendance_lat_range",
+      "type": "c",
+      "definition": "CHECK (((checkin_latitude IS NULL) OR ((checkin_latitude >= ('-90'::integer)::numeric) AND (checkin_latitude <= (90)::numeric))))"
+    },
+    {
+      "table": "attendance",
+      "name": "ck_attendance_lng_range",
+      "type": "c",
+      "definition": "CHECK (((checkin_longitude IS NULL) OR ((checkin_longitude >= ('-180'::integer)::numeric) AND (checkin_longitude <= (180)::numeric))))"
+    },
+    {
+      "table": "attendance",
+      "name": "ck_attendance_method",
+      "type": "c",
+      "definition": "CHECK (((method IS NULL) OR (method = ANY (ARRAY['qr_scan'::text, 'coordinator_manual'::text, 'geo'::text, 'system'::text]))))"
+    },
+    {
+      "table": "attendance",
+      "name": "ck_attendance_method_manual",
+      "type": "c",
+      "definition": "CHECK (((method IS DISTINCT FROM 'coordinator_manual'::text) OR (recorded_by_user_id IS NOT NULL)))"
+    },
+    {
+      "table": "attendance",
+      "name": "ck_attendance_method_qr",
+      "type": "c",
+      "definition": "CHECK (((method IS DISTINCT FROM 'qr_scan'::text) OR (qr_token_id IS NOT NULL)))"
+    },
+    {
+      "table": "attendance",
+      "name": "ck_attendance_no_evidence_without_checkin",
+      "type": "c",
+      "definition": "CHECK (((status = ANY (ARRAY['checked_in'::text, 'completed'::text])) OR ((checkin_at IS NULL) AND (checkout_at IS NULL) AND (method IS NULL))))"
+    },
+    {
+      "table": "attendance",
+      "name": "ck_attendance_no_self_confirm",
+      "type": "c",
+      "definition": "CHECK (((confirmed_by_user_id IS NULL) OR (confirmed_by_user_id <> user_id)))"
+    },
+    {
+      "table": "attendance",
+      "name": "ck_attendance_status",
+      "type": "c",
+      "definition": "CHECK ((status = ANY (ARRAY['expected'::text, 'checked_in'::text, 'absent'::text, 'completed'::text, 'cancelled'::text])))"
+    },
+    {
+      "table": "attendance",
+      "name": "ck_attendance_walkin_method",
+      "type": "c",
+      "definition": "CHECK (((NOT walk_in_flag) OR (method IS NULL) OR (method = ANY (ARRAY['qr_scan'::text, 'coordinator_manual'::text]))))"
+    },
+    {
+      "table": "attendance",
+      "name": "attendance_confirmed_by_user_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (confirmed_by_user_id) REFERENCES users(id) ON DELETE RESTRICT"
+    },
+    {
+      "table": "attendance",
+      "name": "attendance_recorded_by_user_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (recorded_by_user_id) REFERENCES users(id) ON DELETE RESTRICT"
+    },
+    {
+      "table": "attendance",
+      "name": "fk_attendance_assignment",
+      "type": "f",
+      "definition": "FOREIGN KEY (assignment_id, event_id, user_id) REFERENCES assignments(id, event_id, user_id) ON DELETE RESTRICT"
+    },
+    {
+      "table": "attendance",
+      "name": "fk_attendance_qr_event",
+      "type": "f",
+      "definition": "FOREIGN KEY (qr_token_id, event_id) REFERENCES qr_tokens(id, event_id) ON DELETE RESTRICT"
+    },
+    {
+      "table": "attendance",
+      "name": "attendance_assignment_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL assignment_id"
+    },
+    {
+      "table": "attendance",
+      "name": "attendance_confirmation_status_not_null",
+      "type": "n",
+      "definition": "NOT NULL confirmation_status"
+    },
+    {
+      "table": "attendance",
+      "name": "attendance_created_at_not_null",
+      "type": "n",
+      "definition": "NOT NULL created_at"
+    },
+    {
+      "table": "attendance",
+      "name": "attendance_event_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL event_id"
+    },
+    {
+      "table": "attendance",
+      "name": "attendance_geo_verified_not_null",
+      "type": "n",
+      "definition": "NOT NULL geo_verified"
+    },
+    {
+      "table": "attendance",
+      "name": "attendance_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL id"
+    },
+    {
+      "table": "attendance",
+      "name": "attendance_status_not_null",
+      "type": "n",
+      "definition": "NOT NULL status"
+    },
+    {
+      "table": "attendance",
+      "name": "attendance_updated_at_not_null",
+      "type": "n",
+      "definition": "NOT NULL updated_at"
+    },
+    {
+      "table": "attendance",
+      "name": "attendance_user_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL user_id"
+    },
+    {
+      "table": "attendance",
+      "name": "attendance_walk_in_flag_not_null",
+      "type": "n",
+      "definition": "NOT NULL walk_in_flag"
+    },
+    {
+      "table": "attendance",
+      "name": "attendance_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "table": "attendance",
+      "name": "uq_attendance_event_user",
+      "type": "u",
+      "definition": "UNIQUE (event_id, user_id)"
+    },
+    {
+      "table": "attendance_geo_attempts",
+      "name": "ck_geo_attempt_lat",
+      "type": "c",
+      "definition": "CHECK (((latitude IS NULL) OR ((latitude >= ('-90'::integer)::numeric) AND (latitude <= (90)::numeric))))"
+    },
+    {
+      "table": "attendance_geo_attempts",
+      "name": "ck_geo_attempt_lng",
+      "type": "c",
+      "definition": "CHECK (((longitude IS NULL) OR ((longitude >= ('-180'::integer)::numeric) AND (longitude <= (180)::numeric))))"
+    },
+    {
+      "table": "attendance_geo_attempts",
+      "name": "ck_geo_attempt_result",
+      "type": "c",
+      "definition": "CHECK ((result = ANY (ARRAY['accepted'::text, 'already_checked_in'::text, 'invalid_fix'::text, 'low_accuracy'::text, 'stale_fix'::text, 'mock_location'::text, 'outside_geofence'::text, 'window_closed'::text, 'event_not_active'::text, 'geo_disabled'::text, 'not_assigned'::text, 'not_eligible'::text, 'onboarding_required'::text])))"
+    },
+    {
+      "table": "attendance_geo_attempts",
+      "name": "ck_geo_attempt_review_status",
+      "type": "c",
+      "definition": "CHECK ((review_status = ANY (ARRAY['none'::text, 'pending'::text, 'confirmed'::text, 'rejected'::text])))"
+    },
+    {
+      "table": "attendance_geo_attempts",
+      "name": "attendance_geo_attempts_attendance_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (attendance_id) REFERENCES attendance(id) ON DELETE RESTRICT"
+    },
+    {
+      "table": "attendance_geo_attempts",
+      "name": "attendance_geo_attempts_event_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE RESTRICT"
+    },
+    {
+      "table": "attendance_geo_attempts",
+      "name": "attendance_geo_attempts_reviewed_by_user_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (reviewed_by_user_id) REFERENCES users(id) ON DELETE RESTRICT"
+    },
+    {
+      "table": "attendance_geo_attempts",
+      "name": "attendance_geo_attempts_user_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT"
+    },
+    {
+      "table": "attendance_geo_attempts",
+      "name": "attendance_geo_attempts_attempted_at_not_null",
+      "type": "n",
+      "definition": "NOT NULL attempted_at"
+    },
+    {
+      "table": "attendance_geo_attempts",
+      "name": "attendance_geo_attempts_device_mocked_not_null",
+      "type": "n",
+      "definition": "NOT NULL device_mocked"
+    },
+    {
+      "table": "attendance_geo_attempts",
+      "name": "attendance_geo_attempts_event_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL event_id"
+    },
+    {
+      "table": "attendance_geo_attempts",
+      "name": "attendance_geo_attempts_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL id"
+    },
+    {
+      "table": "attendance_geo_attempts",
+      "name": "attendance_geo_attempts_result_not_null",
+      "type": "n",
+      "definition": "NOT NULL result"
+    },
+    {
+      "table": "attendance_geo_attempts",
+      "name": "attendance_geo_attempts_review_status_not_null",
+      "type": "n",
+      "definition": "NOT NULL review_status"
+    },
+    {
+      "table": "attendance_geo_attempts",
+      "name": "attendance_geo_attempts_user_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL user_id"
+    },
+    {
+      "table": "attendance_geo_attempts",
+      "name": "attendance_geo_attempts_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "table": "audit_logs",
+      "name": "audit_logs_actor_user_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE RESTRICT"
+    },
+    {
+      "table": "audit_logs",
+      "name": "audit_logs_action_not_null",
+      "type": "n",
+      "definition": "NOT NULL action"
+    },
+    {
+      "table": "audit_logs",
+      "name": "audit_logs_created_at_not_null",
+      "type": "n",
+      "definition": "NOT NULL created_at"
+    },
+    {
+      "table": "audit_logs",
+      "name": "audit_logs_entity_type_not_null",
+      "type": "n",
+      "definition": "NOT NULL entity_type"
+    },
+    {
+      "table": "audit_logs",
+      "name": "audit_logs_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL id"
+    },
+    {
+      "table": "audit_logs",
+      "name": "audit_logs_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "table": "auth_group",
+      "name": "auth_group_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL id"
+    },
+    {
+      "table": "auth_group",
+      "name": "auth_group_name_not_null",
+      "type": "n",
+      "definition": "NOT NULL name"
+    },
+    {
+      "table": "auth_group",
+      "name": "auth_group_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "table": "auth_group",
+      "name": "auth_group_name_key",
+      "type": "u",
+      "definition": "UNIQUE (name)"
+    },
+    {
+      "table": "auth_group_permissions",
+      "name": "auth_group_permissio_permission_id_84c5c92e_fk_auth_perm",
+      "type": "f",
+      "definition": "FOREIGN KEY (permission_id) REFERENCES auth_permission(id) DEFERRABLE INITIALLY DEFERRED"
+    },
+    {
+      "table": "auth_group_permissions",
+      "name": "auth_group_permissions_group_id_b120cbf9_fk_auth_group_id",
+      "type": "f",
+      "definition": "FOREIGN KEY (group_id) REFERENCES auth_group(id) DEFERRABLE INITIALLY DEFERRED"
+    },
+    {
+      "table": "auth_group_permissions",
+      "name": "auth_group_permissions_group_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL group_id"
+    },
+    {
+      "table": "auth_group_permissions",
+      "name": "auth_group_permissions_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL id"
+    },
+    {
+      "table": "auth_group_permissions",
+      "name": "auth_group_permissions_permission_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL permission_id"
+    },
+    {
+      "table": "auth_group_permissions",
+      "name": "auth_group_permissions_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "table": "auth_group_permissions",
+      "name": "auth_group_permissions_group_id_permission_id_0cd325b0_uniq",
+      "type": "u",
+      "definition": "UNIQUE (group_id, permission_id)"
+    },
+    {
+      "table": "auth_otp",
+      "name": "ck_auth_otp_attempt_count",
+      "type": "c",
+      "definition": "CHECK (((attempt_count >= 0) AND (attempt_count <= 100)))"
+    },
+    {
+      "table": "auth_otp",
+      "name": "ck_auth_otp_consumed",
+      "type": "c",
+      "definition": "CHECK (((consumed_at IS NULL) OR (consumed_at >= created_at)))"
+    },
+    {
+      "table": "auth_otp",
+      "name": "ck_auth_otp_expiry",
+      "type": "c",
+      "definition": "CHECK ((expires_at > created_at))"
+    },
+    {
+      "table": "auth_otp",
+      "name": "ck_auth_otp_purpose",
+      "type": "c",
+      "definition": "CHECK ((purpose = ANY (ARRAY['login'::text, 'qr_registration'::text])))"
+    },
+    {
+      "table": "auth_otp",
+      "name": "auth_otp_attempt_count_not_null",
+      "type": "n",
+      "definition": "NOT NULL attempt_count"
+    },
+    {
+      "table": "auth_otp",
+      "name": "auth_otp_code_hash_not_null",
+      "type": "n",
+      "definition": "NOT NULL code_hash"
+    },
+    {
+      "table": "auth_otp",
+      "name": "auth_otp_created_at_not_null",
+      "type": "n",
+      "definition": "NOT NULL created_at"
+    },
+    {
+      "table": "auth_otp",
+      "name": "auth_otp_expires_at_not_null",
+      "type": "n",
+      "definition": "NOT NULL expires_at"
+    },
+    {
+      "table": "auth_otp",
+      "name": "auth_otp_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL id"
+    },
+    {
+      "table": "auth_otp",
+      "name": "auth_otp_phone_hash_not_null",
+      "type": "n",
+      "definition": "NOT NULL phone_hash"
+    },
+    {
+      "table": "auth_otp",
+      "name": "auth_otp_purpose_not_null",
+      "type": "n",
+      "definition": "NOT NULL purpose"
+    },
+    {
+      "table": "auth_otp",
+      "name": "auth_otp_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "table": "auth_otp_challenge",
+      "name": "ck_auth_otp_challenge_consumed",
+      "type": "c",
+      "definition": "CHECK (((consumed_at IS NULL) OR (consumed_at >= created_at)))"
+    },
+    {
+      "table": "auth_otp_challenge",
+      "name": "ck_auth_otp_challenge_expiry",
+      "type": "c",
+      "definition": "CHECK ((expires_at > created_at))"
+    },
+    {
+      "table": "auth_otp_challenge",
+      "name": "ck_auth_otp_challenge_purpose",
+      "type": "c",
+      "definition": "CHECK ((purpose = ANY (ARRAY['login'::text, 'qr_registration'::text])))"
+    },
+    {
+      "table": "auth_otp_challenge",
+      "name": "ck_auth_otp_challenge_token_hash_len",
+      "type": "c",
+      "definition": "CHECK ((length(challenge_token_hash) = 64))"
+    },
+    {
+      "table": "auth_otp_challenge",
+      "name": "auth_otp_challenge_otp_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (otp_id) REFERENCES auth_otp(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "auth_otp_challenge",
+      "name": "auth_otp_challenge_challenge_token_hash_not_null",
+      "type": "n",
+      "definition": "NOT NULL challenge_token_hash"
+    },
+    {
+      "table": "auth_otp_challenge",
+      "name": "auth_otp_challenge_created_at_not_null",
+      "type": "n",
+      "definition": "NOT NULL created_at"
+    },
+    {
+      "table": "auth_otp_challenge",
+      "name": "auth_otp_challenge_expires_at_not_null",
+      "type": "n",
+      "definition": "NOT NULL expires_at"
+    },
+    {
+      "table": "auth_otp_challenge",
+      "name": "auth_otp_challenge_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL id"
+    },
+    {
+      "table": "auth_otp_challenge",
+      "name": "auth_otp_challenge_otp_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL otp_id"
+    },
+    {
+      "table": "auth_otp_challenge",
+      "name": "auth_otp_challenge_purpose_not_null",
+      "type": "n",
+      "definition": "NOT NULL purpose"
+    },
+    {
+      "table": "auth_otp_challenge",
+      "name": "auth_otp_challenge_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "table": "auth_otp_challenge",
+      "name": "auth_otp_challenge_challenge_token_hash_key",
+      "type": "u",
+      "definition": "UNIQUE (challenge_token_hash)"
+    },
+    {
+      "table": "auth_permission",
+      "name": "auth_permission_content_type_id_2f476e4b_fk_django_co",
+      "type": "f",
+      "definition": "FOREIGN KEY (content_type_id) REFERENCES django_content_type(id) DEFERRABLE INITIALLY DEFERRED"
+    },
+    {
+      "table": "auth_permission",
+      "name": "auth_permission_codename_not_null",
+      "type": "n",
+      "definition": "NOT NULL codename"
+    },
+    {
+      "table": "auth_permission",
+      "name": "auth_permission_content_type_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL content_type_id"
+    },
+    {
+      "table": "auth_permission",
+      "name": "auth_permission_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL id"
+    },
+    {
+      "table": "auth_permission",
+      "name": "auth_permission_name_not_null",
+      "type": "n",
+      "definition": "NOT NULL name"
+    },
+    {
+      "table": "auth_permission",
+      "name": "auth_permission_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "table": "auth_permission",
+      "name": "auth_permission_content_type_id_codename_01ab375a_uniq",
+      "type": "u",
+      "definition": "UNIQUE (content_type_id, codename)"
+    },
+    {
+      "table": "authtoken_token",
+      "name": "authtoken_token_user_id_35299eff_fk_users_id",
+      "type": "f",
+      "definition": "FOREIGN KEY (user_id) REFERENCES users(id) DEFERRABLE INITIALLY DEFERRED"
+    },
+    {
+      "table": "authtoken_token",
+      "name": "authtoken_token_created_not_null",
+      "type": "n",
+      "definition": "NOT NULL created"
+    },
+    {
+      "table": "authtoken_token",
+      "name": "authtoken_token_key_not_null",
+      "type": "n",
+      "definition": "NOT NULL key"
+    },
+    {
+      "table": "authtoken_token",
+      "name": "authtoken_token_user_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL user_id"
+    },
+    {
+      "table": "authtoken_token",
+      "name": "authtoken_token_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (key)"
+    },
+    {
+      "table": "authtoken_token",
+      "name": "authtoken_token_user_id_key",
+      "type": "u",
+      "definition": "UNIQUE (user_id)"
+    },
+    {
+      "table": "charity_fields",
+      "name": "ck_charity_fields_code",
+      "type": "c",
+      "definition": "CHECK ((code ~ '^[a-z][a-z0-9_]{1,49}$'::text))"
+    },
+    {
+      "table": "charity_fields",
+      "name": "ck_charity_fields_label",
+      "type": "c",
+      "definition": "CHECK (((char_length(btrim(label)) >= 1) AND (char_length(btrim(label)) <= 100)))"
+    },
+    {
+      "table": "charity_fields",
+      "name": "charity_fields_active_not_null",
+      "type": "n",
+      "definition": "NOT NULL active"
+    },
+    {
+      "table": "charity_fields",
+      "name": "charity_fields_code_not_null",
+      "type": "n",
+      "definition": "NOT NULL code"
+    },
+    {
+      "table": "charity_fields",
+      "name": "charity_fields_label_not_null",
+      "type": "n",
+      "definition": "NOT NULL label"
+    },
+    {
+      "table": "charity_fields",
+      "name": "charity_fields_sort_order_not_null",
+      "type": "n",
+      "definition": "NOT NULL sort_order"
+    },
+    {
+      "table": "charity_fields",
+      "name": "charity_fields_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (code)"
+    },
+    {
+      "table": "coordinator_profiles",
+      "name": "ck_coordinator_approval",
+      "type": "c",
+      "definition": "CHECK (((status = ANY (ARRAY['pending'::text, 'revoked'::text])) OR ((approved_at IS NOT NULL) AND (approved_by_id IS NOT NULL))))"
+    },
+    {
+      "table": "coordinator_profiles",
+      "name": "ck_coordinator_no_self_approval",
+      "type": "c",
+      "definition": "CHECK (((approved_by_id IS NULL) OR (approved_by_id <> user_id)))"
+    },
+    {
+      "table": "coordinator_profiles",
+      "name": "ck_coordinator_status",
+      "type": "c",
+      "definition": "CHECK ((status = ANY (ARRAY['pending'::text, 'approved'::text, 'suspended'::text, 'revoked'::text])))"
+    },
+    {
+      "table": "coordinator_profiles",
+      "name": "coordinator_profiles_approved_by_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (approved_by_id) REFERENCES users(id) ON DELETE RESTRICT"
+    },
+    {
+      "table": "coordinator_profiles",
+      "name": "coordinator_profiles_user_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT"
+    },
+    {
+      "table": "coordinator_profiles",
+      "name": "coordinator_profiles_created_at_not_null",
+      "type": "n",
+      "definition": "NOT NULL created_at"
+    },
+    {
+      "table": "coordinator_profiles",
+      "name": "coordinator_profiles_status_not_null",
+      "type": "n",
+      "definition": "NOT NULL status"
+    },
+    {
+      "table": "coordinator_profiles",
+      "name": "coordinator_profiles_updated_at_not_null",
+      "type": "n",
+      "definition": "NOT NULL updated_at"
+    },
+    {
+      "table": "coordinator_profiles",
+      "name": "coordinator_profiles_user_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL user_id"
+    },
+    {
+      "table": "coordinator_profiles",
+      "name": "coordinator_profiles_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (user_id)"
+    },
+    {
+      "table": "django_admin_log",
+      "name": "django_admin_log_action_flag_check",
+      "type": "c",
+      "definition": "CHECK ((action_flag >= 0))"
+    },
+    {
+      "table": "django_admin_log",
+      "name": "django_admin_log_content_type_id_c4bce8eb_fk_django_co",
+      "type": "f",
+      "definition": "FOREIGN KEY (content_type_id) REFERENCES django_content_type(id) DEFERRABLE INITIALLY DEFERRED"
+    },
+    {
+      "table": "django_admin_log",
+      "name": "django_admin_log_user_id_c564eba6_fk_users_id",
+      "type": "f",
+      "definition": "FOREIGN KEY (user_id) REFERENCES users(id) DEFERRABLE INITIALLY DEFERRED"
+    },
+    {
+      "table": "django_admin_log",
+      "name": "django_admin_log_action_flag_not_null",
+      "type": "n",
+      "definition": "NOT NULL action_flag"
+    },
+    {
+      "table": "django_admin_log",
+      "name": "django_admin_log_action_time_not_null",
+      "type": "n",
+      "definition": "NOT NULL action_time"
+    },
+    {
+      "table": "django_admin_log",
+      "name": "django_admin_log_change_message_not_null",
+      "type": "n",
+      "definition": "NOT NULL change_message"
+    },
+    {
+      "table": "django_admin_log",
+      "name": "django_admin_log_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL id"
+    },
+    {
+      "table": "django_admin_log",
+      "name": "django_admin_log_object_repr_not_null",
+      "type": "n",
+      "definition": "NOT NULL object_repr"
+    },
+    {
+      "table": "django_admin_log",
+      "name": "django_admin_log_user_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL user_id"
+    },
+    {
+      "table": "django_admin_log",
+      "name": "django_admin_log_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "table": "django_content_type",
+      "name": "django_content_type_app_label_not_null",
+      "type": "n",
+      "definition": "NOT NULL app_label"
+    },
+    {
+      "table": "django_content_type",
+      "name": "django_content_type_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL id"
+    },
+    {
+      "table": "django_content_type",
+      "name": "django_content_type_model_not_null",
+      "type": "n",
+      "definition": "NOT NULL model"
+    },
+    {
+      "table": "django_content_type",
+      "name": "django_content_type_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "table": "django_content_type",
+      "name": "django_content_type_app_label_model_76bd3d3b_uniq",
+      "type": "u",
+      "definition": "UNIQUE (app_label, model)"
+    },
+    {
+      "table": "django_migrations",
+      "name": "django_migrations_app_not_null",
+      "type": "n",
+      "definition": "NOT NULL app"
+    },
+    {
+      "table": "django_migrations",
+      "name": "django_migrations_applied_not_null",
+      "type": "n",
+      "definition": "NOT NULL applied"
+    },
+    {
+      "table": "django_migrations",
+      "name": "django_migrations_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL id"
+    },
+    {
+      "table": "django_migrations",
+      "name": "django_migrations_name_not_null",
+      "type": "n",
+      "definition": "NOT NULL name"
+    },
+    {
+      "table": "django_migrations",
+      "name": "django_migrations_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "table": "django_session",
+      "name": "django_session_expire_date_not_null",
+      "type": "n",
+      "definition": "NOT NULL expire_date"
+    },
+    {
+      "table": "django_session",
+      "name": "django_session_session_data_not_null",
+      "type": "n",
+      "definition": "NOT NULL session_data"
+    },
+    {
+      "table": "django_session",
+      "name": "django_session_session_key_not_null",
+      "type": "n",
+      "definition": "NOT NULL session_key"
+    },
+    {
+      "table": "django_session",
+      "name": "django_session_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (session_key)"
+    },
+    {
+      "table": "event_applications",
+      "name": "ck_application_decided",
+      "type": "c",
+      "definition": "CHECK (((status <> ALL (ARRAY['accepted'::text, 'rejected'::text])) OR (decided_at IS NOT NULL)))"
+    },
+    {
+      "table": "event_applications",
+      "name": "ck_application_decider",
+      "type": "c",
+      "definition": "CHECK (((decided_by_id IS NULL) OR (decided_at IS NOT NULL)))"
+    },
+    {
+      "table": "event_applications",
+      "name": "ck_application_no_self_decision",
+      "type": "c",
+      "definition": "CHECK (((decided_by_id IS NULL) OR (decided_by_id <> user_id)))"
+    },
+    {
+      "table": "event_applications",
+      "name": "ck_application_source",
+      "type": "c",
+      "definition": "CHECK ((source = ANY (ARRAY['browse'::text, 'qr_walkin'::text, 'invite'::text])))"
+    },
+    {
+      "table": "event_applications",
+      "name": "ck_application_status",
+      "type": "c",
+      "definition": "CHECK ((status = ANY (ARRAY['pending'::text, 'accepted'::text, 'waitlisted'::text, 'rejected'::text, 'withdrawn'::text, 'expired'::text])))"
+    },
+    {
+      "table": "event_applications",
+      "name": "ck_application_walkin_token",
+      "type": "c",
+      "definition": "CHECK (((source = 'qr_walkin'::text) = (qr_token_id IS NOT NULL)))"
+    },
+    {
+      "table": "event_applications",
+      "name": "event_applications_decided_by_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (decided_by_id) REFERENCES users(id) ON DELETE RESTRICT"
+    },
+    {
+      "table": "event_applications",
+      "name": "event_applications_event_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE RESTRICT"
+    },
+    {
+      "table": "event_applications",
+      "name": "event_applications_user_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT"
+    },
+    {
+      "table": "event_applications",
+      "name": "fk_applications_post_event",
+      "type": "f",
+      "definition": "FOREIGN KEY (post_id, event_id) REFERENCES event_posts(id, event_id) ON DELETE RESTRICT"
+    },
+    {
+      "table": "event_applications",
+      "name": "fk_applications_qr_event",
+      "type": "f",
+      "definition": "FOREIGN KEY (qr_token_id, event_id) REFERENCES qr_tokens(id, event_id) ON DELETE RESTRICT"
+    },
+    {
+      "table": "event_applications",
+      "name": "event_applications_applied_at_not_null",
+      "type": "n",
+      "definition": "NOT NULL applied_at"
+    },
+    {
+      "table": "event_applications",
+      "name": "event_applications_created_at_not_null",
+      "type": "n",
+      "definition": "NOT NULL created_at"
+    },
+    {
+      "table": "event_applications",
+      "name": "event_applications_event_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL event_id"
+    },
+    {
+      "table": "event_applications",
+      "name": "event_applications_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL id"
+    },
+    {
+      "table": "event_applications",
+      "name": "event_applications_source_not_null",
+      "type": "n",
+      "definition": "NOT NULL source"
+    },
+    {
+      "table": "event_applications",
+      "name": "event_applications_status_not_null",
+      "type": "n",
+      "definition": "NOT NULL status"
+    },
+    {
+      "table": "event_applications",
+      "name": "event_applications_updated_at_not_null",
+      "type": "n",
+      "definition": "NOT NULL updated_at"
+    },
+    {
+      "table": "event_applications",
+      "name": "event_applications_user_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL user_id"
+    },
+    {
+      "table": "event_applications",
+      "name": "event_applications_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "table": "event_applications",
+      "name": "uq_event_applications_id_event_user",
+      "type": "u",
+      "definition": "UNIQUE (id, event_id, user_id)"
+    },
+    {
+      "table": "event_charity_fields",
+      "name": "event_charity_fields_event_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "event_charity_fields",
+      "name": "event_charity_fields_field_code_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (field_code) REFERENCES charity_fields(code) ON DELETE RESTRICT"
+    },
+    {
+      "table": "event_charity_fields",
+      "name": "event_charity_fields_event_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL event_id"
+    },
+    {
+      "table": "event_charity_fields",
+      "name": "event_charity_fields_field_code_not_null",
+      "type": "n",
+      "definition": "NOT NULL field_code"
+    },
+    {
+      "table": "event_charity_fields",
+      "name": "event_charity_fields_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL id"
+    },
+    {
+      "table": "event_charity_fields",
+      "name": "event_charity_fields_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "table": "event_charity_fields",
+      "name": "uq_event_charity_field",
+      "type": "u",
+      "definition": "UNIQUE (event_id, field_code)"
+    },
+    {
+      "table": "event_coordinator_history",
+      "name": "ck_coord_history_changed",
+      "type": "c",
+      "definition": "CHECK ((from_coordinator_id IS DISTINCT FROM to_coordinator_id))"
+    },
+    {
+      "table": "event_coordinator_history",
+      "name": "event_coordinator_history_changed_by_user_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (changed_by_user_id) REFERENCES users(id) ON DELETE RESTRICT"
+    },
+    {
+      "table": "event_coordinator_history",
+      "name": "event_coordinator_history_event_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE RESTRICT"
+    },
+    {
+      "table": "event_coordinator_history",
+      "name": "event_coordinator_history_from_coordinator_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (from_coordinator_id) REFERENCES coordinator_profiles(user_id) ON DELETE RESTRICT"
+    },
+    {
+      "table": "event_coordinator_history",
+      "name": "event_coordinator_history_to_coordinator_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (to_coordinator_id) REFERENCES coordinator_profiles(user_id) ON DELETE RESTRICT"
+    },
+    {
+      "table": "event_coordinator_history",
+      "name": "event_coordinator_history_changed_at_not_null",
+      "type": "n",
+      "definition": "NOT NULL changed_at"
+    },
+    {
+      "table": "event_coordinator_history",
+      "name": "event_coordinator_history_event_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL event_id"
+    },
+    {
+      "table": "event_coordinator_history",
+      "name": "event_coordinator_history_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL id"
+    },
+    {
+      "table": "event_coordinator_history",
+      "name": "event_coordinator_history_to_coordinator_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL to_coordinator_id"
+    },
+    {
+      "table": "event_coordinator_history",
+      "name": "event_coordinator_history_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "table": "event_posts",
+      "name": "ck_event_posts_headcount",
+      "type": "c",
+      "definition": "CHECK (((required_headcount >= 1) AND (required_headcount <= 100000)))"
+    },
+    {
+      "table": "event_posts",
+      "name": "ck_event_posts_physical_level",
+      "type": "c",
+      "definition": "CHECK ((physical_level = ANY (ARRAY['none'::text, 'light'::text, 'medium'::text, 'heavy'::text])))"
+    },
+    {
+      "table": "event_posts",
+      "name": "ck_event_posts_skills",
+      "type": "c",
+      "definition": "CHECK (tags_are_normalized(required_skills))"
+    },
+    {
+      "table": "event_posts",
+      "name": "ck_event_posts_status",
+      "type": "c",
+      "definition": "CHECK ((status = ANY (ARRAY['open'::text, 'full'::text, 'closed'::text])))"
+    },
+    {
+      "table": "event_posts",
+      "name": "ck_event_posts_title",
+      "type": "c",
+      "definition": "CHECK (((char_length(btrim(title)) >= 1) AND (char_length(btrim(title)) <= 150)))"
+    },
+    {
+      "table": "event_posts",
+      "name": "event_posts_event_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE RESTRICT"
+    },
+    {
+      "table": "event_posts",
+      "name": "event_posts_created_at_not_null",
+      "type": "n",
+      "definition": "NOT NULL created_at"
+    },
+    {
+      "table": "event_posts",
+      "name": "event_posts_event_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL event_id"
+    },
+    {
+      "table": "event_posts",
+      "name": "event_posts_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL id"
+    },
+    {
+      "table": "event_posts",
+      "name": "event_posts_leader_needed_not_null",
+      "type": "n",
+      "definition": "NOT NULL leader_needed"
+    },
+    {
+      "table": "event_posts",
+      "name": "event_posts_new_volunteers_allowed_not_null",
+      "type": "n",
+      "definition": "NOT NULL new_volunteers_allowed"
+    },
+    {
+      "table": "event_posts",
+      "name": "event_posts_physical_level_not_null",
+      "type": "n",
+      "definition": "NOT NULL physical_level"
+    },
+    {
+      "table": "event_posts",
+      "name": "event_posts_priority_not_null",
+      "type": "n",
+      "definition": "NOT NULL priority"
+    },
+    {
+      "table": "event_posts",
+      "name": "event_posts_required_headcount_not_null",
+      "type": "n",
+      "definition": "NOT NULL required_headcount"
+    },
+    {
+      "table": "event_posts",
+      "name": "event_posts_required_skills_not_null",
+      "type": "n",
+      "definition": "NOT NULL required_skills"
+    },
+    {
+      "table": "event_posts",
+      "name": "event_posts_status_not_null",
+      "type": "n",
+      "definition": "NOT NULL status"
+    },
+    {
+      "table": "event_posts",
+      "name": "event_posts_title_not_null",
+      "type": "n",
+      "definition": "NOT NULL title"
+    },
+    {
+      "table": "event_posts",
+      "name": "event_posts_updated_at_not_null",
+      "type": "n",
+      "definition": "NOT NULL updated_at"
+    },
+    {
+      "table": "event_posts",
+      "name": "event_posts_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "table": "event_posts",
+      "name": "uq_event_posts_event_title",
+      "type": "u",
+      "definition": "UNIQUE (event_id, title)"
+    },
+    {
+      "table": "event_posts",
+      "name": "uq_event_posts_id_event",
+      "type": "u",
+      "definition": "UNIQUE (id, event_id)"
+    },
+    {
+      "table": "events",
+      "name": "ck_events_acceptance_mode",
+      "type": "c",
+      "definition": "CHECK ((acceptance_mode = ANY (ARRAY['auto'::text, 'manual'::text])))"
+    },
+    {
+      "table": "events",
+      "name": "ck_events_compensation_kind",
+      "type": "c",
+      "definition": "CHECK ((compensation_kind = ANY (ARRAY['unpaid'::text, 'arranged_outside_system'::text])))"
+    },
+    {
+      "table": "events",
+      "name": "ck_events_deadline",
+      "type": "c",
+      "definition": "CHECK (((application_deadline IS NULL) OR (application_deadline <= start_at)))"
+    },
+    {
+      "table": "events",
+      "name": "ck_events_geo_enabled_needs_point",
+      "type": "c",
+      "definition": "CHECK (((NOT geo_checkin_enabled) OR (latitude IS NOT NULL)))"
+    },
+    {
+      "table": "events",
+      "name": "ck_events_geo_pair",
+      "type": "c",
+      "definition": "CHECK (((latitude IS NULL) = (longitude IS NULL)))"
+    },
+    {
+      "table": "events",
+      "name": "ck_events_geo_radius",
+      "type": "c",
+      "definition": "CHECK (((geo_radius_m IS NULL) OR ((geo_radius_m >= 20) AND (geo_radius_m <= 5000))))"
+    },
+    {
+      "table": "events",
+      "name": "ck_events_geo_window",
+      "type": "c",
+      "definition": "CHECK (((geo_checkin_opens_before_min >= 0) AND (geo_checkin_opens_before_min <= 240)))"
+    },
+    {
+      "table": "events",
+      "name": "ck_events_group_size",
+      "type": "c",
+      "definition": "CHECK (((group_size IS NULL) OR (group_size > 0)))"
+    },
+    {
+      "table": "events",
+      "name": "ck_events_lat_range",
+      "type": "c",
+      "definition": "CHECK (((latitude IS NULL) OR ((latitude >= ('-90'::integer)::numeric) AND (latitude <= (90)::numeric))))"
+    },
+    {
+      "table": "events",
+      "name": "ck_events_leader_strategy",
+      "type": "c",
+      "definition": "CHECK ((leader_strategy = ANY (ARRAY['none'::text, 'first_experienced'::text, 'manual'::text])))"
+    },
+    {
+      "table": "events",
+      "name": "ck_events_lng_range",
+      "type": "c",
+      "definition": "CHECK (((longitude IS NULL) OR ((longitude >= ('-180'::integer)::numeric) AND (longitude <= (180)::numeric))))"
+    },
+    {
+      "table": "events",
+      "name": "ck_events_map_provider",
+      "type": "c",
+      "definition": "CHECK ((map_provider = ANY (ARRAY['openstreetmap'::text, 'google'::text])))"
+    },
+    {
+      "table": "events",
+      "name": "ck_events_max_participants",
+      "type": "c",
+      "definition": "CHECK (((max_participants IS NULL) OR (max_participants > 0)))"
+    },
+    {
+      "table": "events",
+      "name": "ck_events_onboarding_version",
+      "type": "c",
+      "definition": "CHECK ((onboarding_version >= 1))"
+    },
+    {
+      "table": "events",
+      "name": "ck_events_purpose_type",
+      "type": "c",
+      "definition": "CHECK ((purpose_type = ANY (ARRAY['charity_event'::text, 'help_wanted_event'::text])))"
+    },
+    {
+      "table": "events",
+      "name": "ck_events_soft_delete",
+      "type": "c",
+      "definition": "CHECK (((deleted_at IS NULL) = (deleted_by_id IS NULL)))"
+    },
+    {
+      "table": "events",
+      "name": "ck_events_status",
+      "type": "c",
+      "definition": "CHECK ((status = ANY (ARRAY['draft'::text, 'published'::text, 'active'::text, 'completed'::text, 'cancelled'::text])))"
+    },
+    {
+      "table": "events",
+      "name": "ck_events_status_timestamps",
+      "type": "c",
+      "definition": "CHECK ((((status = 'draft'::text) AND (published_at IS NULL) AND (activated_at IS NULL) AND (completed_at IS NULL) AND (cancelled_at IS NULL)) OR ((status = 'published'::text) AND (published_at IS NOT NULL) AND (activated_at IS NULL) AND (completed_at IS NULL) AND (cancelled_at IS NULL)) OR ((status = 'active'::text) AND (published_at IS NOT NULL) AND (activated_at IS NOT NULL) AND (completed_at IS NULL) AND (cancelled_at IS NULL)) OR ((status = 'completed'::text) AND (published_at IS NOT NULL) AND (activated_at IS NOT NULL) AND (completed_at IS NOT NULL) AND (cancelled_at IS NULL)) OR ((status = 'cancelled'::text) AND (cancelled_at IS NOT NULL) AND (completed_at IS NULL))))"
+    },
+    {
+      "table": "events",
+      "name": "ck_events_time",
+      "type": "c",
+      "definition": "CHECK ((end_at > start_at))"
+    },
+    {
+      "table": "events",
+      "name": "ck_events_title",
+      "type": "c",
+      "definition": "CHECK (((char_length(btrim(title)) >= 1) AND (char_length(btrim(title)) <= 255)))"
+    },
+    {
+      "table": "events",
+      "name": "events_current_coordinator_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (current_coordinator_id) REFERENCES coordinator_profiles(user_id) ON DELETE RESTRICT"
+    },
+    {
+      "table": "events",
+      "name": "events_deleted_by_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (deleted_by_id) REFERENCES users(id) ON DELETE RESTRICT"
+    },
+    {
+      "table": "events",
+      "name": "events_owner_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (owner_id) REFERENCES coordinator_profiles(user_id) ON DELETE RESTRICT"
+    },
+    {
+      "table": "events",
+      "name": "events_acceptance_mode_not_null",
+      "type": "n",
+      "definition": "NOT NULL acceptance_mode"
+    },
+    {
+      "table": "events",
+      "name": "events_auto_assign_enabled_not_null",
+      "type": "n",
+      "definition": "NOT NULL auto_assign_enabled"
+    },
+    {
+      "table": "events",
+      "name": "events_compensation_kind_not_null",
+      "type": "n",
+      "definition": "NOT NULL compensation_kind"
+    },
+    {
+      "table": "events",
+      "name": "events_created_at_not_null",
+      "type": "n",
+      "definition": "NOT NULL created_at"
+    },
+    {
+      "table": "events",
+      "name": "events_current_coordinator_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL current_coordinator_id"
+    },
+    {
+      "table": "events",
+      "name": "events_end_at_not_null",
+      "type": "n",
+      "definition": "NOT NULL end_at"
+    },
+    {
+      "table": "events",
+      "name": "events_geo_checkin_enabled_not_null",
+      "type": "n",
+      "definition": "NOT NULL geo_checkin_enabled"
+    },
+    {
+      "table": "events",
+      "name": "events_geo_checkin_opens_before_min_not_null",
+      "type": "n",
+      "definition": "NOT NULL geo_checkin_opens_before_min"
+    },
+    {
+      "table": "events",
+      "name": "events_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL id"
+    },
+    {
+      "table": "events",
+      "name": "events_leader_strategy_not_null",
+      "type": "n",
+      "definition": "NOT NULL leader_strategy"
+    },
+    {
+      "table": "events",
+      "name": "events_lodging_provided_not_null",
+      "type": "n",
+      "definition": "NOT NULL lodging_provided"
+    },
+    {
+      "table": "events",
+      "name": "events_map_provider_not_null",
+      "type": "n",
+      "definition": "NOT NULL map_provider"
+    },
+    {
+      "table": "events",
+      "name": "events_meals_provided_not_null",
+      "type": "n",
+      "definition": "NOT NULL meals_provided"
+    },
+    {
+      "table": "events",
+      "name": "events_onboarding_version_not_null",
+      "type": "n",
+      "definition": "NOT NULL onboarding_version"
+    },
+    {
+      "table": "events",
+      "name": "events_owner_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL owner_id"
+    },
+    {
+      "table": "events",
+      "name": "events_purpose_type_not_null",
+      "type": "n",
+      "definition": "NOT NULL purpose_type"
+    },
+    {
+      "table": "events",
+      "name": "events_qr_registration_enabled_not_null",
+      "type": "n",
+      "definition": "NOT NULL qr_registration_enabled"
+    },
+    {
+      "table": "events",
+      "name": "events_require_checkin_confirmation_not_null",
+      "type": "n",
+      "definition": "NOT NULL require_checkin_confirmation"
+    },
+    {
+      "table": "events",
+      "name": "events_require_onboarding_ack_not_null",
+      "type": "n",
+      "definition": "NOT NULL require_onboarding_ack"
+    },
+    {
+      "table": "events",
+      "name": "events_start_at_not_null",
+      "type": "n",
+      "definition": "NOT NULL start_at"
+    },
+    {
+      "table": "events",
+      "name": "events_status_not_null",
+      "type": "n",
+      "definition": "NOT NULL status"
+    },
+    {
+      "table": "events",
+      "name": "events_title_not_null",
+      "type": "n",
+      "definition": "NOT NULL title"
+    },
+    {
+      "table": "events",
+      "name": "events_travel_support_provided_not_null",
+      "type": "n",
+      "definition": "NOT NULL travel_support_provided"
+    },
+    {
+      "table": "events",
+      "name": "events_updated_at_not_null",
+      "type": "n",
+      "definition": "NOT NULL updated_at"
+    },
+    {
+      "table": "events",
+      "name": "events_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "table": "feedback",
+      "name": "ck_feedback_direction",
+      "type": "c",
+      "definition": "CHECK ((direction = ANY (ARRAY['coordinator_to_volunteer'::text, 'volunteer_to_event'::text, 'volunteer_to_coordinator'::text])))"
+    },
+    {
+      "table": "feedback",
+      "name": "ck_feedback_not_self",
+      "type": "c",
+      "definition": "CHECK (((target_user_id IS NULL) OR (target_user_id <> rater_user_id)))"
+    },
+    {
+      "table": "feedback",
+      "name": "ck_feedback_score",
+      "type": "c",
+      "definition": "CHECK (((score >= 1) AND (score <= 5)))"
+    },
+    {
+      "table": "feedback",
+      "name": "ck_feedback_status",
+      "type": "c",
+      "definition": "CHECK ((status = ANY (ARRAY['active'::text, 'hidden'::text])))"
+    },
+    {
+      "table": "feedback",
+      "name": "ck_feedback_tags",
+      "type": "c",
+      "definition": "CHECK (tags_are_normalized(tags))"
+    },
+    {
+      "table": "feedback",
+      "name": "ck_feedback_target",
+      "type": "c",
+      "definition": "CHECK ((((direction = 'volunteer_to_event'::text) AND (target_user_id IS NULL)) OR ((direction <> 'volunteer_to_event'::text) AND (target_user_id IS NOT NULL))))"
+    },
+    {
+      "table": "feedback",
+      "name": "feedback_event_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE RESTRICT"
+    },
+    {
+      "table": "feedback",
+      "name": "feedback_rater_user_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (rater_user_id) REFERENCES users(id) ON DELETE RESTRICT"
+    },
+    {
+      "table": "feedback",
+      "name": "feedback_target_user_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (target_user_id) REFERENCES users(id) ON DELETE RESTRICT"
+    },
+    {
+      "table": "feedback",
+      "name": "feedback_created_at_not_null",
+      "type": "n",
+      "definition": "NOT NULL created_at"
+    },
+    {
+      "table": "feedback",
+      "name": "feedback_direction_not_null",
+      "type": "n",
+      "definition": "NOT NULL direction"
+    },
+    {
+      "table": "feedback",
+      "name": "feedback_event_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL event_id"
+    },
+    {
+      "table": "feedback",
+      "name": "feedback_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL id"
+    },
+    {
+      "table": "feedback",
+      "name": "feedback_rater_user_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL rater_user_id"
+    },
+    {
+      "table": "feedback",
+      "name": "feedback_score_not_null",
+      "type": "n",
+      "definition": "NOT NULL score"
+    },
+    {
+      "table": "feedback",
+      "name": "feedback_status_not_null",
+      "type": "n",
+      "definition": "NOT NULL status"
+    },
+    {
+      "table": "feedback",
+      "name": "feedback_tags_not_null",
+      "type": "n",
+      "definition": "NOT NULL tags"
+    },
+    {
+      "table": "feedback",
+      "name": "feedback_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "table": "moderation_actions",
+      "name": "ck_moderation_action_type",
+      "type": "c",
+      "definition": "CHECK ((action_type = ANY (ARRAY['user_warning'::text, 'user_block'::text, 'user_unblock'::text, 'account_close'::text, 'account_reinstate'::text, 'event_delete'::text, 'event_restore'::text, 'event_cancel'::text, 'feedback_hide'::text])))"
+    },
+    {
+      "table": "moderation_actions",
+      "name": "ck_moderation_expiry",
+      "type": "c",
+      "definition": "CHECK (((expires_at IS NULL) OR (action_type = 'user_block'::text)))"
+    },
+    {
+      "table": "moderation_actions",
+      "name": "ck_moderation_no_self",
+      "type": "c",
+      "definition": "CHECK (((target_user_id IS NULL) OR (target_user_id <> admin_user_id)))"
+    },
+    {
+      "table": "moderation_actions",
+      "name": "ck_moderation_reason",
+      "type": "c",
+      "definition": "CHECK (((action_type <> ALL (ARRAY['user_block'::text, 'account_close'::text, 'event_delete'::text, 'event_cancel'::text, 'feedback_hide'::text])) OR (char_length(btrim(COALESCE(reason, ''::text))) > 0)))"
+    },
+    {
+      "table": "moderation_actions",
+      "name": "ck_moderation_subject",
+      "type": "c",
+      "definition": "CHECK ((((action_type = ANY (ARRAY['user_warning'::text, 'user_block'::text, 'user_unblock'::text, 'account_close'::text, 'account_reinstate'::text])) AND (target_user_id IS NOT NULL) AND (event_id IS NULL) AND (feedback_id IS NULL)) OR ((action_type = ANY (ARRAY['event_delete'::text, 'event_restore'::text, 'event_cancel'::text])) AND (event_id IS NOT NULL) AND (target_user_id IS NULL) AND (feedback_id IS NULL)) OR ((action_type = 'feedback_hide'::text) AND (feedback_id IS NOT NULL) AND (target_user_id IS NULL) AND (event_id IS NULL))))"
+    },
+    {
+      "table": "moderation_actions",
+      "name": "moderation_actions_admin_user_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (admin_user_id) REFERENCES users(id) ON DELETE RESTRICT"
+    },
+    {
+      "table": "moderation_actions",
+      "name": "moderation_actions_event_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE RESTRICT"
+    },
+    {
+      "table": "moderation_actions",
+      "name": "moderation_actions_feedback_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (feedback_id) REFERENCES feedback(id) ON DELETE RESTRICT"
+    },
+    {
+      "table": "moderation_actions",
+      "name": "moderation_actions_target_user_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (target_user_id) REFERENCES users(id) ON DELETE RESTRICT"
+    },
+    {
+      "table": "moderation_actions",
+      "name": "moderation_actions_action_type_not_null",
+      "type": "n",
+      "definition": "NOT NULL action_type"
+    },
+    {
+      "table": "moderation_actions",
+      "name": "moderation_actions_admin_user_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL admin_user_id"
+    },
+    {
+      "table": "moderation_actions",
+      "name": "moderation_actions_created_at_not_null",
+      "type": "n",
+      "definition": "NOT NULL created_at"
+    },
+    {
+      "table": "moderation_actions",
+      "name": "moderation_actions_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL id"
+    },
+    {
+      "table": "moderation_actions",
+      "name": "moderation_actions_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "table": "onboarding_acknowledgments",
+      "name": "ck_onboarding_ack_method",
+      "type": "c",
+      "definition": "CHECK ((method = 'app_tick'::text))"
+    },
+    {
+      "table": "onboarding_acknowledgments",
+      "name": "ck_onboarding_ack_version",
+      "type": "c",
+      "definition": "CHECK ((onboarding_version >= 1))"
+    },
+    {
+      "table": "onboarding_acknowledgments",
+      "name": "onboarding_acknowledgments_event_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE RESTRICT"
+    },
+    {
+      "table": "onboarding_acknowledgments",
+      "name": "onboarding_acknowledgments_user_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT"
+    },
+    {
+      "table": "onboarding_acknowledgments",
+      "name": "onboarding_acknowledgments_acknowledged_at_not_null",
+      "type": "n",
+      "definition": "NOT NULL acknowledged_at"
+    },
+    {
+      "table": "onboarding_acknowledgments",
+      "name": "onboarding_acknowledgments_event_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL event_id"
+    },
+    {
+      "table": "onboarding_acknowledgments",
+      "name": "onboarding_acknowledgments_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL id"
+    },
+    {
+      "table": "onboarding_acknowledgments",
+      "name": "onboarding_acknowledgments_method_not_null",
+      "type": "n",
+      "definition": "NOT NULL method"
+    },
+    {
+      "table": "onboarding_acknowledgments",
+      "name": "onboarding_acknowledgments_onboarding_version_not_null",
+      "type": "n",
+      "definition": "NOT NULL onboarding_version"
+    },
+    {
+      "table": "onboarding_acknowledgments",
+      "name": "onboarding_acknowledgments_user_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL user_id"
+    },
+    {
+      "table": "onboarding_acknowledgments",
+      "name": "onboarding_acknowledgments_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "table": "onboarding_acknowledgments",
+      "name": "uq_onboarding_ack_user_event_ver",
+      "type": "u",
+      "definition": "UNIQUE (user_id, event_id, onboarding_version)"
+    },
+    {
+      "table": "qr_tokens",
+      "name": "ck_qr_expiry",
+      "type": "c",
+      "definition": "CHECK ((expires_at > created_at))"
+    },
+    {
+      "table": "qr_tokens",
+      "name": "ck_qr_hash_len",
+      "type": "c",
+      "definition": "CHECK (((char_length(token_hash) >= 32) AND (char_length(token_hash) <= 128)))"
+    },
+    {
+      "table": "qr_tokens",
+      "name": "ck_qr_max_uses",
+      "type": "c",
+      "definition": "CHECK (((max_uses IS NULL) OR (max_uses > 0)))"
+    },
+    {
+      "table": "qr_tokens",
+      "name": "ck_qr_purpose",
+      "type": "c",
+      "definition": "CHECK ((purpose = ANY (ARRAY['walkin_registration'::text, 'checkin'::text, 'join_event'::text])))"
+    },
+    {
+      "table": "qr_tokens",
+      "name": "ck_qr_revoked",
+      "type": "c",
+      "definition": "CHECK (((revoked_at IS NULL) OR (revoked_at >= created_at)))"
+    },
+    {
+      "table": "qr_tokens",
+      "name": "ck_qr_used_count",
+      "type": "c",
+      "definition": "CHECK (((max_uses IS NULL) OR (used_count <= max_uses)))"
+    },
+    {
+      "table": "qr_tokens",
+      "name": "ck_qr_used_count_nonnegative",
+      "type": "c",
+      "definition": "CHECK ((used_count >= 0))"
+    },
+    {
+      "table": "qr_tokens",
+      "name": "qr_tokens_created_by_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (created_by_id) REFERENCES users(id) ON DELETE RESTRICT"
+    },
+    {
+      "table": "qr_tokens",
+      "name": "qr_tokens_event_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE RESTRICT"
+    },
+    {
+      "table": "qr_tokens",
+      "name": "qr_tokens_created_at_not_null",
+      "type": "n",
+      "definition": "NOT NULL created_at"
+    },
+    {
+      "table": "qr_tokens",
+      "name": "qr_tokens_created_by_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL created_by_id"
+    },
+    {
+      "table": "qr_tokens",
+      "name": "qr_tokens_event_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL event_id"
+    },
+    {
+      "table": "qr_tokens",
+      "name": "qr_tokens_expires_at_not_null",
+      "type": "n",
+      "definition": "NOT NULL expires_at"
+    },
+    {
+      "table": "qr_tokens",
+      "name": "qr_tokens_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL id"
+    },
+    {
+      "table": "qr_tokens",
+      "name": "qr_tokens_purpose_not_null",
+      "type": "n",
+      "definition": "NOT NULL purpose"
+    },
+    {
+      "table": "qr_tokens",
+      "name": "qr_tokens_token_hash_not_null",
+      "type": "n",
+      "definition": "NOT NULL token_hash"
+    },
+    {
+      "table": "qr_tokens",
+      "name": "qr_tokens_used_count_not_null",
+      "type": "n",
+      "definition": "NOT NULL used_count"
+    },
+    {
+      "table": "qr_tokens",
+      "name": "qr_tokens_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "table": "qr_tokens",
+      "name": "uq_qr_tokens_id_event",
+      "type": "u",
+      "definition": "UNIQUE (id, event_id)"
+    },
+    {
+      "table": "qr_tokens",
+      "name": "uq_qr_tokens_token_hash",
+      "type": "u",
+      "definition": "UNIQUE (token_hash)"
+    },
+    {
+      "table": "user_charity_interests",
+      "name": "user_charity_interests_field_code_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (field_code) REFERENCES charity_fields(code) ON DELETE RESTRICT"
+    },
+    {
+      "table": "user_charity_interests",
+      "name": "user_charity_interests_user_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "user_charity_interests",
+      "name": "user_charity_interests_created_at_not_null",
+      "type": "n",
+      "definition": "NOT NULL created_at"
+    },
+    {
+      "table": "user_charity_interests",
+      "name": "user_charity_interests_field_code_not_null",
+      "type": "n",
+      "definition": "NOT NULL field_code"
+    },
+    {
+      "table": "user_charity_interests",
+      "name": "user_charity_interests_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL id"
+    },
+    {
+      "table": "user_charity_interests",
+      "name": "user_charity_interests_user_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL user_id"
+    },
+    {
+      "table": "user_charity_interests",
+      "name": "user_charity_interests_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "table": "user_charity_interests",
+      "name": "uq_user_charity_interest",
+      "type": "u",
+      "definition": "UNIQUE (user_id, field_code)"
+    },
+    {
+      "table": "user_verification_images",
+      "name": "ck_verification_comparison_status",
+      "type": "c",
+      "definition": "CHECK ((comparison_status = ANY (ARRAY['pending'::text, 'match'::text, 'no_match'::text, 'needs_review'::text])))"
+    },
+    {
+      "table": "user_verification_images",
+      "name": "ck_verification_file_format",
+      "type": "c",
+      "definition": "CHECK ((file_format = 'jpeg'::text))"
+    },
+    {
+      "table": "user_verification_images",
+      "name": "ck_verification_image_path",
+      "type": "c",
+      "definition": "CHECK ((((char_length(btrim(image_path)) >= 1) AND (char_length(btrim(image_path)) <= 255)) AND (lower(image_path) ~ '\\.jpe?g$'::text)))"
+    },
+    {
+      "table": "user_verification_images",
+      "name": "ck_verification_image_type",
+      "type": "c",
+      "definition": "CHECK ((image_type = ANY (ARRAY['mock_selfie'::text, 'id_license'::text, 'driver_license'::text])))"
+    },
+    {
+      "table": "user_verification_images",
+      "name": "ck_verification_no_self_review",
+      "type": "c",
+      "definition": "CHECK (((reviewed_by_id IS NULL) OR (reviewed_by_id <> user_id)))"
+    },
+    {
+      "table": "user_verification_images",
+      "name": "ck_verification_review",
+      "type": "c",
+      "definition": "CHECK (((status = 'pending'::text) OR ((reviewed_by_id IS NOT NULL) AND (reviewed_at IS NOT NULL))))"
+    },
+    {
+      "table": "user_verification_images",
+      "name": "ck_verification_score_range",
+      "type": "c",
+      "definition": "CHECK (((comparison_score IS NULL) OR ((comparison_score >= (0)::numeric) AND (comparison_score <= (1)::numeric))))"
+    },
+    {
+      "table": "user_verification_images",
+      "name": "ck_verification_sha256",
+      "type": "c",
+      "definition": "CHECK (((file_sha256 IS NULL) OR (file_sha256 ~ '^[0-9a-f]{64}$'::text)))"
+    },
+    {
+      "table": "user_verification_images",
+      "name": "ck_verification_status",
+      "type": "c",
+      "definition": "CHECK ((status = ANY (ARRAY['pending'::text, 'approved'::text, 'rejected'::text])))"
+    },
+    {
+      "table": "user_verification_images",
+      "name": "user_verification_images_reviewed_by_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (reviewed_by_id) REFERENCES users(id) ON DELETE RESTRICT"
+    },
+    {
+      "table": "user_verification_images",
+      "name": "user_verification_images_user_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT"
+    },
+    {
+      "table": "user_verification_images",
+      "name": "user_verification_images_comparison_status_not_null",
+      "type": "n",
+      "definition": "NOT NULL comparison_status"
+    },
+    {
+      "table": "user_verification_images",
+      "name": "user_verification_images_created_at_not_null",
+      "type": "n",
+      "definition": "NOT NULL created_at"
+    },
+    {
+      "table": "user_verification_images",
+      "name": "user_verification_images_file_format_not_null",
+      "type": "n",
+      "definition": "NOT NULL file_format"
+    },
+    {
+      "table": "user_verification_images",
+      "name": "user_verification_images_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL id"
+    },
+    {
+      "table": "user_verification_images",
+      "name": "user_verification_images_image_path_not_null",
+      "type": "n",
+      "definition": "NOT NULL image_path"
+    },
+    {
+      "table": "user_verification_images",
+      "name": "user_verification_images_image_type_not_null",
+      "type": "n",
+      "definition": "NOT NULL image_type"
+    },
+    {
+      "table": "user_verification_images",
+      "name": "user_verification_images_is_current_not_null",
+      "type": "n",
+      "definition": "NOT NULL is_current"
+    },
+    {
+      "table": "user_verification_images",
+      "name": "user_verification_images_status_not_null",
+      "type": "n",
+      "definition": "NOT NULL status"
+    },
+    {
+      "table": "user_verification_images",
+      "name": "user_verification_images_updated_at_not_null",
+      "type": "n",
+      "definition": "NOT NULL updated_at"
+    },
+    {
+      "table": "user_verification_images",
+      "name": "user_verification_images_user_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL user_id"
+    },
+    {
+      "table": "user_verification_images",
+      "name": "user_verification_images_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "table": "users",
+      "name": "ck_users_account_status",
+      "type": "c",
+      "definition": "CHECK ((account_status = ANY (ARRAY['active'::text, 'blocked'::text, 'closed'::text])))"
+    },
+    {
+      "table": "users",
+      "name": "ck_users_active_status_sync",
+      "type": "c",
+      "definition": "CHECK ((is_active = (account_status = 'active'::text)))"
+    },
+    {
+      "table": "users",
+      "name": "ck_users_admin_flags",
+      "type": "c",
+      "definition": "CHECK ((((NOT is_staff) AND (NOT is_superuser)) OR is_admin))"
+    },
+    {
+      "table": "users",
+      "name": "ck_users_blocked_until",
+      "type": "c",
+      "definition": "CHECK (((blocked_until IS NULL) OR (account_status = 'blocked'::text)))"
+    },
+    {
+      "table": "users",
+      "name": "ck_users_blood_type",
+      "type": "c",
+      "definition": "CHECK ((blood_type = ANY (ARRAY['A+'::text, 'A-'::text, 'B+'::text, 'B-'::text, 'AB+'::text, 'AB-'::text, 'O+'::text, 'O-'::text, 'unknown'::text])))"
+    },
+    {
+      "table": "users",
+      "name": "ck_users_display_name",
+      "type": "c",
+      "definition": "CHECK (((char_length(btrim(display_name)) >= 1) AND (char_length(btrim(display_name)) <= 150)))"
+    },
+    {
+      "table": "users",
+      "name": "ck_users_donation_consistency",
+      "type": "c",
+      "definition": "CHECK ((is_willing_to_donate OR ((NOT is_willing_to_donate_blood) AND (NOT is_willing_to_donate_items))))"
+    },
+    {
+      "table": "users",
+      "name": "ck_users_emergency_pair",
+      "type": "c",
+      "definition": "CHECK (((emergency_contact_name IS NULL) = (emergency_contact_phone_enc IS NULL)))"
+    },
+    {
+      "table": "users",
+      "name": "ck_users_language",
+      "type": "c",
+      "definition": "CHECK ((preferred_language ~ '^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$'::text))"
+    },
+    {
+      "table": "users",
+      "name": "ck_users_phone_hash_len",
+      "type": "c",
+      "definition": "CHECK (((char_length(phone_hash) >= 32) AND (char_length(phone_hash) <= 128)))"
+    },
+    {
+      "table": "users",
+      "name": "ck_users_skills",
+      "type": "c",
+      "definition": "CHECK (tags_are_normalized(skills))"
+    },
+    {
+      "table": "users",
+      "name": "ck_users_verification_status",
+      "type": "c",
+      "definition": "CHECK ((verification_status = ANY (ARRAY['none'::text, 'pending'::text, 'verified'::text, 'rejected'::text])))"
+    },
+    {
+      "table": "users",
+      "name": "users_accepts_unpaid_not_null",
+      "type": "n",
+      "definition": "NOT NULL accepts_unpaid"
+    },
+    {
+      "table": "users",
+      "name": "users_account_status_not_null",
+      "type": "n",
+      "definition": "NOT NULL account_status"
+    },
+    {
+      "table": "users",
+      "name": "users_blood_type_not_null",
+      "type": "n",
+      "definition": "NOT NULL blood_type"
+    },
+    {
+      "table": "users",
+      "name": "users_can_lift_heavy_not_null",
+      "type": "n",
+      "definition": "NOT NULL can_lift_heavy"
+    },
+    {
+      "table": "users",
+      "name": "users_can_work_outdoor_not_null",
+      "type": "n",
+      "definition": "NOT NULL can_work_outdoor"
+    },
+    {
+      "table": "users",
+      "name": "users_created_at_not_null",
+      "type": "n",
+      "definition": "NOT NULL created_at"
+    },
+    {
+      "table": "users",
+      "name": "users_display_name_not_null",
+      "type": "n",
+      "definition": "NOT NULL display_name"
+    },
+    {
+      "table": "users",
+      "name": "users_good_eyesight_not_null",
+      "type": "n",
+      "definition": "NOT NULL good_eyesight"
+    },
+    {
+      "table": "users",
+      "name": "users_has_leader_experience_not_null",
+      "type": "n",
+      "definition": "NOT NULL has_leader_experience"
+    },
+    {
+      "table": "users",
+      "name": "users_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL id"
+    },
+    {
+      "table": "users",
+      "name": "users_is_active_not_null",
+      "type": "n",
+      "definition": "NOT NULL is_active"
+    },
+    {
+      "table": "users",
+      "name": "users_is_admin_not_null",
+      "type": "n",
+      "definition": "NOT NULL is_admin"
+    },
+    {
+      "table": "users",
+      "name": "users_is_staff_not_null",
+      "type": "n",
+      "definition": "NOT NULL is_staff"
+    },
+    {
+      "table": "users",
+      "name": "users_is_superuser_not_null",
+      "type": "n",
+      "definition": "NOT NULL is_superuser"
+    },
+    {
+      "table": "users",
+      "name": "users_is_willing_to_donate_blood_not_null",
+      "type": "n",
+      "definition": "NOT NULL is_willing_to_donate_blood"
+    },
+    {
+      "table": "users",
+      "name": "users_is_willing_to_donate_items_not_null",
+      "type": "n",
+      "definition": "NOT NULL is_willing_to_donate_items"
+    },
+    {
+      "table": "users",
+      "name": "users_is_willing_to_donate_not_null",
+      "type": "n",
+      "definition": "NOT NULL is_willing_to_donate"
+    },
+    {
+      "table": "users",
+      "name": "users_needs_glasses_not_null",
+      "type": "n",
+      "definition": "NOT NULL needs_glasses"
+    },
+    {
+      "table": "users",
+      "name": "users_needs_meal_support_not_null",
+      "type": "n",
+      "definition": "NOT NULL needs_meal_support"
+    },
+    {
+      "table": "users",
+      "name": "users_needs_travel_support_not_null",
+      "type": "n",
+      "definition": "NOT NULL needs_travel_support"
+    },
+    {
+      "table": "users",
+      "name": "users_new_to_volunteer_not_null",
+      "type": "n",
+      "definition": "NOT NULL new_to_volunteer"
+    },
+    {
+      "table": "users",
+      "name": "users_phone_enc_not_null",
+      "type": "n",
+      "definition": "NOT NULL phone_enc"
+    },
+    {
+      "table": "users",
+      "name": "users_phone_hash_not_null",
+      "type": "n",
+      "definition": "NOT NULL phone_hash"
+    },
+    {
+      "table": "users",
+      "name": "users_physical_ok_not_null",
+      "type": "n",
+      "definition": "NOT NULL physical_ok"
+    },
+    {
+      "table": "users",
+      "name": "users_preferred_language_not_null",
+      "type": "n",
+      "definition": "NOT NULL preferred_language"
+    },
+    {
+      "table": "users",
+      "name": "users_skills_not_null",
+      "type": "n",
+      "definition": "NOT NULL skills"
+    },
+    {
+      "table": "users",
+      "name": "users_updated_at_not_null",
+      "type": "n",
+      "definition": "NOT NULL updated_at"
+    },
+    {
+      "table": "users",
+      "name": "users_uuid_not_null",
+      "type": "n",
+      "definition": "NOT NULL uuid"
+    },
+    {
+      "table": "users",
+      "name": "users_verification_status_not_null",
+      "type": "n",
+      "definition": "NOT NULL verification_status"
+    },
+    {
+      "table": "users",
+      "name": "users_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "table": "users",
+      "name": "uq_users_phone_hash",
+      "type": "u",
+      "definition": "UNIQUE (phone_hash)"
+    },
+    {
+      "table": "users",
+      "name": "uq_users_uuid",
+      "type": "u",
+      "definition": "UNIQUE (uuid)"
+    },
+    {
+      "table": "volunteer_availability_exceptions",
+      "name": "ck_availability_exception_times",
+      "type": "c",
+      "definition": "CHECK ((((start_time IS NULL) AND (end_time IS NULL)) OR ((start_time IS NOT NULL) AND (end_time IS NOT NULL) AND (end_time > start_time))))"
+    },
+    {
+      "table": "volunteer_availability_exceptions",
+      "name": "volunteer_availability_exceptions_user_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "volunteer_availability_exceptions",
+      "name": "volunteer_availability_exceptions_created_at_not_null",
+      "type": "n",
+      "definition": "NOT NULL created_at"
+    },
+    {
+      "table": "volunteer_availability_exceptions",
+      "name": "volunteer_availability_exceptions_date_not_null",
+      "type": "n",
+      "definition": "NOT NULL date"
+    },
+    {
+      "table": "volunteer_availability_exceptions",
+      "name": "volunteer_availability_exceptions_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL id"
+    },
+    {
+      "table": "volunteer_availability_exceptions",
+      "name": "volunteer_availability_exceptions_is_available_not_null",
+      "type": "n",
+      "definition": "NOT NULL is_available"
+    },
+    {
+      "table": "volunteer_availability_exceptions",
+      "name": "volunteer_availability_exceptions_user_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL user_id"
+    },
+    {
+      "table": "volunteer_availability_exceptions",
+      "name": "volunteer_availability_exceptions_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "table": "volunteer_availability_exceptions",
+      "name": "uq_availability_exception",
+      "type": "u",
+      "definition": "UNIQUE (user_id, date)"
+    },
+    {
+      "table": "volunteer_availability_rules",
+      "name": "ck_availability_time_order",
+      "type": "c",
+      "definition": "CHECK ((end_time > start_time))"
+    },
+    {
+      "table": "volunteer_availability_rules",
+      "name": "ck_availability_valid_range",
+      "type": "c",
+      "definition": "CHECK (((valid_from IS NULL) OR (valid_to IS NULL) OR (valid_to >= valid_from)))"
+    },
+    {
+      "table": "volunteer_availability_rules",
+      "name": "ck_availability_weekday",
+      "type": "c",
+      "definition": "CHECK (((weekday >= 1) AND (weekday <= 7)))"
+    },
+    {
+      "table": "volunteer_availability_rules",
+      "name": "volunteer_availability_rules_user_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "volunteer_availability_rules",
+      "name": "volunteer_availability_rules_created_at_not_null",
+      "type": "n",
+      "definition": "NOT NULL created_at"
+    },
+    {
+      "table": "volunteer_availability_rules",
+      "name": "volunteer_availability_rules_end_time_not_null",
+      "type": "n",
+      "definition": "NOT NULL end_time"
+    },
+    {
+      "table": "volunteer_availability_rules",
+      "name": "volunteer_availability_rules_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL id"
+    },
+    {
+      "table": "volunteer_availability_rules",
+      "name": "volunteer_availability_rules_start_time_not_null",
+      "type": "n",
+      "definition": "NOT NULL start_time"
+    },
+    {
+      "table": "volunteer_availability_rules",
+      "name": "volunteer_availability_rules_user_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL user_id"
+    },
+    {
+      "table": "volunteer_availability_rules",
+      "name": "volunteer_availability_rules_weekday_not_null",
+      "type": "n",
+      "definition": "NOT NULL weekday"
+    },
+    {
+      "table": "volunteer_availability_rules",
+      "name": "volunteer_availability_rules_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "table": "volunteer_availability_rules",
+      "name": "uq_availability_rule",
+      "type": "u",
+      "definition": "UNIQUE (user_id, weekday, start_time)"
+    }
+  ],
+  "indexes_count": 120,
+  "triggers_count": 53,
+  "triggers": [
+    {
+      "table": "assignments",
+      "trigger": "trg_01_assignments_before_insert",
+      "function": "trg_assignments_before_insert",
+      "def": "CREATE TRIGGER trg_01_assignments_before_insert BEFORE INSERT ON assignments FOR EACH ROW EXECUTE FUNCTION trg_assignments_before_insert()"
+    },
+    {
+      "table": "assignments",
+      "trigger": "trg_01_assignments_before_update",
+      "function": "trg_assignments_before_update",
+      "def": "CREATE TRIGGER trg_01_assignments_before_update BEFORE UPDATE ON assignments FOR EACH ROW EXECUTE FUNCTION trg_assignments_before_update()"
+    },
+    {
+      "table": "assignments",
+      "trigger": "trg_50_assignments_after_insert",
+      "function": "trg_assignments_after_insert",
+      "def": "CREATE TRIGGER trg_50_assignments_after_insert AFTER INSERT ON assignments FOR EACH ROW EXECUTE FUNCTION trg_assignments_after_insert()"
+    },
+    {
+      "table": "assignments",
+      "trigger": "trg_50_assignments_after_update",
+      "function": "trg_assignments_after_update",
+      "def": "CREATE TRIGGER trg_50_assignments_after_update AFTER UPDATE ON assignments FOR EACH ROW EXECUTE FUNCTION trg_assignments_after_update()"
+    },
+    {
+      "table": "assignments",
+      "trigger": "trg_90_assignments_updated_at",
+      "function": "set_updated_at",
+      "def": "CREATE TRIGGER trg_90_assignments_updated_at BEFORE UPDATE ON assignments FOR EACH ROW EXECUTE FUNCTION set_updated_at()"
+    },
+    {
+      "table": "assignments",
+      "trigger": "trg_95_assignments_audit",
+      "function": "trg_audit_row",
+      "def": "CREATE TRIGGER trg_95_assignments_audit AFTER INSERT OR UPDATE ON assignments FOR EACH ROW EXECUTE FUNCTION trg_audit_row()"
+    },
+    {
+      "table": "attendance",
+      "trigger": "trg_01_attendance_before_insert",
+      "function": "trg_attendance_before_insert",
+      "def": "CREATE TRIGGER trg_01_attendance_before_insert BEFORE INSERT ON attendance FOR EACH ROW EXECUTE FUNCTION trg_attendance_before_insert()"
+    },
+    {
+      "table": "attendance",
+      "trigger": "trg_01_attendance_guard",
+      "function": "trg_attendance_guard",
+      "def": "CREATE TRIGGER trg_01_attendance_guard BEFORE UPDATE ON attendance FOR EACH ROW EXECUTE FUNCTION trg_attendance_guard()"
+    },
+    {
+      "table": "attendance",
+      "trigger": "trg_90_attendance_updated_at",
+      "function": "set_updated_at",
+      "def": "CREATE TRIGGER trg_90_attendance_updated_at BEFORE UPDATE ON attendance FOR EACH ROW EXECUTE FUNCTION set_updated_at()"
+    },
+    {
+      "table": "attendance",
+      "trigger": "trg_95_attendance_audit",
+      "function": "trg_audit_row",
+      "def": "CREATE TRIGGER trg_95_attendance_audit AFTER INSERT OR UPDATE ON attendance FOR EACH ROW EXECUTE FUNCTION trg_audit_row('checkin_latitude', 'checkin_longitude')"
+    },
+    {
+      "table": "attendance_geo_attempts",
+      "trigger": "trg_01_geo_attempts_guard",
+      "function": "trg_geo_attempts_guard",
+      "def": "CREATE TRIGGER trg_01_geo_attempts_guard BEFORE UPDATE ON attendance_geo_attempts FOR EACH ROW EXECUTE FUNCTION trg_geo_attempts_guard()"
+    },
+    {
+      "table": "attendance_geo_attempts",
+      "trigger": "trg_01_geo_attempts_no_delete",
+      "function": "trg_block_mutation",
+      "def": "CREATE TRIGGER trg_01_geo_attempts_no_delete BEFORE DELETE ON attendance_geo_attempts FOR EACH ROW EXECUTE FUNCTION trg_block_mutation()"
+    },
+    {
+      "table": "audit_logs",
+      "trigger": "trg_01_audit_append_only",
+      "function": "trg_block_mutation",
+      "def": "CREATE TRIGGER trg_01_audit_append_only BEFORE DELETE OR UPDATE ON audit_logs FOR EACH ROW EXECUTE FUNCTION trg_block_mutation()"
+    },
+    {
+      "table": "audit_logs",
+      "trigger": "trg_01_audit_no_truncate",
+      "function": "trg_block_mutation",
+      "def": "CREATE TRIGGER trg_01_audit_no_truncate BEFORE TRUNCATE ON audit_logs FOR EACH STATEMENT EXECUTE FUNCTION trg_block_mutation()"
+    },
+    {
+      "table": "auth_otp",
+      "trigger": "trg_01_otp_rate_limit",
+      "function": "trg_otp_rate_limit",
+      "def": "CREATE TRIGGER trg_01_otp_rate_limit BEFORE INSERT ON auth_otp FOR EACH ROW EXECUTE FUNCTION trg_otp_rate_limit()"
+    },
+    {
+      "table": "auth_otp_challenge",
+      "trigger": "trg_01_auth_otp_challenge_guard",
+      "function": "trg_auth_otp_challenge_before",
+      "def": "CREATE TRIGGER trg_01_auth_otp_challenge_guard BEFORE INSERT OR UPDATE ON auth_otp_challenge FOR EACH ROW EXECUTE FUNCTION trg_auth_otp_challenge_before()"
+    },
+    {
+      "table": "coordinator_profiles",
+      "trigger": "trg_01_coordinator_guard",
+      "function": "trg_coordinator_guard",
+      "def": "CREATE TRIGGER trg_01_coordinator_guard BEFORE INSERT OR UPDATE ON coordinator_profiles FOR EACH ROW EXECUTE FUNCTION trg_coordinator_guard()"
+    },
+    {
+      "table": "coordinator_profiles",
+      "trigger": "trg_90_coordinator_profiles_updated_at",
+      "function": "set_updated_at",
+      "def": "CREATE TRIGGER trg_90_coordinator_profiles_updated_at BEFORE UPDATE ON coordinator_profiles FOR EACH ROW EXECUTE FUNCTION set_updated_at()"
+    },
+    {
+      "table": "coordinator_profiles",
+      "trigger": "trg_95_coordinator_profiles_audit",
+      "function": "trg_audit_row",
+      "def": "CREATE TRIGGER trg_95_coordinator_profiles_audit AFTER INSERT OR UPDATE ON coordinator_profiles FOR EACH ROW EXECUTE FUNCTION trg_audit_row()"
+    },
+    {
+      "table": "event_applications",
+      "trigger": "trg_01_applications_before_insert",
+      "function": "trg_applications_before_insert",
+      "def": "CREATE TRIGGER trg_01_applications_before_insert BEFORE INSERT ON event_applications FOR EACH ROW EXECUTE FUNCTION trg_applications_before_insert()"
+    },
+    {
+      "table": "event_applications",
+      "trigger": "trg_01_applications_before_update",
+      "function": "trg_applications_before_update",
+      "def": "CREATE TRIGGER trg_01_applications_before_update BEFORE UPDATE ON event_applications FOR EACH ROW EXECUTE FUNCTION trg_applications_before_update()"
+    },
+    {
+      "table": "event_applications",
+      "trigger": "trg_50_applications_after",
+      "function": "trg_applications_after",
+      "def": "CREATE TRIGGER trg_50_applications_after AFTER INSERT OR UPDATE ON event_applications FOR EACH ROW EXECUTE FUNCTION trg_applications_after()"
+    },
+    {
+      "table": "event_applications",
+      "trigger": "trg_90_event_applications_updated_at",
+      "function": "set_updated_at",
+      "def": "CREATE TRIGGER trg_90_event_applications_updated_at BEFORE UPDATE ON event_applications FOR EACH ROW EXECUTE FUNCTION set_updated_at()"
+    },
+    {
+      "table": "event_applications",
+      "trigger": "trg_95_applications_audit",
+      "function": "trg_audit_row",
+      "def": "CREATE TRIGGER trg_95_applications_audit AFTER INSERT OR UPDATE ON event_applications FOR EACH ROW EXECUTE FUNCTION trg_audit_row()"
+    },
+    {
+      "table": "event_coordinator_history",
+      "trigger": "trg_01_coord_history_append_only",
+      "function": "trg_block_mutation",
+      "def": "CREATE TRIGGER trg_01_coord_history_append_only BEFORE DELETE OR UPDATE ON event_coordinator_history FOR EACH ROW EXECUTE FUNCTION trg_block_mutation()"
+    },
+    {
+      "table": "event_posts",
+      "trigger": "trg_01_posts_guard",
+      "function": "trg_posts_guard",
+      "def": "CREATE TRIGGER trg_01_posts_guard BEFORE INSERT OR UPDATE ON event_posts FOR EACH ROW EXECUTE FUNCTION trg_posts_guard()"
+    },
+    {
+      "table": "event_posts",
+      "trigger": "trg_90_event_posts_updated_at",
+      "function": "set_updated_at",
+      "def": "CREATE TRIGGER trg_90_event_posts_updated_at BEFORE UPDATE ON event_posts FOR EACH ROW EXECUTE FUNCTION set_updated_at()"
+    },
+    {
+      "table": "event_posts",
+      "trigger": "trg_95_event_posts_audit",
+      "function": "trg_audit_row",
+      "def": "CREATE TRIGGER trg_95_event_posts_audit AFTER INSERT OR UPDATE ON event_posts FOR EACH ROW EXECUTE FUNCTION trg_audit_row()"
+    },
+    {
+      "table": "events",
+      "trigger": "trg_01_events_before_insert",
+      "function": "trg_events_before_insert",
+      "def": "CREATE TRIGGER trg_01_events_before_insert BEFORE INSERT ON events FOR EACH ROW EXECUTE FUNCTION trg_events_before_insert()"
+    },
+    {
+      "table": "events",
+      "trigger": "trg_01_events_before_update",
+      "function": "trg_events_before_update",
+      "def": "CREATE TRIGGER trg_01_events_before_update BEFORE UPDATE ON events FOR EACH ROW EXECUTE FUNCTION trg_events_before_update()"
+    },
+    {
+      "table": "events",
+      "trigger": "trg_50_events_after_insert",
+      "function": "trg_events_after_insert",
+      "def": "CREATE TRIGGER trg_50_events_after_insert AFTER INSERT ON events FOR EACH ROW EXECUTE FUNCTION trg_events_after_insert()"
+    },
+    {
+      "table": "events",
+      "trigger": "trg_50_events_after_update",
+      "function": "trg_events_after_update",
+      "def": "CREATE TRIGGER trg_50_events_after_update AFTER UPDATE ON events FOR EACH ROW EXECUTE FUNCTION trg_events_after_update()"
+    },
+    {
+      "table": "events",
+      "trigger": "trg_90_events_updated_at",
+      "function": "set_updated_at",
+      "def": "CREATE TRIGGER trg_90_events_updated_at BEFORE UPDATE ON events FOR EACH ROW EXECUTE FUNCTION set_updated_at()"
+    },
+    {
+      "table": "events",
+      "trigger": "trg_95_events_audit",
+      "function": "trg_audit_row",
+      "def": "CREATE TRIGGER trg_95_events_audit AFTER INSERT OR UPDATE ON events FOR EACH ROW EXECUTE FUNCTION trg_audit_row()"
+    },
+    {
+      "table": "feedback",
+      "trigger": "trg_01_feedback_guard",
+      "function": "trg_feedback_guard",
+      "def": "CREATE TRIGGER trg_01_feedback_guard BEFORE INSERT OR UPDATE ON feedback FOR EACH ROW EXECUTE FUNCTION trg_feedback_guard()"
+    },
+    {
+      "table": "feedback",
+      "trigger": "trg_95_feedback_audit",
+      "function": "trg_audit_row",
+      "def": "CREATE TRIGGER trg_95_feedback_audit AFTER INSERT OR UPDATE ON feedback FOR EACH ROW EXECUTE FUNCTION trg_audit_row()"
+    },
+    {
+      "table": "moderation_actions",
+      "trigger": "trg_01_moderation_append_only",
+      "function": "trg_block_mutation",
+      "def": "CREATE TRIGGER trg_01_moderation_append_only BEFORE DELETE OR UPDATE ON moderation_actions FOR EACH ROW EXECUTE FUNCTION trg_block_mutation()"
+    },
+    {
+      "table": "moderation_actions",
+      "trigger": "trg_01_moderation_before_insert",
+      "function": "trg_moderation_before_insert",
+      "def": "CREATE TRIGGER trg_01_moderation_before_insert BEFORE INSERT ON moderation_actions FOR EACH ROW EXECUTE FUNCTION trg_moderation_before_insert()"
+    },
+    {
+      "table": "moderation_actions",
+      "trigger": "trg_50_moderation_after_insert",
+      "function": "trg_moderation_after_insert",
+      "def": "CREATE TRIGGER trg_50_moderation_after_insert AFTER INSERT ON moderation_actions FOR EACH ROW EXECUTE FUNCTION trg_moderation_after_insert()"
+    },
+    {
+      "table": "moderation_actions",
+      "trigger": "trg_95_moderation_audit",
+      "function": "trg_audit_row",
+      "def": "CREATE TRIGGER trg_95_moderation_audit AFTER INSERT ON moderation_actions FOR EACH ROW EXECUTE FUNCTION trg_audit_row()"
+    },
+    {
+      "table": "onboarding_acknowledgments",
+      "trigger": "trg_01_onboarding_append_only",
+      "function": "trg_block_mutation",
+      "def": "CREATE TRIGGER trg_01_onboarding_append_only BEFORE DELETE OR UPDATE ON onboarding_acknowledgments FOR EACH ROW EXECUTE FUNCTION trg_block_mutation()"
+    },
+    {
+      "table": "onboarding_acknowledgments",
+      "trigger": "trg_01_onboarding_before_insert",
+      "function": "trg_onboarding_before_insert",
+      "def": "CREATE TRIGGER trg_01_onboarding_before_insert BEFORE INSERT ON onboarding_acknowledgments FOR EACH ROW EXECUTE FUNCTION trg_onboarding_before_insert()"
+    },
+    {
+      "table": "qr_tokens",
+      "trigger": "trg_01_qr_guard",
+      "function": "trg_qr_guard",
+      "def": "CREATE TRIGGER trg_01_qr_guard BEFORE INSERT OR UPDATE ON qr_tokens FOR EACH ROW EXECUTE FUNCTION trg_qr_guard()"
+    },
+    {
+      "table": "qr_tokens",
+      "trigger": "trg_95_qr_tokens_audit",
+      "function": "trg_audit_row",
+      "def": "CREATE TRIGGER trg_95_qr_tokens_audit AFTER INSERT OR UPDATE ON qr_tokens FOR EACH ROW EXECUTE FUNCTION trg_audit_row()"
+    },
+    {
+      "table": "user_verification_images",
+      "trigger": "trg_01_vimg_guard",
+      "function": "trg_vimg_guard",
+      "def": "CREATE TRIGGER trg_01_vimg_guard BEFORE INSERT OR UPDATE ON user_verification_images FOR EACH ROW EXECUTE FUNCTION trg_vimg_guard()"
+    },
+    {
+      "table": "user_verification_images",
+      "trigger": "trg_50_vimg_after",
+      "function": "trg_vimg_after",
+      "def": "CREATE TRIGGER trg_50_vimg_after AFTER INSERT OR UPDATE ON user_verification_images FOR EACH ROW EXECUTE FUNCTION trg_vimg_after()"
+    },
+    {
+      "table": "user_verification_images",
+      "trigger": "trg_90_user_verification_images_updated_at",
+      "function": "set_updated_at",
+      "def": "CREATE TRIGGER trg_90_user_verification_images_updated_at BEFORE UPDATE ON user_verification_images FOR EACH ROW EXECUTE FUNCTION set_updated_at()"
+    },
+    {
+      "table": "user_verification_images",
+      "trigger": "trg_95_verification_images_audit",
+      "function": "trg_audit_row",
+      "def": "CREATE TRIGGER trg_95_verification_images_audit AFTER INSERT OR UPDATE ON user_verification_images FOR EACH ROW EXECUTE FUNCTION trg_audit_row()"
+    },
+    {
+      "table": "users",
+      "trigger": "trg_01_users_guard",
+      "function": "trg_users_guard",
+      "def": "CREATE TRIGGER trg_01_users_guard BEFORE INSERT OR UPDATE ON users FOR EACH ROW EXECUTE FUNCTION trg_users_guard()"
+    },
+    {
+      "table": "users",
+      "trigger": "trg_90_users_updated_at",
+      "function": "set_updated_at",
+      "def": "CREATE TRIGGER trg_90_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION set_updated_at()"
+    },
+    {
+      "table": "users",
+      "trigger": "trg_95_users_audit",
+      "function": "trg_audit_row",
+      "def": "CREATE TRIGGER trg_95_users_audit AFTER INSERT OR UPDATE ON users FOR EACH ROW EXECUTE FUNCTION trg_audit_row()"
+    },
+    {
+      "table": "volunteer_availability_exceptions",
+      "trigger": "trg_95_availability_exceptions_audit",
+      "function": "trg_audit_row",
+      "def": "CREATE TRIGGER trg_95_availability_exceptions_audit AFTER INSERT OR UPDATE ON volunteer_availability_exceptions FOR EACH ROW EXECUTE FUNCTION trg_audit_row()"
+    },
+    {
+      "table": "volunteer_availability_rules",
+      "trigger": "trg_95_availability_rules_audit",
+      "function": "trg_audit_row",
+      "def": "CREATE TRIGGER trg_95_availability_rules_audit AFTER INSERT OR UPDATE ON volunteer_availability_rules FOR EACH ROW EXECUTE FUNCTION trg_audit_row()"
+    }
+  ],
+  "tags_are_normalized_live_def": "CREATE OR REPLACE FUNCTION public.tags_are_normalized(tags text[])\n RETURNS boolean\n LANGUAGE sql\n IMMUTABLE\nAS $function$\n    SELECT COALESCE(cardinality(tags) <= 30, FALSE)\n       AND NOT EXISTS (\n            SELECT 1 FROM unnest(tags) AS t(tag)\n             WHERE t.tag IS NULL\n                OR t.tag = ''\n                OR t.tag <> lower(btrim(t.tag))\n                OR char_length(t.tag) > 50)\n$function$\n",
+  "row_counts": {
+    "app_settings": 7,
+    "assignments": 1075,
+    "attendance": 1075,
+    "attendance_geo_attempts": 2,
+    "audit_logs": 10795,
+    "auth_group": 0,
+    "auth_group_permissions": 0,
+    "auth_otp": 12,
+    "auth_otp_challenge": 12,
+    "auth_permission": 156,
+    "authtoken_token": 189,
+    "charity_fields": 13,
+    "coordinator_profiles": 122,
+    "django_admin_log": 0,
+    "django_content_type": 39,
+    "django_migrations": 31,
+    "django_session": 15,
+    "event_applications": 1078,
+    "event_charity_fields": 338,
+    "event_coordinator_history": 198,
+    "event_posts": 475,
+    "events": 189,
+    "feedback": 281,
+    "moderation_actions": 12,
+    "onboarding_acknowledgments": 789,
+    "qr_tokens": 5,
+    "user_charity_interests": 1583,
+    "user_verification_images": 79,
+    "users": 742,
+    "volunteer_availability_exceptions": 298,
+    "volunteer_availability_rules": 1367
+  },
+  "invariants": {
+    "dup_users_uuid": 0,
+    "orphaned_coordinators": 0,
+    "orphaned_event_posts": 0,
+    "orphaned_applications": 0,
+    "orphaned_assignments": 0,
+    "orphaned_attendance": 0
+  },
+  "ai_views": {
+    "v_public_events": true,
+    "v_event_summary": true,
+    "v_event_post_capacity": true,
+    "v_accepted_unassigned": true,
+    "v_pending_confirmations": true,
+    "v_event_checkin_board": true,
+    "v_geo_attempts_review": true
+  }
+}

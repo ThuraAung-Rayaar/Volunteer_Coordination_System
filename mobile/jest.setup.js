@@ -22,6 +22,12 @@ jest.mock('@maplibre/maplibre-react-native', () => {
     Map: (props) => React.createElement(View, { testID: 'maplibre-map', ...props }, props.children),
     Camera: (props) => React.createElement(View, { testID: 'maplibre-camera', ...props }, props.children),
     Marker: (props) => React.createElement(View, { testID: 'maplibre-marker', ...props }, props.children),
+    LogManager: {
+      setLogLevel: jest.fn(),
+      onLog: jest.fn(),
+      start: jest.fn(),
+      stop: jest.fn(),
+    },
   };
 }, { virtual: true });
 

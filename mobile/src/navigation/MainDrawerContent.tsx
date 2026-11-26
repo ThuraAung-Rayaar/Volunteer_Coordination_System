@@ -12,8 +12,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { DrawerContentComponentProps } from '@react-navigation/drawer';
 import { useCurrentUser } from '../app/UserContext';
-import { isMockMode } from '../app/configuration/dataMode';
-import { AppIcon, AppText, IconName, StatusBadge } from '../shared';
+import { isOfflineMode } from '../app/configuration/dataMode';
+import { AppIcon, AppText, IconName, StatusBadge, VcsLogo } from '../shared';
 import { hexToRgba, useAppTheme } from '../theme';
 import type { RouteName } from './routeNames';
 
@@ -26,7 +26,7 @@ interface DrawerItemConfig {
 const MAIN_ITEMS: DrawerItemConfig[] = [
   { name: 'Dashboard', label: 'Dashboard', icon: 'home' },
   { name: 'Events', label: 'Events', icon: 'compass' },
-  { name: 'Friends', label: 'Friends', icon: 'user' },
+  { name: 'Assistant', label: 'AI Assistant', icon: 'spark' },
 ];
 
 const ACCOUNT_ITEMS: DrawerItemConfig[] = [
@@ -55,7 +55,7 @@ export function MainDrawerContent({
 }: DrawerContentComponentProps): React.JSX.Element {
   const insets = useSafeAreaInsets();
   const { theme, isDark } = useAppTheme();
-  const { currentUser, isCoordinator, switchUserPreset } = useCurrentUser();
+  const { currentUser, isCoordinator } = useCurrentUser();
 
   const currentRouteName = state.routes[state.index]?.name;
 
@@ -136,18 +136,20 @@ export function MainDrawerContent({
           },
         ]}
       >
-        <View
-          style={[
-            styles.avatarSquircle,
-            {
-              backgroundColor: hexToRgba(theme.colors.primary, isDark ? 0.22 : 0.12),
-              borderColor: hexToRgba(theme.colors.primary, 0.25),
-              borderRadius: 16,
-              marginBottom: 10,
-            },
-          ]}
-        >
-          <AppIcon name="user" size={24} color={theme.colors.primary} />
+        <View style={styles.headerTopRow}>
+          <View
+            style={[
+              styles.avatarSquircle,
+              {
+                backgroundColor: hexToRgba(theme.colors.primary, isDark ? 0.22 : 0.12),
+                borderColor: hexToRgba(theme.colors.primary, 0.25),
+                borderRadius: 16,
+              },
+            ]}
+          >
+            <AppIcon name="user" size={24} color={theme.colors.primary} />
+          </View>
+          <VcsLogo size={34} showRing={false} />
         </View>
 
         <AppText variant="title" weight="extrabold" color={theme.colors.textPrimary}>
@@ -166,6 +168,9 @@ export function MainDrawerContent({
           <StatusBadge status="emerald" label="Active Volunteer" />
           {isCoordinator ? (
             <StatusBadge status="sky" label="Approved Coordinator" />
+          ) : null}
+          {isOfflineMode() ? (
+            <StatusBadge status="amber" label="Offline Cache" />
           ) : null}
         </View>
       </View>
@@ -229,86 +234,6 @@ export function MainDrawerContent({
           {PREFERENCE_ITEMS.map(renderDrawerItem)}
         </View>
       </ScrollView>
-
-      {/* Bottom QA Profile Switcher — Mock mode only */}
-      {typeof __DEV__ !== 'undefined' && __DEV__ && isMockMode() ? (
-        <View
-          style={[
-            styles.footerSection,
-            {
-              borderTopColor: theme.colors.border,
-              backgroundColor: theme.colors.surfaceRaised,
-              padding: 14,
-            },
-          ]}
-        >
-          <AppText
-            variant="eyebrow"
-            color={theme.colors.muted}
-            style={styles.qaFooterLabel}
-          >
-            QA DEMO PROFILE SWITCHER
-          </AppText>
-
-          <View style={styles.qaButtonsRow}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Switch to ordinary volunteer"
-              onPress={() => switchUserPreset('volunteer')}
-              style={[
-                styles.qaButton,
-                {
-                  backgroundColor: !isCoordinator
-                    ? theme.colors.primary
-                    : theme.colors.surface,
-                  borderColor: theme.colors.border,
-                  borderRadius: 10,
-                },
-              ]}
-            >
-              <AppText
-                variant="label"
-                weight="bold"
-                color={
-                  !isCoordinator
-                    ? '#FFFFFF'
-                    : theme.colors.textPrimary
-                }
-              >
-                Volunteer
-              </AppText>
-            </Pressable>
-
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Switch to approved coordinator"
-              onPress={() => switchUserPreset('coordinator')}
-              style={[
-                styles.qaButton,
-                {
-                  backgroundColor: isCoordinator
-                    ? theme.colors.primary
-                    : theme.colors.surface,
-                  borderColor: theme.colors.border,
-                  borderRadius: 10,
-                },
-              ]}
-            >
-              <AppText
-                variant="label"
-                weight="bold"
-                color={
-                  isCoordinator
-                    ? '#FFFFFF'
-                    : theme.colors.textPrimary
-                }
-              >
-                Coordinator
-              </AppText>
-            </Pressable>
-          </View>
-        </View>
-      ) : null}
     </View>
   );
 }
@@ -319,6 +244,12 @@ const styles = StyleSheet.create({
   },
   headerSection: {
     borderBottomWidth: 1,
+  },
+  headerTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
   },
   avatarSquircle: {
     width: 48,

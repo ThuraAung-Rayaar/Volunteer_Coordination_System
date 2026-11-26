@@ -1,0 +1,53 @@
+{  
+  "runtime": {
+    "environment": "development",
+    "debug": false,
+    "allowed_hosts": ["localhost", "127.0.0.1"],
+    "cors_allow_all_origins": false,
+    "cors_allowed_origins": []
+  },
+  "consumer_ui": {
+    "dev_options_enabled": false,
+    "runtime_flags_path": ".local/runtime_flags.json"
+  },
+  "security": {
+    "django_secret_key": "",
+    "phone_hash_hmac_secret": "",
+    "otp_code_hmac_secret": "",
+    "auth_session_token_secret": "",
+    "phone_encryption_key": "",
+    "verification_image_encryption_key": "",
+    "verification_image_key_id": "v1",
+    "verification_image_keyring": {}
+  },
+  "database": {
+    "engine": "django.db.backends.postgresql",
+    "name": "volunteer_coordination_db",
+    "user": "postgres",
+    "password": "",
+    "host": "127.0.0.1",
+    "port": "5432"
+  },
+  "maps": {
+    "carto_api_key": "",
+    "tile_url_template": ""
+  },
+  "ai": {
+    "enabled": true,
+    "provider": "mock",
+    "model": "gemini-3.5-flash-lite",
+    "api_key": "",
+    "timeout_seconds": 45,
+    "ollama_base_url": "http://127.0.0.1:11434",
+    "ollama_keep_alive": "5m",
+    "max_output_tokens": 800,
+    "rate_limit_per_minute": 20
+  },
+  "auth": {
+    "allow_dev_code_in_auth_response": false,
+    "otp_delivery_enabled": false,
+    "otp_delivery_provider": "console",
+    "otp_code_length": 6,
+    "admin_bootstrap_password": ""
+  }
+}

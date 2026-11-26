@@ -4,9 +4,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  KeyboardAvoidingView,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,7 +12,6 @@ import {
 } from 'react-native';
 import type { ProfileRepository } from '../../../data/contracts/profileRepository';
 import { defaultProfileRepository } from '../../../data/mock/MockProfileRepository';
-import { isMockMode } from '../../../app/configuration/dataMode';
 import { useRepositories } from '../../../app/RepositoryProvider';
 import type {
   AvailabilityException,
@@ -33,6 +30,7 @@ import {
   EmptyState,
   ErrorState,
   FilterChip,
+  KeyboardLiftView,
   LoadingState,
   ScreenContainer,
   SectionHeader,
@@ -536,8 +534,8 @@ export function AvailabilityScreen({
         animationType="fade"
         onRequestClose={() => setIsRuleModalVisible(false)}
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        <KeyboardLiftView
+          inModal
           style={styles.scrimBackdrop}
         >
           <View
@@ -828,17 +826,17 @@ export function AvailabilityScreen({
                 </View>
                 <View style={styles.actionBtnWrap}>
                   <AppButton
-                    label={isMockMode() ? 'Save Rule (Demo)' : 'Save Rule'}
+                    label="Save Rule"
                     variant="primary"
                     leftIcon="check"
-                    accessibilityLabel={isMockMode() ? 'Add Rule (Demo)' : 'Add Rule'}
+                    accessibilityLabel="Add Rule"
                     onPress={handleSaveWeeklyRule}
                   />
                 </View>
               </View>
             </ScrollView>
           </View>
-        </KeyboardAvoidingView>
+        </KeyboardLiftView>
       </Modal>
 
       {/* Add Date Exception Bottom Sheet */}
@@ -848,8 +846,8 @@ export function AvailabilityScreen({
         animationType="fade"
         onRequestClose={() => setIsExceptionModalVisible(false)}
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        <KeyboardLiftView
+          inModal
           style={styles.scrimBackdrop}
         >
           <View
@@ -1005,17 +1003,17 @@ export function AvailabilityScreen({
                 </View>
                 <View style={styles.actionBtnWrap}>
                   <AppButton
-                    label={isMockMode() ? 'Save Exception (Demo)' : 'Save Exception'}
+                    label="Save Exception"
                     variant="primary"
                     leftIcon="check"
-                    accessibilityLabel={isMockMode() ? 'Save Exception (Demo)' : 'Save Exception'}
+                    accessibilityLabel="Save Exception"
                     onPress={handleSaveException}
                   />
                 </View>
               </View>
             </ScrollView>
           </View>
-        </KeyboardAvoidingView>
+        </KeyboardLiftView>
       </Modal>
 
       {/* Interactive Date Picker Modal */}

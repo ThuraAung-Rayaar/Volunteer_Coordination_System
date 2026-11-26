@@ -2,6 +2,8 @@
  * @format
  */
 
+export const DEFAULT_BFF_PORT = 8000;
+
 export interface ApiConfig {
   baseUrl: string;
   apiPrefix: string;
@@ -10,26 +12,19 @@ export interface ApiConfig {
 
 /**
  * Host presets for development workflows:
- * - USB_DEVICE: For actual physical devices connected via USB cable.
- *   Using `adb reverse tcp:8000 tcp:8000`, the phone can route directly to the host PC's
- *   port 8000 over USB without needing Wi-Fi or changing local IP addresses.
- * - ANDROID_EMULATOR: For Android Studio QEMU Virtual Devices (AVD).
- * - IOS_SIMULATOR: For iOS simulators running on macOS host.
+ * - USB_DEVICE: Physical devices connected via USB (`adb reverse tcp:8000 tcp:8000`),
+ *   iOS simulator, or local desktop loopback.
+ * - ANDROID_EMULATOR: Android Studio QEMU Virtual Devices (AVD).
+ * - IOS_SIMULATOR: iOS simulators running on macOS host.
  */
 export const API_HOST_PRESETS = {
-  USB_DEVICE: 'http://localhost:8000',
-  ANDROID_EMULATOR: 'http://10.0.2.2:8000',
-  IOS_SIMULATOR: 'http://localhost:8000',
+  USB_DEVICE: `http://localhost:${DEFAULT_BFF_PORT}`,
+  ANDROID_EMULATOR: `http://10.0.2.2:${DEFAULT_BFF_PORT}`,
+  IOS_SIMULATOR: `http://localhost:${DEFAULT_BFF_PORT}`,
 } as const;
 
 export type ApiHostPreset = 'usb' | 'emulator';
 
-/**
- * Resolves the default base host depending on platform and workflow.
- * Defaults to 'http://localhost:8000' so physical Android devices over USB
- * (with `adb reverse tcp:8000 tcp:8000`), iOS simulators, and web work immediately
- * without requiring Wi-Fi LAN setup.
- */
 function getDefaultBaseHost(): string {
   return API_HOST_PRESETS.USB_DEVICE;
 }
@@ -44,9 +39,53 @@ let currentConfig: ApiConfig = { ...DEFAULT_CONFIG };
 const apiConfigListeners = new Set<(config: ApiConfig) => void>();
 
 /**
- * Subscribes to API configuration updates.
- * Returns an unsubscribe callback.
+ * Normalizes a user-supplied host or URL into a clean http(s)://host:port origin.
  */
+export function normalizeBaseUrlInput(rawInput: string, defaultPort: number = DEFAULT_BFF_PORT): string {
+  const trimmed = rawInput.trim().replace(/\/+$/, '');
+  if (!trimmed) {
+    return getDefaultBaseHost();
+  }
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed;
+  }
+  if (/^\d+$/.test(trimmed)) {
+    return `http://localhost:${trimmed}`;
+  }
+  if (trimmed.includes(':')) {
+    return `http://${trimmed}`;
+  }
+  return `http://${trimmed}:${defaultPort}`;
+}
+
+/**
+ * Builds prioritized candidate BFF base URLs for automatic localhost/emulator discovery.
+ */
+export function buildCandidateBaseUrls(
+  port: number = DEFAULT_BFF_PORT,
+  preferredBaseUrl?: string,
+): string[] {
+  const safePort = Number.isFinite(port) && port > 0 ? Math.floor(port) : DEFAULT_BFF_PORT;
+  const candidates: string[] = [];
+
+  const pushUnique = (url?: string) => {
+    if (!url) return;
+    const normalized = url.trim().replace(/\/+$/, '');
+    if (normalized && !candidates.includes(normalized)) {
+      candidates.push(normalized);
+    }
+  };
+
+  if (preferredBaseUrl) {
+    pushUnique(normalizeBaseUrlInput(preferredBaseUrl, safePort));
+  }
+  pushUnique(`http://localhost:${safePort}`);
+  pushUnique(`http://10.0.2.2:${safePort}`);
+  pushUnique(`http://127.0.0.1:${safePort}`);
+
+  return candidates;
+}
+
 export function addApiConfigListener(
   listener: (config: ApiConfig) => void,
 ): () => void {
@@ -56,16 +95,10 @@ export function addApiConfigListener(
   };
 }
 
-/**
- * Returns current API configuration.
- */
 export function getApiConfig(): ApiConfig {
   return { ...currentConfig };
 }
 
-/**
- * Updates partial or full API configuration and notifies subscribers.
- */
 export function setApiConfig(overrides: Partial<ApiConfig>): void {
   currentConfig = {
     ...currentConfig,
@@ -80,9 +113,6 @@ export function setApiConfig(overrides: Partial<ApiConfig>): void {
   });
 }
 
-/**
- * Convenience helper to switch between USB device and emulator host presets.
- */
 export function setApiHostPreset(preset: ApiHostPreset): void {
   setApiConfig({
     baseUrl:
@@ -92,9 +122,13 @@ export function setApiHostPreset(preset: ApiHostPreset): void {
   });
 }
 
-/**
- * Resets API configuration to platform defaults and notifies subscribers.
- */
+export function setApiPort(port: number): void {
+  const safePort = Number.isFinite(port) && port > 0 ? Math.floor(port) : DEFAULT_BFF_PORT;
+  const match = currentConfig.baseUrl.match(/^(https?:\/\/[^:/]+)(?::\d+)?/i);
+  const hostPrefix = match ? match[1] : 'http://localhost';
+  setApiConfig({ baseUrl: `${hostPrefix}:${safePort}` });
+}
+
 export function resetApiConfig(): void {
   currentConfig = { ...DEFAULT_CONFIG };
   apiConfigListeners.forEach(listener => {
@@ -106,20 +140,11 @@ export function resetApiConfig(): void {
   });
 }
 
-/**
- * Builds a normalized, absolute URL for a given BFF endpoint path.
- * Guarantees exactly one leading slash on prefix and endpoint without duplicate slashes.
- *
- * Example:
- * buildApiUrl('/events/') -> "http://10.0.2.2:8000/api/v1/events/"
- * buildApiUrl('auth/otp/request/') -> "http://10.0.2.2:8000/api/v1/auth/otp/request/"
- */
 export function buildApiUrl(endpointPath: string, config: ApiConfig = currentConfig): string {
   const normalizedBase = config.baseUrl.replace(/\/+$/, '');
   const prefix = config.apiPrefix ? `/${config.apiPrefix.replace(/^\/+|\/+$/g, '')}` : '';
   const cleanPath = endpointPath.startsWith('/') ? endpointPath : `/${endpointPath}`;
 
-  // If path already starts with the prefix, don't duplicate it
   if (prefix && cleanPath.startsWith(prefix)) {
     return `${normalizedBase}${cleanPath}`;
   }

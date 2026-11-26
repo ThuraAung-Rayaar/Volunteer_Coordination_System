@@ -1,49 +1,64 @@
 # Volunteer HR Management System — System Documentation Portal
 
-> **Current Version:** v0.10.0 (Release-Ready)  
-> **Last Updated:** 2026-11-16  
+> **Current Version:** v0.12.2+ (AI Assistant, QueryCache & New-Laptop Bootstrap)  
+> **Last Updated:** 2026-11-26  
 > **Target Repository:** `python_stack/`  
+> **Active Branch:** `feature/ai-chat-cache-ml-insights`
 
 ---
 
 ## 1. System Architecture Overview
 
-The **Volunteer HR Management System (CommonGround / Workshift)** is an enterprise-grade volunteer coordination platform consisting of three unified tiers:
+The **Volunteer HR Management System (CommonGround / Workshift / VCS)** is an enterprise-grade volunteer coordination platform consisting of three unified tiers plus a centralized Root Dependency Injection & Console Orchestration layer:
 
 ```mermaid
 flowchart TD
-    subgraph ClientTier["Mobile Client Tier (mobile/)"]
-        RN["React Native 0.88.1 / React 19.3"]
-        NAV["17-Screen Drawer Navigator"]
-        DM["DataMode Router: 'mock' | 'http'"]
-        CORE["Core API & Session Transport"]
+    subgraph Bootstrap["Setup & Dependency Injection"]
+        STATUS["scripts/check_system_status.py -> SYSTEM_STATUS.md"]
+        DI["config_di.py <- di_config.local.json"]
+        DB_SETUP["postgres_sql/manage_database.py -> SEEDED_CREDENTIALS.txt"]
     end
 
-    subgraph BackendTier["Django BFF Tier (backend/)"]
-        DRF["Django 5.1 / DRF 3.15"]
-        BFF["BFF Routers (/api/v1/)"]
+    subgraph ClientTier["Mobile Client Tier (mobile/)"]
+        RN["React Native 0.88.1 / React 19.3 / TS 6.0"]
+        NAV["Drawer Navigator (incl. AssistantScreen & Islands)"]
+        CACHE["QueryCache + Offline Cache"]
+        DM["DataMode Router: 'mock' | 'http'"]
+        CORE["Core API & Tokenized Auth Handshake"]
+    end
+
+    subgraph BackendTier["Django BFF & AI Tier (backend/)"]
+        DRF["Django 5.1 / DRF 3.15.2"]
+        BFF["BFF Routers (/api/v1/ & /api/bff/mobile/)"]
+        AI["Database-First AI Assistant (Mock / Gemini / Ollama)"]
         ADM["Admin Portal Web UI & APIs"]
-        SRV["19 Business Logic Services"]
-        MAP_ENG["Self-Hosted Map Tile Engine"]
+        SRV["22 Business Logic Services"]
+        MAP_ENG["Self-Hosted MBTiles Map Tile Engine"]
     end
 
     subgraph DatabaseTier["PostgreSQL Engine Tier (postgres_sql/)"]
-        PG["PostgreSQL 18+ with btree_gist"]
-        TRIG["Stored Procedures & Triggers"]
-        VIEWS["Read-Only Optimized Views"]
-        AUDIT["Audit & Moderation Logs"]
+        PG["PostgreSQL 18.6 (VCS_db.sql + btree_gist + uuidv7)"]
+        SEED["postgres_sql/seedlings/ (Yangon Demo + AI Cohort)"]
+        TRIG["Stored Procedures, Guards & Audit Triggers"]
+        VIEWS["11 Read-Only Optimized Views"]
     end
 
+    DI --> BFF
+    DI --> DB_SETUP
     RN --> NAV
-    NAV --> DM
+    NAV --> CACHE
+    CACHE --> DM
     DM -->|'http' mode| CORE
     CORE -->|REST API / Token Auth| BFF
     BFF --> SRV
+    BFF --> AI
     ADM --> SRV
+    AI --> SRV
     SRV -->|psycopg3 / Raw SQL Functions| PG
+    DB_SETUP --> PG
+    DB_SETUP --> SEED
     PG --> TRIG
     PG --> VIEWS
-    PG --> AUDIT
 ```
 
 ---
@@ -52,111 +67,75 @@ flowchart TD
 
 | Subsystem | Version / Stack | Implementation Status | Quality & Verification Metrics |
 |---|---|---|---|
-| **Database Engine** | PostgreSQL 18+ (`postgres_sql/`) | **100% Complete (v0.6.0)** | 22 tables, 14 DB views, 28 stored functions/triggers, full `self_test.sql` coverage. |
-| **Backend & BFF** | Django 5.1 / DRF 3.15 (`backend/`) | **100% Complete (v0.6.0)** | 19 service modules, 5 Django apps, OpenAPI 3.0 schema (206 KB), 11 Admin Web UI templates, unified URL dispatching (`/api/v1/`). |
-| **Mobile Client** | React Native 0.88.1 / TS 6.0 (`mobile/`) | **100% Complete (v0.10.0)** | 17 Drawer screens, Dual-Mode (`mock`/`http`), Core API transport, TokenStore, DTOs & Mappers, HTTP Repositories, 0 type errors, **28 test suites / 365 tests passing (100%)**. |
-| **BFF Integration** | React Native ↔ Django BFF | **100% Complete (Phases 0–9)** | Zero DB changes, zero backend changes, zero external dependencies, strict DRF allow-list compliance. |
+| **Database Engine** | PostgreSQL 18.6 (`postgres_sql/VCS_db.sql`) | **Frozen & Verified (v0.12.0)** | 31 base tables (23 domain + 8 Django), 11 public views, 53 triggers, `btree_gist`, native `uuidv7()`, organized `postgres_sql/seedlings/`. |
+| **Backend & BFF** | Django 5.1 / DRF 3.15.2 (`backend/`) | **Complete** | 22 service modules, `/api/v1/` & `/api/bff/mobile/` routes, tokenized OTP handshake, AES-256-GCM image streaming, self-hosted MBTiles tile proxy. |
+| **AI & ML Layer** | `backend/ai/`, `recommendation_service.py`, `staffing_insight_service.py` | **Complete & Smoke-Tested** | Database-first / LLM-second assistant (`Mock`, `Gemini`, `Ollama`), versioned prompts (`vcs.shared.v2`), deterministic fallback, PII redaction. |
+| **Mobile Client** | React Native 0.88.1 / React 19.3 / TS 6.0 (`mobile/`) | **Complete** | 25+ feature screens (incl. `AssistantScreen`), Dual-Mode (`mock`/`http`), `QueryCache`, offline cache, startup permission policy, **0 TypeScript errors, 46 suites / 658 tests passing**. |
+| **New-Laptop Bootstrap & DI** | `config_di.py`, `di_config.local.json`, `postgres_sql/`, `scripts/` | **Complete** | Automated readiness probe (`SYSTEM_STATUS.md`), true DI JSON generator, unified `postgres_sql/manage_database.py` (DB creation, schema, migrations & mandatory Yangon + 500-user AI cohort seedlings -> `SEEDED_CREDENTIALS.txt`). |
 
 ---
 
-## 3. Documentation Suite Index
+## 3. New-Laptop Setup & Startup Playbook
 
-This directory (`docs/`) contains comprehensive deep-dive analyses and verification audits for each system layer:
-
-### Core System Documents
-- [docs/mobile_analysis.md](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/docs/mobile_analysis.md)  
-  *Complete architectural breakdown of the React Native client: technology stack, design system, component primitives, navigation structure, domain business rules, dual-mode networking, DTOs & mappers, HTTP repositories, and the 28-suite test suite.*
-
-- [docs/backend_analysis.md](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/docs/backend_analysis.md)  
-  *In-depth reference for the Django backend: project configuration, settings, PostgreSQL connection pooling, apps and models, 19 service modules, BFF endpoints, Admin Portal, OpenAPI schema, and URL routing.*
-
-- [docs/database_deep_dive.md](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/docs/database_deep_dive.md)  
-  *Exhaustive catalog of the PostgreSQL database schema: entity-relationship diagrams, all 22 tables, stored procedures, triggers, state machines, view models, maintenance routines, and seed data.*
-
-- [docs/mobile_bff_database_connectivity_audit.md](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/docs/mobile_bff_database_connectivity_audit.md)  
-  *Detailed audit and gap analysis of Mobile Client ↔ Django BFF ↔ PostgreSQL connectivity: event loading, event declaration, event creation, updates, volunteer acceptance, synchronization, full 38-capability scan, and map/geolocation preparation.*
-
-### Baseline & Integration Audits (`docs/baseline/`)
-- [docs/baseline/v0_10_0_phase_0_discovery_and_baseline_report.md](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/docs/baseline/v0_10_0_phase_0_discovery_and_baseline_report.md)  
-  *Phase 0 baseline discovery and freeze report documenting test baseline, pre-existing type errors, and non-invasive enforcement rules.*
-
-- [docs/baseline/v0_10_0_implementation_feasibility_report.md](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/docs/baseline/v0_10_0_implementation_feasibility_report.md)  
-  *Pre-execution feasibility audit identifying technical precautions, serializer query parameter mappings (`starts_after`, `starts_before`, `upcoming`), and contract freezing.*
-
-- [docs/baseline/v0_10_0_final_completion_summary.md](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/docs/baseline/v0_10_0_final_completion_summary.md)  
-  *Executive summary and phase-by-phase delivery matrix for all 10 integration phases (Phases 0–9), test suite metrics, and verification results.*
-
----
-
-## 4. Subsystems Summary
-
-### 4.1 Database Layer (`postgres_sql/`)
-- **Schema Engine:** PostgreSQL 18+ with `btree_gist` extension for exclusion constraints and native `uuidv7()`.
-- **Key Tables:** `users`, `events`, `event_posts`, `event_applications`, `coordinator_assignments`, `attendance`, `attendance_geo_attempts`, `qr_tokens`, `audit_logs`.
-- **Core Stored Logic:** Stored functions manage auto-assignment algorithms, geofence Haversine calculations, coordinator handover with owner-as-monitor constraints, and rating updates.
-- **Data Privacy:** Raw phone numbers are strictly hashed (HMAC) and AES encrypted; volunteer contact details and physical capability profiles are shielded behind T2 privacy gates.
-
-### 4.2 Backend & BFF Layer (`backend/`)
-- **Framework:** Django 5.1 with Django REST Framework 3.15.2.
-- **Architecture:** Unmanaged Django models (`managed = False`) mapped to PostgreSQL tables and views; all business logic concentrated in `services/`.
-- **BFF Endpoints:** Mounted at `/api/v1/`, `/api/bff/mobile/`, and `/api/`:
-  - `auth/`: OTP request, verification, token issuance, logout.
-  - `volunteer/`: Public event search, charity taxonomies, user profile allow-list, availability rules, application submit/withdraw.
-  - `checkin/`: Onboarding briefing & acknowledgment, QR tokens, GPS geo check-in, checkout, event feedback.
-  - `coordinator/`: Coordinator application, metrics, event CRUD & lifecycle transitions, applicant review, auto/manual post assignment, attendance roster.
-- **Admin Portal:** Web UI (`/admin-dashboard/`) with 11 HTML template views for administrative approvals, moderation, and system settings.
-
-### 4.3 Mobile Client Layer (`mobile/`)
-- **Framework:** React Native 0.88.1, React 19.3, TypeScript 6.0.
-- **Dual-Mode Data Architecture:**
-  - `DataMode = 'mock'`: Uses in-memory repositories with realistic simulated delays and offline fixtures.
-  - `DataMode = 'http'`: Communicates with live Django BFF endpoints via `ApiClient` and HTTP repositories.
-- **Navigation Shell:** Custom 17-screen Drawer Navigation with role-based screen mounting (Volunteer vs Coordinator) and QA demo persona switcher.
-- **Quality Gates:** 0 TypeScript compiler errors (`npx tsc --noEmit`), 28 test suites / 365 tests passing (100%).
-
----
-
-## 5. Quickstart & Verification Playbook
-
-### 5.1 Mobile Client Verification
+### Step 1: Check System Prerequisites (`SYSTEM_STATUS.md`)
 ```powershell
-# Navigate to mobile subproject
-cd mobile
+python scripts\check_system_status.py
+```
+Inspects Python, `.venv`, pip packages, PostgreSQL 18+, Node.js `>= 22.11.0`, React Native `0.88.1`, JDK 17/21, Android Studio/SDK/NDK/ADB/AVDs, `di_config.local.json`, and `map/*.mbtiles`, reporting exact satisfaction percentage and refreshing [SYSTEM_STATUS.md](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/SYSTEM_STATUS.md).
 
-# Run TypeScript static typechecking (Enforces 0 errors)
+### Step 2: Install Python & Mobile Dependencies (Fresh Machine)
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r backend\requirements\local.txt
+
+cd mobile
+npm ci
+cd ..
+```
+
+### Step 3: Create True Dependency Injection Config (`di_config.local.json`)
+```powershell
+.\.venv\Scripts\python.exe scripts\setup_di_config.py --interactive
+```
+Creates the gitignored root [di_config.local.json](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/di_config.local.json) (instead of relying on [di_config.example.json](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/di_config.example.json)) with database settings, map keys/tile templates, AI provider/API keys, runtime flags, and 6 distinct cryptographic secrets.
+
+### Step 4: Create, Structure & Seed Local PostgreSQL Database (`SEEDED_CREDENTIALS.txt`)
+```powershell
+.\.venv\Scripts\python.exe postgres_sql\manage_database.py
+```
+Prompts for your local PostgreSQL username and password (`localhost` / `127.0.0.1`), creates `volunteer_coordination_db`, applies [VCS_db.sql](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/postgres_sql/VCS_db.sql), runs Django migrations, seeds [postgres_sql/seedlings/](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/postgres_sql/seedlings/README.md) re-keyed to your active DI secrets (with optional 500-user/150-event AI cohort via `--with-ai-cohort`), and writes rich Super Admin, Admin, Coordinator, and Volunteer credentials to `SEEDED_CREDENTIALS.txt` at the root.
+
+### Step 5: Launch Backend, Metro & Android App (3 Terminals)
+See [docs/NEW_LAPTOP_WINDOWS_SETUP_GUIDE.md](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/docs/NEW_LAPTOP_WINDOWS_SETUP_GUIDE.md) for the complete Windows setup & 3-terminal launch commands (`backend\manage.py runserver 0.0.0.0:8000`, `cd mobile && npm start`, and `npm run android` or `npm run android:device`).
+
+---
+
+## 4. Documentation Suite Index
+
+- [docs/V0_CLIENT_PROTOTYPE_FINAL_ANALYSIS.md](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/docs/V0_CLIENT_PROTOTYPE_FINAL_ANALYSIS.md) — Version 0 (v0) client prototype final analysis, flow audit, and live verification matrix.
+- [docs/NEW_LAPTOP_WINDOWS_SETUP_GUIDE.md](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/docs/NEW_LAPTOP_WINDOWS_SETUP_GUIDE.md) — Clean Windows laptop installation guide (downloads, Windows environment variables, DI config, DB setup, and 3-terminal launch).
+- [docs/README.md](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/docs/README.md) — Authoritative documentation portal index.
+- [SYSTEM_STATUS.md](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/SYSTEM_STATUS.md) — Live environment readiness & dependency matrix for this machine.
+- [docs/backend_analysis.md](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/docs/backend_analysis.md) — Django 5.1 backend, AI/BFF routes, 22 services, and security.
+- [docs/mobile_analysis.md](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/docs/mobile_analysis.md) — React Native 0.88.1 client, DDD layers, Assistant, and QueryCache.
+- [docs/full_database_details.md](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/docs/full_database_details.md) — PostgreSQL 18.6 schema catalog (`postgres_sql/VCS_db.sql`).
+- [docs/ai_ml_integration.md](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/docs/ai_ml_integration.md) — AI Assistant, ML Recommendations, Staffing Insights, and QueryCache.
+- [docs/tokenization_login_architecture.md](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/docs/tokenization_login_architecture.md) — Zero-PII tokenized OTP handshake state machine.
+- [docs/VCS_PROTOTYPE_RUNBOOK_2026-11-26.md](file:///c:/Users/USER/Documents/INTERN/Project/Volunteer_HR_Management/python_stack/docs/VCS_PROTOTYPE_RUNBOOK_2026-11-26.md) — Prototype startup, verification, and demo runbook.
+
+---
+
+## 5. Verification Quick Commands
+
+```powershell
+# Backend check & targeted AI/analytics tests
+.\.venv\Scripts\python.exe backend\manage.py check
+.\.venv\Scripts\python.exe backend\manage.py test ai.tests bff.coordinator.tests.test_staffing_insight bff.volunteer.tests.test_recommendations --noinput
+
+# Mobile TypeScript & Jest suite (from mobile/)
+cd mobile
 npx tsc --noEmit
-
-# Run Jest unit and integration test suites
-npm test -- --watchAll=false
-```
-
-### 5.2 Running the Mobile App
-```powershell
-cd mobile
-
-# Start Metro Bundler
-npx react-native start
-
-# Run on Android Emulator (points to http://10.0.2.2:8000/api/v1)
-npx react-native run-android
-```
-
-### 5.3 Backend Development Server
-```powershell
-# Activate Python virtual environment
-.venv\Scripts\Activate.ps1
-
-# Start Django development server
-python backend/manage.py runserver 0.0.0.0:8000
-
-# Access Swagger interactive API documentation
-# http://127.0.0.1:8000/api/docs/
-```
-
-### 5.4 Database Verification
-```powershell
-# Execute PostgreSQL self-test suite
-psql -U postgres -d volunteer_coordination_db -f postgres_sql/self_test.sql
+npm test -- --runInBand
 ```
 
 ---

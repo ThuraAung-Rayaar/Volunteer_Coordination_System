@@ -10,7 +10,6 @@ import {
 } from 'react-native';
 import type { ProfileRepository } from '../../../data/contracts/profileRepository';
 import { defaultProfileRepository } from '../../../data/mock/MockProfileRepository';
-import { isMockMode } from '../../../app/configuration/dataMode';
 import { useRepositories } from '../../../app/RepositoryProvider';
 import { CHARITY_CATEGORIES, CharityCategoryCode } from '../../../domain/models/event';
 import type {
@@ -250,11 +249,7 @@ export function ProfileEditScreen({
 
       if (result.success && result.data) {
         setProfile(result.data);
-        setFeedbackBanner(
-          isMockMode()
-            ? `Profile saved in local mock state (${result.message})`
-            : result.message,
-        );
+        setFeedbackBanner(result.message);
         if (navigation?.navigate) {
           navigation.navigate('Profile');
         } else if (navigation?.goBack) {

@@ -11,7 +11,10 @@ import {
   View,
 } from 'react-native';
 import { CoordinatorRepository } from '../../../data/contracts/coordinatorRepository';
-import { defaultCoordinatorRepository } from '../../../data/mock/MockCoordinatorRepository';
+import {
+  defaultCoordinatorRepository,
+  MockCoordinatorRepository,
+} from '../../../data/mock/MockCoordinatorRepository';
 import { useRepositories } from '../../../app/RepositoryProvider';
 import { isMockMode } from '../../../app/configuration/dataMode';
 import type {
@@ -29,6 +32,7 @@ import {
   AppText,
   EmptyState,
   FilterChip,
+  KeyboardLiftView,
   LoadingState,
   SectionHeader,
   StatusBadge,
@@ -82,12 +86,13 @@ export function CoordinatorAssignmentsScreen({
       setIsLoading(true);
       try {
         const evList = await repo.getMyEvents();
+        const isMockRepo = isMockMode() || repo instanceof MockCoordinatorRepository;
         const operationalEvents = evList.filter(
           e =>
             e.status !== 'cancelled' &&
             e.status !== 'completed' &&
             e.status !== 'ended' &&
-            (isMockMode() || !e.endAt || new Date(e.endAt).getTime() >= Date.now()),
+            (isMockRepo || !e.endAt || new Date(e.endAt).getTime() >= Date.now()),
         );
         setEvents(operationalEvents);
 
@@ -260,12 +265,12 @@ export function CoordinatorAssignmentsScreen({
           style={styles.autoAssignDesc}
         >
           Post matching, group sizing, and capacity rules are evaluated by
-          server-authoritative functions. Preview auto-placement locally.
+          server-authoritative functions.
         </AppText>
 
         <View style={styles.autoAssignButtonWrapper}>
           <AppButton
-            label="Run Auto-Assignment (Demo Preview)"
+            label="Run Auto-Assignment"
             variant="primary"
             loading={isProcessing}
             disabled={isMonitorMode || unassignedApps.length === 0}
@@ -489,27 +494,30 @@ export function CoordinatorAssignmentsScreen({
         ) : isLoading ? (
           <LoadingState label="Loading shift assignments..." />
         ) : (
-          <FlatList
-            data={displayAssignments}
-            keyExtractor={item => item.id}
-            ListHeaderComponent={renderHeader}
-            renderItem={({ item }) => (
-              <AssignmentRow
-                assignment={item}
-                isMonitorMode={isMonitorMode}
-                onCancelAssignment={handleCancelAssignment}
-              />
-            )}
-            contentContainerStyle={styles.listContent}
-            ListEmptyComponent={
-              activeTab === 'assigned' ? (
-                <EmptyState
-                  title="No Assignments Found"
-                  description="No volunteers have been assigned to shifts yet."
+          <KeyboardLiftView>
+            <FlatList
+              data={displayAssignments}
+              keyExtractor={item => item.id}
+              keyboardShouldPersistTaps="handled"
+              ListHeaderComponent={renderHeader}
+              renderItem={({ item }) => (
+                <AssignmentRow
+                  assignment={item}
+                  isMonitorMode={isMonitorMode}
+                  onCancelAssignment={handleCancelAssignment}
                 />
-              ) : undefined
-            }
-          />
+              )}
+              contentContainerStyle={styles.listContent}
+              ListEmptyComponent={
+                activeTab === 'assigned' ? (
+                  <EmptyState
+                    title="No Assignments Found"
+                    description="No volunteers have been assigned to shifts yet."
+                  />
+                ) : undefined
+              }
+            />
+          </KeyboardLiftView>
         )}
 
         <CoordinatorDynamicIsland

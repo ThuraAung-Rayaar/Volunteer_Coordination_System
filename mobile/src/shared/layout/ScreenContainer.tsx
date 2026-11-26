@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '../../theme';
+import { KeyboardLiftView } from '../components/KeyboardLiftView';
 
 export interface ScreenContainerProps extends ViewProps {
   children: React.ReactNode;
@@ -71,21 +72,23 @@ export function ScreenContainer({
 
   if (scroll) {
     return (
-      <ScrollView
-        style={[styles.container, dynamicBaseStyle, insetsStyle, style]}
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingHorizontal: 16, paddingVertical: 12 },
-          contentContainerStyle,
-        ]}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="none"
-        onScrollBeginDrag={handleScrollBeginDrag}
-        {...restProps}
-      >
-        {children}
-      </ScrollView>
+      <KeyboardLiftView style={styles.container}>
+        <ScrollView
+          style={[styles.container, dynamicBaseStyle, insetsStyle, style]}
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingHorizontal: 16, paddingVertical: 12 },
+            contentContainerStyle,
+          ]}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="none"
+          onScrollBeginDrag={handleScrollBeginDrag}
+          {...restProps}
+        >
+          {children}
+        </ScrollView>
+      </KeyboardLiftView>
     );
   }
 

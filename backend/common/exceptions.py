@@ -391,7 +391,12 @@ def custom_exception_handler(exc, context):
 
     if response is not None:
         if hasattr(response, "data"):
-            detail = response.data.get("detail", response.data)
+            from common.runtime_config import is_consumer_only_mode
+
+            if isinstance(response.data, dict):
+                detail = response.data.get("detail", response.data)
+            else:
+                detail = response.data
             if isinstance(detail, list):
                 detail = "; ".join(str(d) for d in detail)
             elif isinstance(detail, dict):
@@ -403,10 +408,18 @@ def custom_exception_handler(exc, context):
                         messages.append(f"{field}: {errors}")
                 detail = "; ".join(messages)
 
+            error_code = getattr(exc, "code", getattr(exc, "default_code", "validation_error"))
+            safe_message = str(detail)
+            if is_consumer_only_mode():
+                if response.status_code >= 500:
+                    safe_message = "We could not process that right now. Please try again shortly."
+                elif response.status_code == 400 and (":" in safe_message or ";" in safe_message):
+                    safe_message = "Please review the entered details and try again."
+
             response.data = {
                 "error": {
-                    "code": getattr(exc, "code", getattr(exc, "default_code", "validation_error")),
-                    "message": str(detail),
+                    "code": error_code,
+                    "message": safe_message,
                 }
             }
         return response
@@ -424,8 +437,14 @@ def custom_exception_handler(exc, context):
             status=domain_error.status_code,
         )
 
+    from common.runtime_config import is_consumer_only_mode
     logger.exception("Unhandled exception in view: %s", context.get("view", "unknown"))
+    consumer_msg = (
+        "Something needs another try. Please refresh or try again shortly."
+        if is_consumer_only_mode()
+        else "An unexpected error occurred."
+    )
     return Response(
-        {"error": {"code": "internal_error", "message": "An unexpected error occurred."}},
+        {"error": {"code": "internal_error", "message": consumer_msg}},
         status=status.HTTP_500_INTERNAL_SERVER_ERROR,
     )

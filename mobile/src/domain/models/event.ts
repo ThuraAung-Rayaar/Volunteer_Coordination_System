@@ -80,6 +80,8 @@ export interface EventSummary {
   status: EventStatus;
   locationName: string;
   landmarkText?: string;
+  latitude?: number;
+  longitude?: number;
   startAt: string;
   endAt: string;
   applicationDeadline?: string;
@@ -168,4 +170,21 @@ export interface VolunteerAssignmentItem {
     | 'expected'
     | 'cancelled';
   verifiedHours?: number;
+}
+
+export interface RecommendedEvent {
+  event: {
+    eventId: number;
+    title: string;
+    startAt: string | null;
+    endAt: string | null;
+    locationName: string;
+    charityFields: string[];
+    spotsRemaining?: number;
+  };
+  matchScore: number;
+  matchLabel: 'strong' | 'moderate' | 'exploratory';
+  reasons: string[];
+  matchedPostIds: number[];
+  policyVersion: string;
 }

@@ -18,7 +18,7 @@ from django.http import (
 )
 from django.shortcuts import redirect
 from drf_spectacular.utils import extend_schema
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import AllowAny
 
 from common.map_engine import (
@@ -36,6 +36,7 @@ from .views import _guard_admin_html
 @extend_schema(exclude=True)
 @api_view(["GET"])
 @permission_classes([AllowAny])
+@throttle_classes([])
 def map_catalog_api_view(request) -> JsonResponse:
     """
     Catalog discovery endpoint returning metadata, zoom bounds, and
@@ -49,6 +50,7 @@ def map_catalog_api_view(request) -> JsonResponse:
 @extend_schema(exclude=True)
 @api_view(["GET"])
 @permission_classes([AllowAny])
+@throttle_classes([])
 def map_style_api_view(request) -> JsonResponse:
     """Return a MapLibre-compatible raster style backed by the VCS tile proxy."""
     tile_base = request.build_absolute_uri("/api/v1/maps/tiles/")
@@ -80,6 +82,7 @@ def map_style_api_view(request) -> JsonResponse:
 @extend_schema(exclude=True)
 @api_view(["GET", "HEAD"])
 @permission_classes([AllowAny])
+@throttle_classes([])
 def map_tile_proxy_view(request, z: int, x: int, y: int) -> HttpResponse:
     """
     Slippy-map tile proxy endpoint. Serves from local MBTiles first;
