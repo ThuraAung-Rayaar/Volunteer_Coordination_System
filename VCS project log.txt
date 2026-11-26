@@ -1,4 +1,3 @@
-VCS project log
 ============================
 cmd to run the project
 -----------------
@@ -15,27 +14,6 @@ cd mobile
 npm run reverse
 # Equivalent to: adb reverse tcp:8081 tcp:8081 && adb reverse tcp:8000 tcp:8000
 
-npx react-native run-android --device=RFCR71P2BKE
+npx react-native run-android --device={device code}
 
 ==========================
-high priority improvement
-------------
-
-after the http mode is okay , need to make the mobile backend to memorize some event detail for offline mode usability , enabling sqllite query within phone , than can replace template mode with  this offline version , 
-
-than make an automatic transfer control between http protocols and offline mode
-
-
-==================
-Task to do
-----------
-
-need to make localhost runtime within same wifi : not included
-
-
-need to clean up the project.
-need to bundle up to make sure the project can be restarted in new device vis git pull than installing all necessary programs , extension , etc..., than successfuly run the project
-
------------
-
-1
